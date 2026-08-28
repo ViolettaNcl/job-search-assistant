@@ -1,0 +1,22 @@
+# Never send local build outputs or secrets into Docker build context.
+**/bin/
+**/obj/
+
+# Local secrets / environment files.
+.env
+.env.*
+!.env.example
+
+# Source-control and editor metadata.
+.git/
+.vs/
+.vscode/
+.idea/
+
+# Test / coverage artifacts.
+TestResults/
+coverage/
+
+# Local user-specific files.
+*.user
+*.suo
