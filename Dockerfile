@@ -9,5 +9,4 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app/publish .
 EXPOSE 8080
-ENV ASPNETCORE_URLS=http://+:8080
-ENTRYPOINT ["dotnet","JobSearchAssistant.dll"]
+CMD ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet JobSearchAssistant.dll"]
