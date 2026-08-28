@@ -1,0 +1,15 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore src/JobSearchAssistant/JobSearchAssistant.csproj
+      - run: dotnet build src/JobSearchAssistant/JobSearchAssistant.csproj -c Release --no-restore
+      - run: dotnet test tests/JobSearchAssistant.Tests/JobSearchAssistant.Tests.csproj -c Release

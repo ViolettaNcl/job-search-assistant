@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jobassistant
+      POSTGRES_USER: jobassistant
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-now}
+    volumes:
+      - jobassistant_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobassistant -d jobassistant"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__Postgres: Host=db;Port=5432;Database=jobassistant;Username=jobassistant;Password=${POSTGRES_PASSWORD:-change-me-now}
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
+      Telegram__AllowedChatId: ${TELEGRAM_ALLOWED_CHAT_ID:-0}
+      HH__Enabled: ${HH_ENABLED:-true}
+      HH__ClientId: ${HH_CLIENT_ID:-}
+      HH__ClientSecret: ${HH_CLIENT_SECRET:-}
+      HH__RedirectUri: ${HH_REDIRECT_URI:-http://localhost:8080/api/hh/oauth/callback}
+      Remotive__Enabled: ${REMOTIVE_ENABLED:-true}
+      Adzuna__Enabled: ${ADZUNA_ENABLED:-false}
+      Adzuna__AppId: ${ADZUNA_APP_ID:-}
+      Adzuna__AppKey: ${ADZUNA_APP_KEY:-}
+      Adzuna__CountryCodes__0: us
+      Adzuna__CountryCodes__1: gb
+      Adzuna__CountryCodes__2: de
+      Adzuna__CountryCodes__3: ca
+      Adzuna__CountryCodes__4: au
+      Adzuna__CountryCodes__5: fr
+      Adzuna__CountryCodes__6: nl
+      Adzuna__CountryCodes__7: pl
+      Security__EncryptionKeyBase64: ${ENCRYPTION_KEY_BASE64}
+      Security__EnableAutomaticSubmission: ${ENABLE_AUTOMATIC_SUBMISSION:-false}
+    volumes:
+      - jobassistant_keys:/app/keys
+
+volumes:
+  jobassistant_pg:
+  jobassistant_keys:
