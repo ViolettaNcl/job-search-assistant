@@ -36,7 +36,7 @@ public sealed class HhClient(
 
     public async Task<IReadOnlyList<string>> SearchIdsAsync(string query, string experience, CancellationToken ct)
     {
-        var client = CreateClient();
+        var client = CreateClient(await TryGetAccessTokenAsync(ct));
         var url = $"/vacancies?text={Uri.EscapeDataString(query)}&schedule=remote&experience={experience}&per_page=50&page=0&order_by=publication_time";
         using var response = await client.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
