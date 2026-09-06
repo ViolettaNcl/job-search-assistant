@@ -29,6 +29,15 @@ public sealed class ApplicationQuestionServiceTests
     }
 
     [TestMethod]
+    public void EuImmigrationCaseSponsorship_IsNo()
+    {
+        var result = Resolve("Germany", new ExtensionFieldInput("f1", "Will you now or in the future require us to commence an immigration case to employ you?", "select", "", ["Yes", "No"]));
+        var field = result.Fields.Single();
+        Assert.AreEqual("fill", field.Action);
+        Assert.AreEqual("No", field.Value);
+    }
+
+    [TestMethod]
     public void CommercialYears_AreNeverInvented()
     {
         var result = Resolve("Germany", new ExtensionFieldInput("f1", "How many years of commercial experience do you have?", "number", "", null));
@@ -45,10 +54,26 @@ public sealed class ApplicationQuestionServiceTests
     }
 
     [TestMethod]
+    public void Pronouns_AreNotAutoFilled()
+    {
+        var result = Resolve("Cyprus", new ExtensionFieldInput("f1", "Pronouns", "select", "", ["She/her", "He/him"]));
+        Assert.AreEqual("blocked", result.Fields.Single().Action);
+    }
+
+    [TestMethod]
     public void DateOfBirth_IsBlocked()
     {
         var result = Resolve("Cyprus", new ExtensionFieldInput("f1", "Date of birth", "date", "", null));
         Assert.AreEqual("blocked", result.Fields.Single().Action);
+    }
+
+    [TestMethod]
+    public void GreenhouseVerificationCode_IsBlocked()
+    {
+        var result = Resolve("Germany", new ExtensionFieldInput("f1", "Security Code - confirm you are not a robot", "text", "", null));
+        var field = result.Fields.Single();
+        Assert.AreEqual("blocked", field.Action);
+        Assert.AreEqual("verification", field.MemoryKey);
     }
 
     [TestMethod]
@@ -57,6 +82,42 @@ public sealed class ApplicationQuestionServiceTests
         var result = Resolve("Cyprus", new ExtensionFieldInput("f1", "Company name", "text", "", null));
         Assert.AreEqual("review", result.Fields.Single().Action);
         Assert.IsNull(result.Fields.Single().Value);
+    }
+
+    [TestMethod]
+    public void LeverCurrentCompany_IsReviewed()
+    {
+        var result = Resolve("Cyprus", new ExtensionFieldInput("f1", "Current company", "text", "", null));
+        Assert.AreEqual("review", result.Fields.Single().Action);
+        Assert.AreEqual("employer", result.Fields.Single().MemoryKey);
+    }
+
+    [TestMethod]
+    public void AshbyPlainName_IsCandidateFullName()
+    {
+        var result = Resolve("Cyprus", new ExtensionFieldInput("f1", "Name", "text", "", null));
+        var field = result.Fields.Single();
+        Assert.AreEqual("fill", field.Action);
+        Assert.AreEqual("Violetta Nicolaou", field.Value);
+    }
+
+    [TestMethod]
+    public void AtsAutocompleteCurrentLocation_IsReviewed()
+    {
+        var result = Resolve("Cyprus", new ExtensionFieldInput("f1", "Current location", "combobox", "", null));
+        var field = result.Fields.Single();
+        Assert.AreEqual("review", field.Action);
+        Assert.AreEqual("location", field.MemoryKey);
+        StringAssert.Contains(field.Reason, "Autocomplete");
+    }
+
+    [TestMethod]
+    public void NormalCurrentLocationText_IsSafelyFilled()
+    {
+        var result = Resolve("Cyprus", new ExtensionFieldInput("f1", "Current location", "text", "", null));
+        var field = result.Fields.Single();
+        Assert.AreEqual("fill", field.Action);
+        Assert.AreEqual("Volgograd, Russia", field.Value);
     }
 
     [TestMethod]
@@ -115,7 +176,7 @@ public sealed class ApplicationQuestionServiceTests
         var request = new ResolveApplicationFieldsRequest(
             "Russia", "ru", "", "",
             new Dictionary<string, string> { ["salary"] = "100000" },
-            [new ExtensionFieldInput("f1", "Salary expectation", "number", "", null)]);
+            [new ExtensionFieldInput("f1", "Desired pay", "number", "", null)]);
 
         var field = _sut.Resolve(request).Fields.Single();
         Assert.AreEqual("review", field.Action);
