@@ -21,7 +21,7 @@ function vjaMakeReadinessRow(item) {
 
   const badge = document.createElement("span");
   badge.className = "readinessBadge";
-  badge.textContent = item.action === "blocked" ? "Manual only" : "Review";
+  badge.textContent = item.action === "blocked" ? "Manual only" : item.currentValuePresent ? "Verify" : "Review";
 
   const label = document.createElement("strong");
   label.textContent = item.label;
@@ -103,7 +103,34 @@ function vjaRenderSubmissionReadiness() {
   node.append(disclaimer);
 }
 
+async function vjaRecheckSubmissionReadiness() {
+  const button = document.getElementById("recheckForm");
+  if (!latest) return showError("Analyze the vacancy first.");
+  clearError();
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Rechecking…";
+  }
+  try {
+    await refreshFieldPlan();
+    vjaRenderSubmissionReadiness();
+    const unresolved = Number(latestPlan?.reviewCount || 0) + Number(latestPlan?.blockedCount || 0);
+    $("fillNote").textContent = unresolved
+      ? `Checklist refreshed. ${latestPlan.reviewCount || 0} fields need review and ${latestPlan.blockedCount || 0} are manual-only.`
+      : "Checklist refreshed. No unresolved fields were detected by the assistant; review the full employer form and attachment before submitting.";
+  } catch (error) {
+    showError(error?.message || String(error));
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Recheck submission checklist";
+    }
+  }
+}
+
 window.vjaRenderSubmissionReadiness = vjaRenderSubmissionReadiness;
+
+document.getElementById("recheckForm")?.addEventListener("click", vjaRecheckSubmissionReadiness);
 
 const vjaPlanNode = document.querySelector(".formPlan");
 if (vjaPlanNode) {
