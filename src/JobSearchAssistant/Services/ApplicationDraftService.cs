@@ -49,8 +49,8 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
         var missingSkills = missing.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Take(5).ToArray();
         var headline = roleKind switch
         {
-            "qa" => russian ? "Junior QA Engineer / .NET Developer" : "Junior QA Engineer / .NET Developer",
-            "support" => russian ? "Junior Technical / Implementation Engineer" : "Junior Technical / Implementation Engineer",
+            "qa" => "Junior QA Engineer / .NET Developer",
+            "support" => russian ? "Junior инженер по внедрению / технической поддержке" : "Junior Technical / Implementation Engineer",
             "fullstack" => russian ? "Junior Full-Stack .NET разработчик" : "Junior Full-Stack .NET Developer",
             _ => russian ? "Junior C# / .NET разработчик" : "Junior C# / .NET Developer"
         };
@@ -76,7 +76,7 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
             ["requiresSponsorshipRussia"] = _candidate.RussiaWorkAuthorized ? "No" : "Yes",
             ["languages"] = string.Join(", ", _candidate.FluentLanguages),
             ["commercialExperience"] = russian
-                ? "Первый официальный developer role; есть самостоятельный real-client проект, разработанный end-to-end."
+                ? "Первая официальная работа разработчиком; есть самостоятельный клиентский проект, сделанный от начала до конца."
                 : "Seeking first formal developer role; has an independent real-client project delivered end-to-end.",
             ["availability"] = "Ask candidate if the form requires an exact start date.",
             ["salary"] = "Use the vacancy range/local market; ask candidate if a binding exact figure is required."
@@ -101,34 +101,34 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
 
     private string BuildRussianShort(string company, string title, string roleKind, string[] emphasize)
     {
-        var focus = HumanList(emphasize.Take(4), "C#, ASP.NET Core и SQL");
-        return $"Здравствуйте! Увидела вакансию «{title}» в {company} и решила откликнуться, потому что задачи близки к тому, с чем я уже работаю. Мой основной стек — {focus}. Мой главный проект DentalClinic — полноценное приложение для реальной стоматологической практики, которое я делала от backend и базы данных до тестирования и деплоя. Сейчас ищу первую сильную команду, где смогу расти как {RussianRole(roleKind)}. GitHub: {_candidate.GitHubUrl}";
+        var focus = HumanListRu(emphasize.Take(4), "C#, ASP.NET Core и SQL");
+        return $"Здравствуйте! Увидела вакансию «{title}» в {company} и решила откликнуться, потому что задачи близки к тому, с чем я уже работаю. Мой основной стек — {focus}. Главный проект — DentalClinic, полноценное приложение для реальной стоматологической практики, которое я делала от серверной части и базы данных до тестирования и деплоя. Сейчас ищу первую сильную команду, где смогу расти как {RussianRole(roleKind)}. GitHub: {_candidate.GitHubUrl}";
     }
 
     private string BuildEnglishShort(string company, string title, string roleKind, string[] emphasize)
     {
-        var focus = HumanList(emphasize.Take(4), "C#, ASP.NET Core and SQL");
+        var focus = HumanListEn(emphasize.Take(4), "C#, ASP.NET Core and SQL");
         return $"Hi! I came across the {title} role at {company} and decided to apply because the work is close to what I have already been building. My strongest areas are {focus}. My main project, DentalClinic, is a real-client application that I worked on end-to-end, from the backend and database to testing and deployment. I am now looking for my first strong team where I can keep growing as a {EnglishRole(roleKind)}. GitHub: {_candidate.GitHubUrl}";
     }
 
     private string BuildRussianLetter(string company, string title, string roleKind, string[] emphasize, string[] missing)
     {
-        var focus = HumanList(emphasize.Take(5), "C#, ASP.NET Core, EF Core и SQL Server");
+        var focus = HumanListRu(emphasize.Take(5), "C#, ASP.NET Core, EF Core и SQL Server");
         var gap = missing.Length == 0
             ? ""
-            : $" С технологиями {HumanList(missing.Take(2), "из вакансии")}, с которыми у меня пока меньше практики, готова быстро разобраться — в отклике не хочу приписывать себе то, чего ещё не делала.";
+            : $" С {HumanListRu(missing.Take(2), "дополнительными технологиями из вакансии")} у меня пока меньше практики, но я готова быстро их подтянуть. Не хочу приписывать себе опыт, которого у меня ещё не было.";
 
-        return $"Здравствуйте!\n\nМеня зовут {_candidate.RussianName}. Увидела вакансию «{title}» в {company} и решила откликнуться: по задачам и стеку она очень близка к тому, чем я занимаюсь сейчас.\n\nЯ закончила обучение по специальности «Информационные системы и программирование» с дипломом с отличием. Основной стек — {focus}. Мой главный проект — DentalClinic, полноценная платформа для реальной стоматологической практики: ASP.NET Core, EF Core, SQL Server, JWT, SignalR, фоновые задачи, Docker, тесты и внешние AI-интеграции. Я работала с проектом целиком — от структуры данных и backend до интерфейса, тестирования и деплоя.\n\nПонимаю, что это будет мой первый официальный developer role, поэтому ищу команду, где смогу быстро расти, получать code review и работать с реальными production-задачами.{gap}\n\nGitHub: {_candidate.GitHubUrl}\nPortfolio: {_candidate.CvUrl}\n\nБуду рада пообщаться и, если нужно, выполнить тестовое задание.\n\n{_candidate.RussianName}";
+        return $"Здравствуйте!\n\nМеня зовут {_candidate.RussianName}. Увидела вакансию «{title}» в {company} и решила откликнуться, потому что по задачам и стеку она очень близка к тому, чем я занимаюсь сейчас.\n\nЯ закончила обучение по специальности «Информационные системы и программирование» с дипломом с отличием. Основной стек — {focus}. Мой главный проект — DentalClinic, полноценная платформа для реальной стоматологической практики: ASP.NET Core, EF Core, SQL Server, JWT, SignalR, фоновые задачи, Docker, тесты и интеграции с AI-сервисами. Я работала с проектом целиком — от структуры данных и серверной части до интерфейса, тестирования и деплоя.\n\nЭто будет моя первая официальная работа разработчиком, поэтому сейчас ищу команду, где смогу быстро расти, получать хорошую обратную связь по коду и постепенно брать на себя больше ответственности.{gap}\n\nGitHub: {_candidate.GitHubUrl}\nПортфолио: {_candidate.CvUrl}\n\nБуду рада пообщаться и, если нужно, выполнить тестовое задание.\n\n{_candidate.RussianName}";
     }
 
     private string BuildEnglishLetter(string company, string title, string roleKind, string[] emphasize, string[] missing)
     {
-        var focus = HumanList(emphasize.Take(5), "C#, ASP.NET Core, EF Core and SQL Server");
+        var focus = HumanListEn(emphasize.Take(5), "C#, ASP.NET Core, EF Core and SQL Server");
         var gap = missing.Length == 0
             ? ""
-            : $" I have less hands-on experience with {HumanList(missing.Take(2), "some of the additional tools in the description")}, so I would rather be transparent about that and learn them than overstate my background.";
+            : $" I have less hands-on experience with {HumanListEn(missing.Take(2), "some of the additional tools in the description")}, so I would rather be transparent about that and learn them than overstate my background.";
 
-        return $"Hi,\n\nI am {_candidate.Name}, and I came across the {title} opening at {company}. I decided to apply because the work is very close to what I have been building recently.\n\nI graduated with an honours programming diploma in Information Systems and Programming. My strongest areas are {focus}. My main project is DentalClinic, a full application for a real dental practice built with ASP.NET Core, EF Core, SQL Server, JWT, SignalR, background jobs, Docker, automated testing and external AI integrations. I worked across the project end-to-end, including the backend, data layer, UI, testing and deployment.\n\nI am still early in my professional developer career, and I am looking for a team where I can learn quickly, receive good code review and contribute to real production work from the start.{gap}\n\nGitHub: {_candidate.GitHubUrl}\nPortfolio: {_candidate.CvUrl}\n\nI would be happy to talk through my projects or complete a technical task if useful.\n\n{_candidate.Name}";
+        return $"Hi,\n\nMy name is {_candidate.Name}. I came across the {title} opening at {company} and decided to apply because the work is very close to what I have been building recently.\n\nI graduated with an honours programming diploma in Information Systems and Programming. My strongest areas are {focus}. My main project is DentalClinic, a full application for a real dental practice built with ASP.NET Core, EF Core, SQL Server, JWT, SignalR, background jobs, Docker, automated testing and external AI integrations. I worked across the project end-to-end, including the backend, data layer, UI, testing and deployment.\n\nI am still early in my professional developer career, and I am looking for a team where I can learn quickly, get useful code review and contribute to real production work from the start.{gap}\n\nGitHub: {_candidate.GitHubUrl}\nPortfolio: {_candidate.CvUrl}\n\nI would be happy to talk through my projects or complete a technical task if useful.\n\n{_candidate.Name}";
     }
 
     private string[] SelectEmphasis(string roleKind, string[] matched)
@@ -170,19 +170,25 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
         ? []
         : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
-    private static string HumanList(IEnumerable<string> items, string fallback)
+    private static string HumanListEn(IEnumerable<string> items, string fallback)
+        => HumanList(items, fallback, "and");
+
+    private static string HumanListRu(IEnumerable<string> items, string fallback)
+        => HumanList(items, fallback, "и");
+
+    private static string HumanList(IEnumerable<string> items, string fallback, string conjunction)
     {
         var array = items.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (array.Length == 0) return fallback;
         if (array.Length == 1) return array[0];
-        if (array.Length == 2) return $"{array[0]} and {array[1]}";
-        return $"{string.Join(", ", array[..^1])} and {array[^1]}";
+        if (array.Length == 2) return $"{array[0]} {conjunction} {array[1]}";
+        return $"{string.Join(", ", array[..^1])} {conjunction} {array[^1]}";
     }
 
     private static string RussianRole(string roleKind) => roleKind switch
     {
         "qa" => "QA-инженер",
-        "support" => "technical/implementation engineer",
+        "support" => "инженер по внедрению / технической поддержке",
         "fullstack" => "Full-Stack .NET разработчик",
         _ => ".NET разработчик"
     };
