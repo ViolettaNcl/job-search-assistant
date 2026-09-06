@@ -16,6 +16,9 @@ Version **0.2** is a review-first application autopilot for Russia and Europe. I
    - fields intentionally blocked from automation.
 6. Click **Fill safe fields**.
 7. Review anything left for you and press the website's final Submit/Apply button yourself.
+8. Click **Mark applied** after submission so the application is recorded in the Job Search Assistant CRM.
+
+**Save to tracker** can store the vacancy before you apply. Duplicate source URLs reuse the existing CRM record instead of creating repeated applications.
 
 ## ATS-aware extraction
 
@@ -47,6 +50,8 @@ Application Memory deliberately does **not** learn or reuse:
 - relocation commitments
 - years of commercial experience
 - criminal/legal declarations
+- passport/national-ID data
+- date of birth/age
 - medical/disability information
 - demographic answers
 - security-clearance declarations
@@ -96,7 +101,9 @@ After updating the extension code, click **Reload** on the extension card in `ch
 - `POST /api/extension/analyze`
 - `POST /api/extension/resolve-fields`
 - `POST /api/import/hh`
+- `POST /api/import/manual`
 - `POST /api/vacancies/{id}/apply-tailored`
+- `POST /api/vacancies/{id}/mark-applied`
 - `GET /api/vacancies/{id}/application-draft`
 
 ## Privacy model
@@ -108,7 +115,7 @@ Reusable answers saved with Application Memory remain in this Chrome profile's l
 ## Next iteration
 
 - richer Greenhouse/Lever/Ashby field adapters based on real application forms
-- application tracker import + Mark Applied for external sites
 - optional LLM provider interface for deeper company-specific wording
 - daily top-application queue
 - configurable phone/LinkedIn in the verified candidate profile after the user confirms them
+- follow-up reminders for high-value applications with no response
