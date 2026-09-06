@@ -26,6 +26,19 @@ assert.equal(normalized.matchScore, 100);
 assert.equal(normalized.language, "ru");
 assert.equal(desk.attemptNumber(normalized), 2);
 
+const malformed = desk.normalizeItem({
+  vacancyId: id2,
+  matchScore: "not-a-number",
+  businessDaysWaiting: null,
+  followUpCount: "bad",
+  priorityScore: undefined
+});
+assert.equal(malformed.matchScore, 0);
+assert.equal(malformed.businessDaysWaiting, 0);
+assert.equal(malformed.followUpCount, 0);
+assert.equal(malformed.priorityScore, 0);
+assert.equal(desk.attemptNumber({ followUpCount: "bad" }), 1);
+
 const next = desk.selectNext([
   { vacancyId: id1, title: "A", priorityScore: 90, businessDaysWaiting: 8, matchScore: 88 },
   { vacancyId: id2, title: "B", priorityScore: 96, businessDaysWaiting: 5, matchScore: 92 }
