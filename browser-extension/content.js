@@ -262,6 +262,27 @@ function customOptions(el, type) {
   return options.length ? [...new Set(options)] : null;
 }
 
+const vjaFillFailureKeys = new Set();
+
+function fillFailureKey(el, token) {
+  const label = labelFor(el);
+  const normalizer = window.vjaFieldVerification?.normalize;
+  const normalized = normalizer ? normalizer(label) : String(label || "").replace(/\s+/g, " ").trim().toLowerCase();
+  return normalized || token;
+}
+
+function markFillFailure(el, token) {
+  vjaFillFailureKeys.add(fillFailureKey(el, token));
+}
+
+function clearFillFailure(el, token) {
+  vjaFillFailureKeys.delete(fillFailureKey(el, token));
+}
+
+function hasFillFailure(el, token) {
+  return vjaFillFailureKeys.has(fillFailureKey(el, token));
+}
+
 function scanFields() {
   const fields = visibleFields().map((el, index) => {
     const token = ensureToken(el, index);
@@ -274,7 +295,8 @@ function scanFields() {
       label: labelFor(el),
       type,
       currentValue: currentValue(el),
-      options
+      options,
+      fillFailed: hasFillFailure(el, token)
     };
   });
   return {
@@ -337,11 +359,43 @@ function setFieldValue(el, value) {
   return false;
 }
 
-function applyFieldPlan(resolutions) {
+function verificationCandidates(el) {
+  const values = [currentValue(el)];
+  if (el instanceof HTMLSelectElement) {
+    const selected = el.selectedOptions?.[0];
+    if (selected) {
+      values.push(selected.value || "");
+      values.push(selected.textContent || "");
+    }
+  }
+  if (el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox") && el.checked) {
+    values.push(el.value || "");
+    values.push(labelFor(el));
+  }
+  return [...new Set(values.map(x => String(x || "").trim()).filter(Boolean))];
+}
+
+function fillPersisted(el, expected) {
+  const matcher = window.vjaFieldVerification?.matchesExpected;
+  if (!matcher) return Boolean(currentValue(el));
+  return matcher(fieldTypeFor(el), verificationCandidates(el), expected);
+}
+
+function waitForUiSettle(milliseconds = 90) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+function isRadioAlternative(el) {
+  return el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox");
+}
+
+async function applyFieldPlan(resolutions) {
   let filled = 0;
   let skippedExisting = 0;
   const review = [];
   const blocked = [];
+  const attempts = [];
+  let failed = 0;
 
   for (const item of resolutions || []) {
     const el = document.querySelector(`[data-vja-field-token="${CSS.escape(item.token)}"]`);
@@ -355,14 +409,40 @@ function applyFieldPlan(resolutions) {
       continue;
     }
     if (item.action !== "fill") continue;
-    if (currentValue(el) && !(el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox"))) {
+    if (currentValue(el) && !isRadioAlternative(el)) {
       skippedExisting++;
       continue;
     }
-    if (setFieldValue(el, item.value)) filled++;
+    if (setFieldValue(el, item.value)) {
+      attempts.push({ token: item.token, expected: item.value, element: el });
+    } else if (!isRadioAlternative(el)) {
+      markFillFailure(el, item.token);
+      failed++;
+    }
   }
 
-  return { filled, skippedExisting, review: review.length, blocked: blocked.length };
+  if (attempts.length) await waitForUiSettle();
+
+  for (const attempt of attempts) {
+    const current = document.querySelector(`[data-vja-field-token="${CSS.escape(attempt.token)}"]`);
+    const el = current || attempt.element;
+    const persisted = Boolean(current?.isConnected) && fillPersisted(el, attempt.expected);
+    if (persisted) {
+      clearFillFailure(el, attempt.token);
+      filled++;
+    } else {
+      markFillFailure(el, attempt.token);
+      failed++;
+    }
+  }
+
+  return {
+    filled,
+    failed,
+    skippedExisting,
+    review: review.length + failed,
+    blocked: blocked.length
+  };
 }
 
 function collectRememberable(resolutions) {
@@ -399,12 +479,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   try {
     if (message.type === "extractPage") sendResponse(extractPage());
     else if (message.type === "scanFields") sendResponse(scanFields());
-    else if (message.type === "applyFieldPlan") sendResponse(applyFieldPlan(message.resolutions));
+    else if (message.type === "applyFieldPlan") {
+      applyFieldPlan(message.resolutions)
+        .then(sendResponse)
+        .catch(error => sendResponse({ error: error?.message || String(error), filled: 0, failed: 0 }));
+    }
     else if (message.type === "collectRememberable") sendResponse(collectRememberable(message.resolutions));
     else if (message.type === "inspectUploads") sendResponse(inspectUploads());
     else if (message.type === "highlightCvUpload") sendResponse(highlightCvUpload(message.filename));
   } catch (error) {
-    sendResponse({ error: error?.message || String(error), filled: 0 });
+    sendResponse({ error: error?.message || String(error), filled: 0, failed: 0 });
   }
   return true;
 });

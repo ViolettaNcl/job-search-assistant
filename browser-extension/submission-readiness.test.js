@@ -1,8 +1,8 @@
 const assert = require("node:assert/strict");
 const readiness = require("./submission-readiness.js");
 
-function field(token, label, currentValue = "", type = "text") {
-  return { token, label, currentValue, type };
+function field(token, label, currentValue = "", type = "text", extra = {}) {
+  return { token, label, currentValue, type, ...extra };
 }
 
 assert.equal(readiness.build({ fields: [], uploadFields: 0 }, { fields: [] }).state, "clear");
@@ -13,6 +13,7 @@ const review = readiness.build(
 );
 assert.equal(review.state, "review");
 assert.equal(review.reviewCount, 1);
+assert.equal(review.failedCount, 0);
 assert.equal(review.items[0].label, "Work authorization");
 assert.equal(review.items[0].currentValuePresent, false);
 
@@ -22,6 +23,23 @@ const answeredReview = readiness.build(
 );
 assert.equal(answeredReview.items[0].currentValuePresent, true);
 assert.equal(answeredReview.state, "review");
+
+const failedFill = readiness.build(
+  { fields: [field("f", "Email", "", "email", { fillFailed: true })], uploadFields: 0 },
+  { fields: [{ token: "f", action: "fill", value: "violetta@example.com", memoryKey: "email", reason: "Verified email." }] }
+);
+assert.equal(failedFill.state, "review");
+assert.equal(failedFill.failedCount, 1);
+assert.equal(failedFill.reviewCount, 0);
+assert.equal(failedFill.items[0].action, "failed");
+assert.match(failedFill.items[0].reason, /did not persist|could not be verified/i);
+
+const failedFillWithCurrentValue = readiness.build(
+  { fields: [field("f", "Email", "violetta@example.com", "email", { fillFailed: true })], uploadFields: 0 },
+  { fields: [{ token: "f", action: "fill", value: "violetta@example.com" }] }
+);
+assert.equal(failedFillWithCurrentValue.items[0].currentValuePresent, true);
+assert.equal(failedFillWithCurrentValue.failedCount, 1);
 
 const blocked = readiness.build(
   { fields: [field("a", "Salary"), field("b", "Date of birth", "1990-01-01", "date")], uploadFields: 1 },
@@ -34,6 +52,7 @@ const blocked = readiness.build(
 assert.equal(blocked.state, "blocked");
 assert.equal(blocked.blockedCount, 1);
 assert.equal(blocked.reviewCount, 1);
+assert.equal(blocked.failedCount, 0);
 assert.equal(blocked.cvCheckpoint.status, "check");
 
 const inserted = readiness.build(

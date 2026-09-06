@@ -18,6 +18,7 @@ jobs:
           node --check browser-extension/background.js
           node --check browser-extension/ats-structured.js
           node --check browser-extension/ats-controls.js
+          node --check browser-extension/field-verification.js
           node --check browser-extension/content.js
           node --check browser-extension/submission-readiness.js
           node --check browser-extension/popup.js
@@ -27,11 +28,14 @@ jobs:
           node --check browser-extension/options.js
           node --check browser-extension/ats-structured.test.js
           node --check browser-extension/ats-controls.test.js
+          node --check browser-extension/field-verification.test.js
           node --check browser-extension/submission-readiness.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls
         run: node browser-extension/ats-controls.test.js
+      - name: Test persisted autofill verification
+        run: node browser-extension/field-verification.test.js
       - name: Test submission readiness
         run: node browser-extension/submission-readiness.test.js
       - name: Validate dashboard inline JavaScript

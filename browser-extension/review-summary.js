@@ -12,16 +12,27 @@ function vjaEnsureReadinessNode() {
   return node;
 }
 
+function vjaCurrentReadiness() {
+  if (!latestPlan || !latestScan || !window.vjaSubmissionReadiness) return null;
+  return window.vjaSubmissionReadiness.build(latestScan, latestPlan, {
+    recommendedName: latest?.draft?.recommendedCv || "",
+    uploadedName: window.vjaLastUploadedCvName || ""
+  });
+}
+
 function vjaMakeReadinessRow(item) {
   const row = document.createElement("li");
-  row.className = `readinessItem ${item.action === "blocked" ? "readinessItem-blocked" : "readinessItem-review"}`;
+  const kind = item.action === "blocked" ? "blocked" : item.action === "failed" ? "failed" : "review";
+  row.className = `readinessItem readinessItem-${kind}`;
 
   const top = document.createElement("div");
   top.className = "readinessItemTop";
 
   const badge = document.createElement("span");
   badge.className = "readinessBadge";
-  badge.textContent = item.action === "blocked" ? "Manual only" : item.currentValuePresent ? "Verify" : "Review";
+  if (item.action === "blocked") badge.textContent = "Manual only";
+  else if (item.action === "failed") badge.textContent = item.currentValuePresent ? "Verify fill" : "Autofill failed";
+  else badge.textContent = item.currentValuePresent ? "Verify" : "Review";
 
   const label = document.createElement("strong");
   label.textContent = item.label;
@@ -43,7 +54,8 @@ function vjaRenderSubmissionReadiness() {
   if (!node) return;
   node.replaceChildren();
 
-  if (!latestPlan || !latestScan || !window.vjaSubmissionReadiness) {
+  const result = vjaCurrentReadiness();
+  if (!result) {
     node.className = "readinessCard readiness-neutral";
     const text = document.createElement("p");
     text.className = "readinessEmpty";
@@ -51,11 +63,6 @@ function vjaRenderSubmissionReadiness() {
     node.append(text);
     return;
   }
-
-  const result = window.vjaSubmissionReadiness.build(latestScan, latestPlan, {
-    recommendedName: latest?.draft?.recommendedCv || "",
-    uploadedName: window.vjaLastUploadedCvName || ""
-  });
 
   node.className = `readinessCard readiness-${result.state}`;
 
@@ -113,10 +120,14 @@ async function vjaRecheckSubmissionReadiness() {
   }
   try {
     await refreshFieldPlan();
+    const result = vjaCurrentReadiness();
     vjaRenderSubmissionReadiness();
-    const unresolved = Number(latestPlan?.reviewCount || 0) + Number(latestPlan?.blockedCount || 0);
+    const reviewCount = Number(result?.reviewCount || 0);
+    const failedCount = Number(result?.failedCount || 0);
+    const blockedCount = Number(result?.blockedCount || 0);
+    const unresolved = reviewCount + failedCount + blockedCount;
     $("fillNote").textContent = unresolved
-      ? `Checklist refreshed. ${latestPlan.reviewCount || 0} fields need review and ${latestPlan.blockedCount || 0} are manual-only.`
+      ? `Checklist refreshed. ${reviewCount} need review, ${failedCount} autofill attempt${failedCount === 1 ? "" : "s"} need verification, and ${blockedCount} are manual-only.`
       : "Checklist refreshed. No unresolved fields were detected by the assistant; review the full employer form and attachment before submitting.";
   } catch (error) {
     showError(error?.message || String(error));
