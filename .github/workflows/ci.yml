@@ -24,6 +24,7 @@ jobs:
           node --check browser-extension/submission-readiness.js
           node --check browser-extension/application-session.js
           node --check browser-extension/daily-queue.js
+          node --check browser-extension/queue-defer.js
           node --check browser-extension/popup.js
           node --check browser-extension/cv-upload.js
           node --check browser-extension/cv-vault-popup.js
@@ -39,6 +40,7 @@ jobs:
           node --check browser-extension/submission-readiness.test.js
           node --check browser-extension/application-session.test.js
           node --check browser-extension/daily-queue.test.js
+          node --check browser-extension/queue-defer.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls
@@ -53,6 +55,8 @@ jobs:
         run: node browser-extension/application-session.test.js
       - name: Test daily apply queue selection
         run: node browser-extension/daily-queue.test.js
+      - name: Test queue deferral request format
+        run: node browser-extension/queue-defer.test.js
       - name: Validate dashboard inline JavaScript
         run: |
           python3 - <<'PY'
