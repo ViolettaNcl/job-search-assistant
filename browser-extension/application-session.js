@@ -104,6 +104,14 @@
     return Boolean((sameOrigin || sameKnownTenant) && isApplicationLike(current));
   }
 
+  function canHandoffFromOpener(session, currentUrl, sourceTabId, openerTabId, now = Date.now(), ttlMs = DEFAULT_TTL_MS) {
+    const sourceId = Number(sourceTabId);
+    const openerId = Number(openerTabId);
+    if (!Number.isFinite(sourceId) || !Number.isFinite(openerId) || sourceId < 0 || openerId < 0) return false;
+    if (sourceId !== openerId) return false;
+    return canRestore(session, currentUrl, now, ttlMs);
+  }
+
   function slotKey(tabId) {
     const id = Number(tabId);
     return Number.isFinite(id) && id >= 0 ? `vjaApplicationSession:${id}` : "";
@@ -119,6 +127,7 @@
     create,
     isExpired,
     canRestore,
+    canHandoffFromOpener,
     slotKey
   };
 });
