@@ -31,6 +31,7 @@ jobs:
               "src/JobSearchAssistant/wwwroot/index.html",
               "src/JobSearchAssistant/wwwroot/queue.html",
               "src/JobSearchAssistant/wwwroot/followups.html",
+              "src/JobSearchAssistant/wwwroot/analytics.html",
           ]
           output = Path("/tmp/vja-inline-js")
           output.mkdir(parents=True, exist_ok=True)

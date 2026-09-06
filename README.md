@@ -24,6 +24,8 @@ The project is built around one principle: find fewer but stronger opportunities
 - Daily ranked application queue at **`/queue.html`**.
 - Follow-up queue at **`/followups.html`** for Applied jobs that have gone several business days without progress.
 - Follow-up attempts are recorded as CRM events and stop surfacing once the vacancy advances beyond Applied.
+- Outcome analytics at **`/analytics.html`** for response/interview/offer rates by source, market, role type, match-score band and CV variant.
+- External CV attribution records a filename only when the extension actually inserted that PDF before the application was marked Applied.
 - Telegram commands and responsive web dashboard.
 - PostgreSQL, Docker, GitHub Actions and MSTest.
 
@@ -35,8 +37,9 @@ The project is built around one principle: find fewer but stronger opportunities
 4. For Greenhouse, Lever, Ashby or another employer site, open the vacancy and use the Chrome extension.
 5. Review the generated message and any fields marked **review** or **blocked**.
 6. Upload the recommended CV from CV Vault when appropriate, verify the attachment, and submit the external form yourself.
-7. Click **Mark applied** so the CRM stays accurate.
+7. Click **Mark applied** so the CRM stays accurate. If the extension actually inserted the PDF, that filename is attributed to the application for analytics.
 8. Check **`/followups.html`** for applications that are due a polite recruiter follow-up.
+9. Use **`/analytics.html`** to learn which sources/markets/role types and CV variants are producing real responses.
 
 The application queue excludes jobs already marked Applied and jobs classified as likely ineligible. The follow-up queue only includes applications still in Applied status; HR contact/interview/rejection/offer states automatically leave the queue.
 
@@ -68,18 +71,19 @@ Browser: Ashby / other career sites ─┤
                          match + eligibility scoring
                                       ↓
                                PostgreSQL CRM
-                          ↙        ↓         ↘
-                    Telegram  Dashboard   queues
-                                      ↓
-                     application draft + field resolver
-                               ↙              ↘
-                       HH official API      Chrome extension
-                                             ↓
-                                  autofill + CV Vault
-                                             ↓
-                                      candidate final submit
-                                             ↓
-                                      follow-up queue
+                      ↙          ↓          ↘
+                Telegram     Dashboard     queues
+                               ↓     ↘
+                 application draft   outcome analytics
+                         + field resolver
+                       ↙              ↘
+               HH official API      Chrome extension
+                                     ↓
+                              autofill + CV Vault
+                                     ↓
+                              candidate final submit
+                                     ↓
+                         follow-up + CV attribution
 ```
 
 Tech: **.NET 10 LTS, ASP.NET Core Minimal API, EF Core, PostgreSQL, HttpClient, Chrome Manifest V3, Docker, GitHub Actions, MSTest**.
@@ -112,12 +116,15 @@ Daily queue: `http://localhost:8080/queue.html`
 
 Follow-up queue: `http://localhost:8080/followups.html`
 
+Outcome analytics: `http://localhost:8080/analytics.html`
+
 ## Main API routes
 
 ```text
 GET  /api/dashboard
 GET  /api/application-queue?limit=20&minScore=75
 GET  /api/followups?afterBusinessDays=5&maxAttempts=2&limit=30
+GET  /api/analytics/outcomes
 POST /api/collect
 POST /api/extension/analyze
 POST /api/extension/resolve-fields
@@ -125,8 +132,20 @@ POST /api/import/browser
 POST /api/import/hh
 POST /api/vacancies/{id}/apply-tailored
 POST /api/vacancies/{id}/mark-applied
+POST /api/vacancies/{id}/cv-attribution?resumeLabel=...
 POST /api/vacancies/{id}/followup-sent
 ```
+
+## Outcome analytics behavior
+
+The analytics screen reports response, interview and offer rates across source, market, role type, score band and CV variant.
+
+- `Applied` by itself is still waiting and does **not** count as a response.
+- HR Contact, interview stages, rejection and offer count as recruiter responses.
+- HR Interview, Tech Interview, Test Task and Offer count toward interview progression.
+- The UI displays small samples, but “strongest signal” callouts require at least **3 applications** in that segment.
+- External CV filenames are attributed only when the extension actually inserted that PDF into the application page. Manual/unknown uploads remain **CV not recorded** instead of being guessed.
+- HH applications remain grouped under the selected HH resume path rather than pretending the browser CV Vault was used.
 
 ## Follow-up behavior
 
@@ -148,6 +167,7 @@ The generated follow-up is Russian for Russia/HH applications and English for in
 - `/best` — top matches
 - `/world` — international jobs
 - `/applied` — applications
+- `/followups` — applications due a recruiter follow-up
 - `/interviews` — interview/test pipeline
 - `/stats` — funnel statistics
 - `/resumes` — HH resumes
@@ -168,7 +188,7 @@ Background automatic submission is deliberately limited. HH's explicit applicant
 dotnet test tests/JobSearchAssistant.Tests/JobSearchAssistant.Tests.csproj
 ```
 
-Tests cover vacancy scoring, application queue ordering, rich browser import, safe application-field resolution and follow-up timing/attempt behavior. CI also validates all Chrome extension JavaScript syntax.
+Tests cover vacancy scoring, application queue ordering, rich browser import, safe application-field resolution, follow-up timing/attempt behavior, CV attribution and outcome analytics. CI also validates all Chrome extension JavaScript and inline dashboard/queue/analytics JavaScript syntax.
 
 ## Deployment
 
@@ -181,5 +201,4 @@ For persistent production use, configure PostgreSQL and the relevant HH/Telegram
 - validate and refine ATS selectors against real Greenhouse/Lever/Ashby applications;
 - verified profile fields for phone/LinkedIn after explicit user confirmation;
 - optional deeper language-model tailoring with a deterministic truthful fallback;
-- application outcome analytics by source/role;
 - production database migrations and deployment hardening.
