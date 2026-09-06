@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Violetta — Outcome Analytics</title>
+  <style>
+    :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#201727;background:#f7f5f9;line-height:1.45;--muted:#746a7c;--line:#e7e0eb;--panel:#fff;--accent:#6841a5;--good:#287a55;--warn:#9a6a13;--shadow:0 10px 32px rgba(52,35,67,.07)}
+    *{box-sizing:border-box}body{margin:0}.shell{max-width:1220px;margin:auto;padding:28px 22px 60px}.header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.header h1{margin:0 0 7px;font-size:30px;letter-spacing:-.02em}.sub{color:var(--muted);max-width:760px}.nav{display:flex;gap:8px;flex-wrap:wrap}.btn{display:inline-flex;align-items:center;min-height:39px;border:1px solid #d9cfe3;border-radius:10px;padding:8px 12px;background:#fff;color:#513276;text-decoration:none;font-weight:700}.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .notice{margin:18px 0;padding:12px 14px;border-radius:12px;background:#fff8e9;border:1px solid #f0dfb5;color:#745011;font-size:13px}.notice.good{background:#ecf7f0;border-color:#cfe9d9;color:#246b4b}
+    .summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:18px 0}.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px;box-shadow:var(--shadow)}.stat span{display:block;color:var(--muted);font-size:12px}.stat strong{display:block;font-size:25px;margin-top:4px}.stat small{display:block;color:var(--muted);margin-top:3px}
+    .signals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 20px}.signal{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}.signal b{display:block;font-size:14px}.signal strong{display:block;font-size:20px;margin:6px 0 2px}.signal span{color:var(--muted);font-size:12px}
+    .section{background:#fff;border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:var(--shadow);margin:14px 0}.section-head{display:flex;justify-content:space-between;gap:12px;align-items:end;margin-bottom:10px}.section h2{font-size:18px;margin:0}.section-head span{color:var(--muted);font-size:12px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:720px}th,td{text-align:left;padding:10px 9px;border-top:1px solid #eee8f1;font-size:13px}th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;border-top:0}td.num,th.num{text-align:right}.label{font-weight:700}.bar{height:7px;background:#eee9f2;border-radius:999px;overflow:hidden;min-width:110px}.bar span{display:block;height:100%;background:var(--accent);border-radius:999px}.rate{font-weight:750}.muted{color:var(--muted)}.empty{padding:28px;text-align:center;color:var(--muted)}
+    .foot{color:var(--muted);font-size:12px;margin-top:18px}.error{padding:15px;border-radius:12px;background:#fff0f1;color:#8d3540;border:1px solid #ecd2d7}
+    @media(max-width:900px){.summary{grid-template-columns:repeat(3,1fr)}.signals{grid-template-columns:1fr 1fr}.header{display:block}.nav{margin-top:14px}}
+    @media(max-width:620px){.shell{padding:20px 13px 45px}.summary{grid-template-columns:repeat(2,1fr)}.signals{grid-template-columns:1fr}.stat strong{font-size:22px}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header class="header">
+    <div>
+      <h1>Outcome Analytics</h1>
+      <div class="sub">Learn which sources, markets, role types, match-score bands and CV variants actually produce recruiter responses and interviews. These are outcome metrics, not vacancy-volume metrics.</div>
+    </div>
+    <nav class="nav">
+      <a class="btn" href="/">Dashboard</a>
+      <a class="btn" href="/queue.html">Daily Queue</a>
+      <a class="btn" href="/followups.html">Follow-ups</a>
+      <a class="btn primary" href="#" onclick="event.preventDefault();load()">Refresh analytics</a>
+    </nav>
+  </header>
+
+  <div id="qualityNotice" class="notice">Loading application outcomes…</div>
+  <section id="summary" class="summary"></section>
+  <section id="signals" class="signals"></section>
+  <div id="sections"></div>
+  <div class="foot">A “response” means the application advanced beyond waiting/applied status, including recruiter contact, interview, rejection or offer. “Interview” starts at HR interview and later stages. Small samples are shown, but recommendation signals require at least 3 applications in a segment.</div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct=value=>`${Number(value||0).toFixed(1)}%`;
+
+function summaryCard(label,value,note=''){
+  return `<div class="stat"><span>${esc(label)}</span><strong>${esc(value)}</strong>${note?`<small>${esc(note)}</small>`:''}</div>`;
+}
+function qualifiedBest(rows,metric){
+  return (rows||[]).filter(x=>x.applications>=3).sort((a,b)=>(b[metric]||0)-(a[metric]||0)||b.applications-a.applications)[0]||null;
+}
+function signalCard(title,row,metric){
+  if(!row)return `<div class="signal"><b>${esc(title)}</b><strong>Not enough data</strong><span>Need at least 3 applications in one segment.</span></div>`;
+  return `<div class="signal"><b>${esc(title)}</b><strong>${esc(row.label)}</strong><span>${pct(row[metric])} · ${row.applications} applications</span></div>`;
+}
+function renderTable(title,subtitle,rows){
+  if(!rows?.length)return `<section class="section"><div class="section-head"><h2>${esc(title)}</h2><span>${esc(subtitle)}</span></div><div class="empty">No application data yet.</div></section>`;
+  const maxApps=Math.max(...rows.map(x=>x.applications),1);
+  const body=rows.map(row=>`<tr>
+    <td><div class="label">${esc(row.label)}</div><div class="bar" aria-label="${row.applications} applications"><span style="width:${Math.max(5,row.applications/maxApps*100)}%"></span></div></td>
+    <td class="num">${row.applications}</td>
+    <td class="num">${row.responses}</td>
+    <td class="num rate">${pct(row.responseRate)}</td>
+    <td class="num">${row.interviews}</td>
+    <td class="num rate">${pct(row.interviewRate)}</td>
+    <td class="num">${row.offers}</td>
+    <td class="num">${row.rejections}</td>
+  </tr>`).join('');
+  return `<section class="section"><div class="section-head"><h2>${esc(title)}</h2><span>${esc(subtitle)}</span></div><div class="table-wrap"><table><thead><tr><th>Segment</th><th class="num">Applied</th><th class="num">Responses</th><th class="num">Response rate</th><th class="num">Interviews</th><th class="num">Interview rate</th><th class="num">Offers</th><th class="num">Rejected</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
+}
+async function load(){
+  $('qualityNotice').className='notice';$('qualityNotice').textContent='Loading application outcomes…';
+  try{
+    const response=await fetch('/api/analytics/outcomes');
+    if(!response.ok)throw new Error(`Analytics returned ${response.status}`);
+    const data=await response.json();
+    const overall=data.overall||{};
+    $('summary').innerHTML=[
+      summaryCard('Applications',data.totalApplications||0,'tracked submissions'),
+      summaryCard('Response rate',pct(overall.responseRate),`${overall.responses||0} responses`),
+      summaryCard('Interview rate',pct(overall.interviewRate),`${overall.interviews||0} interviews`),
+      summaryCard('Offers',overall.offers||0,pct(overall.offerRate)),
+      summaryCard('CV-attributed',data.attributedCvApplications||0,`${data.totalApplications?Math.round((data.attributedCvApplications||0)*100/data.totalApplications):0}% of applications`)
+    ].join('');
+
+    const bestSource=qualifiedBest(data.bySource,'responseRate');
+    const bestMarket=qualifiedBest(data.byMarket,'responseRate');
+    const bestScore=qualifiedBest(data.byScoreBand,'interviewRate');
+    $('signals').innerHTML=signalCard('Strongest source signal',bestSource,'responseRate')+signalCard('Strongest market signal',bestMarket,'responseRate')+signalCard('Best interview score band',bestScore,'interviewRate');
+
+    $('sections').innerHTML=
+      renderTable('By source','Where applications actually convert',data.bySource)+
+      renderTable('By market','Russia vs international',data.byMarket)+
+      renderTable('By role type','Full-time, internship, contractor, freelance',data.byRoleType)+
+      renderTable('By match-score band','Does higher fit produce more interviews?',data.byScoreBand)+
+      renderTable('By CV variant','Only actual recorded uploads are named',data.byCvVariant);
+
+    const total=data.totalApplications||0;
+    if(total<5){
+      $('qualityNotice').textContent=`Only ${total} tracked application${total===1?'':'s'} so far. Treat every rate as preliminary until the sample grows.`;
+    }else if(total<15){
+      $('qualityNotice').textContent=`${total} tracked applications: useful early signals, but avoid major strategy changes from small segment samples.`;
+    }else{
+      $('qualityNotice').className='notice good';
+      $('qualityNotice').textContent=`${total} tracked applications. Segment trends are becoming useful; prioritize patterns with at least 3 applications and keep watching response/interview rates.`;
+    }
+  }catch(error){
+    $('summary').innerHTML='';$('signals').innerHTML='';$('sections').innerHTML=`<div class="error">${esc(error.message||String(error))}</div>`;
+    $('qualityNotice').textContent='Could not load outcome analytics.';
+  }
+}
+load();
+</script>
+</body>
+</html>
