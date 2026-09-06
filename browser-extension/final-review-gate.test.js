@@ -13,14 +13,20 @@ assert.equal(result.state, "unresolved");
 assert.equal(result.canLocateSubmit, false);
 assert.match(result.title, /3 checkpoints/);
 
-result = gate.evaluate({
+const attachmentReadiness = {
   reviewCount: 0,
   failedCount: 0,
   blockedCount: 0,
   cvCheckpoint: { status: "check" }
-});
+};
+result = gate.evaluate(attachmentReadiness);
 assert.equal(result.state, "attachment-review");
 assert.equal(result.canConfirmReview, false);
+assert.equal(result.canConfirmAttachment, true);
+
+result = gate.evaluate(attachmentReadiness, { found: false }, { attachmentVerified: true });
+assert.equal(result.state, "ready-no-submit");
+assert.equal(result.canConfirmReview, true);
 
 result = gate.evaluate({
   reviewCount: 0,
