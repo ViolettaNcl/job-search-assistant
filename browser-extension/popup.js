@@ -14,6 +14,7 @@ async function saveApiBase() {
   const value = $("apiBase").value.trim().replace(/\/$/, "");
   await chrome.storage.sync.set({ apiBase: value });
   setDot(true);
+  await refreshCandidateProfile();
 }
 
 async function getMemory() {
@@ -78,6 +79,29 @@ function isHhVacancy(url) {
 function prettyAts(value) {
   const labels = { hh: "HH.ru", greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", generic: "Generic form" };
   return labels[value] || value || "Generic form";
+}
+
+async function refreshCandidateProfile() {
+  const node = $("profileStatus");
+  if (!node) return;
+  try {
+    const api = await getApiBase();
+    const response = await fetch(`${api}/api/candidate`);
+    if (!response.ok) throw new Error(`Candidate profile returned ${response.status}.`);
+    const candidate = await response.json();
+    const readiness = candidate.readiness || {};
+    if (readiness.coreReady === false) {
+      const missing = (readiness.missingCoreFields || []).join(", ") || "required facts";
+      node.textContent = `Profile incomplete: verify ${missing} before relying on autofill.`;
+      return;
+    }
+    const optional = readiness.missingOptionalContacts || [];
+    node.textContent = optional.length
+      ? `Core profile ready. Still unverified: ${optional.join(", ")}. Those fields will require browser-confirmed memory or manual review.`
+      : "Verified candidate profile ready, including phone and LinkedIn.";
+  } catch (error) {
+    node.textContent = `Could not verify candidate profile: ${error?.message || String(error)}`;
+  }
 }
 
 async function refreshFieldPlan() {
@@ -358,4 +382,5 @@ async function applyOnHh() {
   } catch {
     setDot(false);
   }
+  await refreshCandidateProfile();
 })();
