@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "0.2.0",
-  "description": "Analyze vacancies, prepare truthful tailored applications, reuse confirmed answers and safely autofill common ATS fields.",
-  "permissions": ["activeTab", "storage", "clipboardWrite"],
+  "version": "0.3.0",
+  "description": "Analyze vacancies, tailor applications, reuse confirmed answers, autofill ATS forms and insert the recommended stored CV.",
+  "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
+  "options_page": "options.html",
   "action": {
     "default_title": "Violetta Apply Assistant",
     "default_popup": "popup.html"
