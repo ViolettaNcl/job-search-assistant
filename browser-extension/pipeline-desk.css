@@ -1,0 +1,12 @@
+.pipelineDeskCard{border:1px solid #e7e0eb;border-radius:14px;background:#fff;padding:13px;margin:12px 0;box-shadow:0 8px 24px rgba(52,35,67,.06)}
+.pipelineDeskHead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.pipelineDeskHead>div{display:grid;gap:2px;min-width:0}
+.pipelineDeskHead strong{font-size:14px}
+.pipelineStageBadge{font-size:11px;font-weight:800;border-radius:999px;padding:4px 7px;background:#eee7f7;color:#54317f;white-space:nowrap}
+.pipelineMeta{font-size:11px;color:#746a7c;margin:7px 0}
+.pipelineDeskCard label{display:grid;gap:4px;margin:8px 0;font-size:11px;color:#746a7c;font-weight:700}
+.pipelineDeskCard select,.pipelineDeskCard input{width:100%;font:inherit;font-size:12px;border:1px solid #ddd4e3;border-radius:9px;padding:8px;background:#fff;color:#21172b}
+.pipelineDeskActions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.pipelineDeskActions .fullRow{grid-column:1/-1}
+.pipelineDeskStatus{font-size:11px;color:#746a7c;margin:8px 0 0}
+.pipelineDeskCard.isEmpty #pipelineTargetWrap,.pipelineDeskCard.isEmpty #pipelineNoteWrap,.pipelineDeskCard.isEmpty #recordPipelineStage,.pipelineDeskCard.isEmpty #openPipelineJob{display:none}
