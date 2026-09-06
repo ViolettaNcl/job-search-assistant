@@ -74,7 +74,7 @@ public sealed class MatchScoringService(IOptions<CandidateProfileOptions> candid
         if (lowerTitle.Contains("contractor") || lowerTitle.Contains("b2b") || lowerTitle.Contains("freelance") || lowerTitle.Contains("фриланс"))
             score += 4;
         if (remote) score += 7;
-        else score -= 20;
+        else score -= 100;
         if (experience.Contains("noExperience", StringComparison.OrdinalIgnoreCase)) score += 8;
         if (experience.Contains("between1And3", StringComparison.OrdinalIgnoreCase)) score += 3;
 
@@ -102,6 +102,8 @@ public sealed class MatchScoringService(IOptions<CandidateProfileOptions> candid
 
     private (string Status, string Reason) EvaluateEligibility(string text, bool remote, string location, string remoteScope)
     {
+        if (!remote) return ("Likely ineligible", "Current search profile is remote-only.");
+
         var l = $"{text} {location} {remoteScope}".ToLowerInvariant();
         var worldwide = l.Contains("worldwide") || l.Contains("anywhere") || l.Contains("global remote") || l.Contains("work from anywhere");
         var contractor = l.Contains("international contractor") || l.Contains("independent contractor") || l.Contains("contractor worldwide") || l.Contains("b2b") || l.Contains("freelance");
@@ -125,8 +127,7 @@ public sealed class MatchScoringService(IOptions<CandidateProfileOptions> candid
         if (usOnly || ukOnly) return ("Likely ineligible", "Role appears restricted to US/UK work authorization or location.");
         if (noSponsorship && !worldwide && !russia && !europe)
             return ("Likely ineligible", "Employer does not sponsor and the vacancy is not clearly within Violetta's work-authorized markets.");
-        if (remote) return ("Verify", "Remote role; verify the exact countries from which the employer can hire/payroll.");
-        return ("Verify", "On-site/hybrid role; work authorization is likely fine in Russia/EU, but relocation and office location must be checked.");
+        return ("Verify", "Remote role; verify the exact countries from which the employer can hire/payroll.");
     }
 
     private static bool Contains(string text, string token)
