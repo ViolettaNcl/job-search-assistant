@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Violetta Apply Assistant — CV Vault</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f6f7f9; color: #17191f; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 38px 20px 70px; }
+    h1 { margin: 0 0 8px; font-size: 30px; }
+    p { color: #656c78; line-height: 1.55; }
+    .card { margin-top: 18px; padding: 18px; background: white; border: 1px solid #e1e4e9; border-radius: 14px; }
+    .card h2 { margin: 0 0 6px; font-size: 17px; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; margin-top: 14px; }
+    input[type=file] { width: 100%; padding: 10px; border: 1px solid #d6dae1; border-radius: 9px; background: #fafbfc; }
+    button { border: 1px solid #d4d8df; border-radius: 9px; background: white; color: #17191f; padding: 9px 12px; font: inherit; font-weight: 700; cursor: pointer; }
+    button.primary { background: #17191f; color: white; border-color: #17191f; }
+    button.danger { color: #9f1239; }
+    .status { margin-top: 10px; font-size: 12px; color: #6a717d; }
+    .ok { color: #14723b; }
+    .warning { color: #92570c; }
+    .privacy { margin-top: 24px; padding: 14px 16px; border-radius: 12px; background: #eef3ff; color: #33466d; font-size: 13px; line-height: 1.5; }
+    code { background: #f0f1f3; padding: 2px 5px; border-radius: 5px; }
+    @media (max-width: 560px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>CV Vault</h1>
+  <p>Choose each PDF once. The files are stored only inside this Chrome profile and can then be inserted into a visible application upload field when the Apply Assistant recommends that CV.</p>
+
+  <section class="card">
+    <h2>English CV</h2>
+    <p>Used for European and international applications.</p>
+    <div class="row">
+      <input id="enFile" type="file" accept="application/pdf,.pdf" />
+      <button id="saveEn" class="primary">Save English CV</button>
+    </div>
+    <div id="enStatus" class="status">No file checked yet.</div>
+  </section>
+
+  <section class="card">
+    <h2>Russian CV</h2>
+    <p>Used for Russian / HH.ru applications and Russian-language employers.</p>
+    <div class="row">
+      <input id="ruFile" type="file" accept="application/pdf,.pdf" />
+      <button id="saveRu" class="primary">Save Russian CV</button>
+    </div>
+    <div id="ruStatus" class="status">No file checked yet.</div>
+  </section>
+
+  <section class="card">
+    <h2>Manage stored files</h2>
+    <div class="row">
+      <div class="status">Removing a CV only deletes the extension's local copy. It does not delete the original file from your computer.</div>
+      <button id="clearAll" class="danger">Clear CV Vault</button>
+    </div>
+  </section>
+
+  <div class="privacy">
+    <strong>Privacy:</strong> CV files are kept in <code>chrome.storage.local</code> for this extension. They are not uploaded to the Job Search Assistant backend. A CV is sent only to the currently open application page when you explicitly click <strong>Upload recommended CV</strong>.
+  </div>
+
+  <script src="options.js"></script>
+</main>
+</body>
+</html>
