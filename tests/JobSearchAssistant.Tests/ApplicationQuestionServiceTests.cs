@@ -45,6 +45,21 @@ public sealed class ApplicationQuestionServiceTests
     }
 
     [TestMethod]
+    public void DateOfBirth_IsBlocked()
+    {
+        var result = Resolve("Cyprus", new ExtensionFieldInput("f1", "Date of birth", "date", "", null));
+        Assert.AreEqual("blocked", result.Fields.Single().Action);
+    }
+
+    [TestMethod]
+    public void CompanyName_IsNotMistakenForCandidateName()
+    {
+        var result = Resolve("Cyprus", new ExtensionFieldInput("f1", "Company name", "text", "", null));
+        Assert.AreEqual("review", result.Fields.Single().Action);
+        Assert.IsNull(result.Fields.Single().Value);
+    }
+
+    [TestMethod]
     public void ConfirmedPhoneMemory_IsReused()
     {
         var request = new ResolveApplicationFieldsRequest(
