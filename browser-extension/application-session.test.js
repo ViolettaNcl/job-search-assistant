@@ -44,6 +44,23 @@ assert.equal(
   false
 );
 
+const childApplyUrl = "https://acme.wd5.myworkdayjobs.com/en-US/Careers/apply/job/R123/application";
+assert.equal(sessions.canHandoffFromOpener(session, childApplyUrl, 42, 42, now + 5_000), true);
+assert.equal(sessions.canHandoffFromOpener(session, childApplyUrl, 42, 43, now + 5_000), false);
+assert.equal(
+  sessions.canHandoffFromOpener(session, "https://other.wd3.myworkdayjobs.com/en-US/Jobs/apply/job/R123", 42, 42, now + 5_000),
+  false
+);
+assert.equal(
+  sessions.canHandoffFromOpener(session, "https://acme.wd5.myworkdayjobs.com/en-US/Careers/job/Berlin/Other-Role_R999", 42, 42, now + 5_000),
+  false
+);
+assert.equal(
+  sessions.canHandoffFromOpener(session, childApplyUrl, 42, 42, now + sessions.DEFAULT_TTL_MS + 1),
+  false
+);
+assert.equal(sessions.canHandoffFromOpener(session, childApplyUrl, "bad", 42, now + 5_000), false);
+
 assert.equal(sessions.isApplicationLike("https://jobs.smartrecruiters.com/acme/123/apply"), true);
 assert.equal(sessions.isApplicationLike("https://jobs.smartrecruiters.com/acme/123"), false);
 assert.equal(sessions.hostFamily("https://foo.jobs.smartrecruiters.com/apply"), "smartrecruiters.com");
