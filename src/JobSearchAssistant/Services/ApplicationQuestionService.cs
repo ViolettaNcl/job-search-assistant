@@ -89,10 +89,10 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
             return Review(field, "relocation", "Relocation is a job-specific commitment and should be confirmed before submission.", false);
 
         if (Matches(label, "phone", "mobile", "телефон", "номер телефона"))
-            return FromMemoryOrReview(field, memory, "phone", "Phone number has not been configured yet.", true);
+            return FromVerifiedOrMemoryOrReview(field, _candidate.Phone, memory, "phone", "Phone number has not been verified in the candidate profile yet.");
 
         if (Matches(label, "linkedin"))
-            return FromMemoryOrReview(field, memory, "linkedin", "LinkedIn URL has not been configured yet.", true);
+            return FromVerifiedOrMemoryOrReview(field, _candidate.LinkedInUrl, memory, "linkedin", "LinkedIn URL has not been verified in the candidate profile yet.");
 
         if (Matches(label, "first name", "given name") || Regex.IsMatch(label, @"(^|\s)имя($|\s)", RegexOptions.IgnoreCase))
             return Fill(field, request.Language == "ru" ? "Виолетта" : FirstName(_candidate.Name), "firstName", "Verified candidate identity.");
@@ -166,16 +166,18 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         return Review(field, normalizedKey, "Employer-specific or unfamiliar question; review once before answering.", false);
     }
 
-    private ExtensionFieldResolution FromMemoryOrReview(
+    private static ExtensionFieldResolution FromVerifiedOrMemoryOrReview(
         ExtensionFieldInput field,
+        string verifiedValue,
         IReadOnlyDictionary<string, string> memory,
         string key,
-        string reason,
-        bool canRemember)
+        string reason)
     {
+        if (!string.IsNullOrWhiteSpace(verifiedValue))
+            return Fill(field, verifiedValue.Trim(), key, "Using a verified candidate-profile contact fact.", false);
         if (memory.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
-            return Fill(field, value, key, "Using a user-confirmed reusable answer.", canRemember);
-        return Review(field, key, reason, canRemember);
+            return Fill(field, value, key, "Using a user-confirmed reusable answer from this browser.", true);
+        return Review(field, key, reason, true);
     }
 
     private static ExtensionFieldResolution Fill(ExtensionFieldInput field, string value, string key, string reason, bool canRemember = false)
