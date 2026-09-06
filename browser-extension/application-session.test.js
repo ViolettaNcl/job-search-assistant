@@ -69,9 +69,21 @@ const sharedHostPage = {
 };
 const sharedHostSession = sessions.create({ latest, latestPage: sharedHostPage }, now);
 assert.equal(
-  sessions.canHandoffFromOpener(sharedHostSession, "https://jobs.smartrecruiters.com/Acme/123-junior-developer/apply", 50, 50, now + 5_000),
+  sessions.canRestore(sharedHostSession, "https://jobs.smartrecruiters.com/Acme/123-junior-developer/apply", now + 5_000),
+  true
+);
+assert.equal(
+  sessions.canRestore(sharedHostSession, "https://jobs.smartrecruiters.com/Other/999-other-role/apply", now + 5_000),
   false,
-  "shared-host ATS must not cross tabs without an explicit tenant identity"
+  "same shared origin must not restore across employers"
+);
+assert.equal(
+  sessions.canHandoffFromOpener(sharedHostSession, "https://jobs.smartrecruiters.com/Acme/123-junior-developer/apply", 50, 50, now + 5_000),
+  true
+);
+assert.equal(
+  sessions.canHandoffFromOpener(sharedHostSession, "https://jobs.smartrecruiters.com/Other/999-other-role/apply", 50, 50, now + 5_000),
+  false
 );
 
 const teamtailorPage = {
@@ -96,6 +108,12 @@ assert.equal(sessions.hostFamily("https://foo.jobs.smartrecruiters.com/apply"), 
 assert.equal(sessions.tenantKey("https://acme.wd5.myworkdayjobs.com/apply"), "workday:acme");
 assert.equal(sessions.tenantKey("https://other.wd3.myworkdayjobs.com/apply"), "workday:other");
 assert.equal(sessions.tenantKey("https://acme.teamtailor.com/jobs/123/apply"), "teamtailor.com:acme");
+assert.equal(sessions.tenantKey("https://jobs.smartrecruiters.com/Acme/123/apply"), "smartrecruiters.com:path:acme");
+assert.equal(sessions.tenantKey("https://jobs.lever.co/Acme/abc/apply"), "lever.co:path:acme");
+assert.equal(sessions.tenantKey("https://jobs.ashbyhq.com/Acme/abc/application"), "ashbyhq.com:path:acme");
+assert.equal(sessions.tenantKey("https://job-boards.greenhouse.io/Acme/jobs/123"), "greenhouse.io:path:acme");
+assert.equal(sessions.tenantKey("https://apply.workable.com/Acme/j/ABC/apply"), "workable.com:path:acme");
+assert.equal(sessions.tenantKey("https://apply.workable.com/apply"), "");
 assert.equal(sessions.normalizedUrl("https://example.com/job/123/#details"), "https://example.com/job/123");
 
 assert.equal(sessions.create({ latest: null, latestPage: page }, now), null);
