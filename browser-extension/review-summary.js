@@ -32,6 +32,7 @@ function vjaMakeReadinessRow(item) {
   badge.className = "readinessBadge";
   if (item.action === "blocked") badge.textContent = "Manual only";
   else if (item.action === "failed") badge.textContent = item.currentValuePresent ? "Verify fill" : "Autofill failed";
+  else if (item.action === "required") badge.textContent = "Required";
   else badge.textContent = item.currentValuePresent ? "Verify" : "Review";
 
   const label = document.createElement("strong");
@@ -42,7 +43,7 @@ function vjaMakeReadinessRow(item) {
 
   const reason = document.createElement("span");
   reason.className = "readinessReason";
-  reason.textContent = item.currentValuePresent
+  reason.textContent = item.currentValuePresent && item.action !== "required"
     ? `${item.reason} An answer is currently present; verify it is correct.`
     : item.reason;
   row.append(reason);
@@ -106,7 +107,7 @@ function vjaRenderSubmissionReadiness() {
 
   const disclaimer = document.createElement("p");
   disclaimer.className = "readinessDisclaimer";
-  disclaimer.textContent = "This checklist covers only fields detected by the extension. Always review the employer's full form and attachments before the final Submit/Apply action.";
+  disclaimer.textContent = "This checklist covers only controls detected by the extension. Always review the employer's full form and attachments before the final Submit/Apply action.";
   node.append(disclaimer);
 }
 
@@ -125,10 +126,11 @@ async function vjaRecheckSubmissionReadiness() {
     const reviewCount = Number(result?.reviewCount || 0);
     const failedCount = Number(result?.failedCount || 0);
     const blockedCount = Number(result?.blockedCount || 0);
-    const unresolved = reviewCount + failedCount + blockedCount;
+    const requiredCount = Number(result?.requiredCount || 0);
+    const unresolved = reviewCount + failedCount + blockedCount + requiredCount;
     $("fillNote").textContent = unresolved
-      ? `Checklist refreshed. ${reviewCount} need review, ${failedCount} autofill attempt${failedCount === 1 ? "" : "s"} need verification, and ${blockedCount} are manual-only.`
-      : "Checklist refreshed. No unresolved fields were detected by the assistant; review the full employer form and attachment before submitting.";
+      ? `Checklist refreshed. ${requiredCount} required field${requiredCount === 1 ? "" : "s"} blank, ${reviewCount} need review, ${failedCount} autofill attempt${failedCount === 1 ? "" : "s"} need verification, and ${blockedCount} are manual-only.`
+      : "Checklist refreshed. No unresolved or detectably blank required fields were found; review the full employer form and attachment before submitting.";
   } catch (error) {
     showError(error?.message || String(error));
   } finally {
