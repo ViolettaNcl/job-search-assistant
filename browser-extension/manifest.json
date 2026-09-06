@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "0.9.0",
-  "description": "Analyze vacancies, keep application context across ATS steps, verify safe autofill and check submission readiness.",
+  "version": "1.0.0",
+  "description": "Run a ranked apply-next loop, keep ATS context across steps, verify safe autofill and check submission readiness.",
   "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
   "background": {

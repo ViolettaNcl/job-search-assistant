@@ -18,6 +18,16 @@ button:disabled { opacity: .55; cursor: default; }
 .secondary { background: white; color: #16181d; border: 1px solid #d5d8df; }
 .full { width: 100%; margin-bottom: 12px; }
 .compactFull { margin-top: -2px; font-size: 11px; padding: 7px 10px; }
+.dailyLoopCard { margin: 12px 0; padding: 11px; border: 1px solid #d9dee7; border-radius: 11px; background: white; }
+.dailyLoopTop { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.dailyLoopTop > div { min-width: 0; }
+.dailyLoopTop > div > strong { display: block; font-size: 12px; line-height: 1.35; }
+.dailyLoopCompany { display: block; margin-top: 3px; font-size: 10px; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dailyLoopScore { flex: none; font-size: 17px; }
+.dailyLoopMeta { margin-top: 7px; color: #6b7280; font-size: 10px; line-height: 1.4; }
+.dailyLoopActions { margin-top: 9px; }
+.dailyLoopActions button { font-size: 10px; padding: 7px 8px; }
+.dailyQueueButton { margin: 7px 0 0; }
 .sessionBanner { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 9px; margin: 10px 0 12px; border: 1px solid #cfe2ff; border-radius: 9px; background: #f4f8ff; }
 .sessionBanner span { min-width: 0; font-size: 10px; line-height: 1.35; color: #334155; }
 .sessionBanner button { flex: none; padding: 5px 7px; font-size: 9px; }

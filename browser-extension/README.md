@@ -2,11 +2,34 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **0.9** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, verifies safe ATS autofill, automatically refreshes the submission checklist, keeps the application context across compatible multi-step ATS pages, stores applications in the CRM, and can insert the recommended CV from a local browser vault.
+Version **1.0** is a review-first application autopilot for Russia and Europe. It uses the backend's ranked vacancy queue to make the daily workflow continuous: open the next strong job, analyze it, tailor the application, safely fill what can be verified, preserve context across compatible ATS steps, record the application, then advance to the next strong unapplied vacancy.
+
+## Daily apply loop
+
+The popup now shows the strongest **75+** unapplied job from the backend queue.
+
+The loop is intentionally simple:
+
+1. Click **Open next strong job**.
+2. The vacancy opens in a new tab, leaving any unfinished application tab intact.
+3. Analyze the vacancy and complete the review-first application workflow.
+4. Submit externally yourself, or use the supported HH official API flow when available.
+5. Click **Mark applied** for an external application.
+6. The queue card refreshes automatically and advances to the next unapplied strong job.
+
+The popup does not create a second ranking model. It calls:
+
+`GET /api/application-queue?limit=20&minScore=75`
+
+and respects the backend's fit, freshness and eligibility ranking. The local selector only removes unsafe/irrelevant navigation targets such as invalid URLs, likely-ineligible entries, jobs below 75, and the vacancy already open/analyzed in the current workflow.
+
+**Open full application queue** remains available when Violetta wants to review the broader shortlist instead of taking the next ranked job.
+
+Opening the next job is always an explicit click. The extension does not automatically launch vacancies in the background and does not automatically submit external ATS forms.
 
 ## External job sites
 
-1. Open a vacancy in Chrome.
+1. Open a vacancy in Chrome, either directly or through the daily loop.
 2. Click **Violetta Apply Assistant**.
 3. Click **Analyze this vacancy**.
 4. The backend scores the job and creates a truthful role-specific application draft.
@@ -16,13 +39,13 @@ Version **0.9** is a review-first application autopilot for Russia and Europe. I
 8. Correct any review/manual-only/failed-fill items yourself. **Recheck submission checklist** remains available after manual edits.
 9. Click **Upload recommended CV** when a stored CV is available and verify the employer page shows the expected attachment.
 10. Review the whole employer form, then press the website's final Submit/Apply button yourself.
-11. Click **Mark applied** after submission so the application is recorded in the CRM.
+11. Click **Mark applied** after submission so the application is recorded in the CRM and the daily queue can advance.
 
 **Save to tracker** can store the vacancy before you apply. Rich browser import keeps the job description, country/location, fit score and eligibility instead of saving only a shallow link. Duplicate source URLs reuse the existing CRM record.
 
 ## Multi-step ATS sessions
 
-Version 0.9 keeps the active application context in `chrome.storage.session`, keyed to the current browser tab. This solves a common problem on Workday/SmartRecruiters/Personio-style flows where the job description disappears after the candidate moves from the vacancy page into step 2/3/4 of the application.
+The active application context is kept in `chrome.storage.session`, keyed to the current browser tab. This solves a common problem on Workday/SmartRecruiters/Personio-style flows where the job description disappears after the candidate moves from the vacancy page into later application steps.
 
 The session stores only the application context needed to continue the current workflow:
 
@@ -34,15 +57,11 @@ The session stores only the application context needed to continue the current w
 
 It does **not** copy CV PDF bytes, reusable Application Memory, passwords, CAPTCHA/2FA answers, legal declarations or sensitive personal fields into the session record.
 
-A session can restore when:
+A session can restore when the current page is the same analyzed vacancy, when the same tab moves to an application-looking URL on the same origin, or for selected ATS families when a cross-subdomain transition preserves the same employer/tenant identity. Workday restoration is tenant-bound, so one employer's session cannot be restored onto another employer's Workday site.
 
-- the current page is the same analyzed vacancy; or
-- the same tab moves to a URL that looks like an application step on the same origin; or
-- the same tab moves between subdomains of the same recognized ATS family, such as `*.myworkdayjobs.com`, and the destination looks like an application step.
+A different job-detail page on the same site is deliberately not treated as a continuation. Sessions expire after eight hours and are removed after the application is recorded as Applied. The popup shows when a multi-step session is active/restored and provides **Forget** to discard it manually.
 
-A different job-detail page on the same site is deliberately **not** treated as a continuation. Sessions expire after eight hours and are removed after the application is recorded as Applied. The popup shows when a multi-step session is active/restored and provides **Forget** to discard it manually.
-
-The first v0.9 implementation is intentionally same-tab. Cross-tab/new-window ATS handoff is a separate reliability problem and is not guessed automatically.
+The current implementation is intentionally same-tab. Cross-tab/new-window ATS handoff is not guessed automatically.
 
 ## ATS-aware extraction
 
@@ -58,13 +77,7 @@ Legal, verification/CAPTCHA, security, identity-document, demographic and medica
 
 ## Verified safe autofill
 
-The extension does not treat a programmatic input event as proof that a field was filled successfully. For fields classified as safe to fill it:
-
-1. writes the intended value;
-2. dispatches normal input/change/blur events;
-3. waits briefly for the ATS/React UI to settle;
-4. reads the field back;
-5. compares the persisted value against the intended value with deterministic normalization.
+The extension does not treat a programmatic input event as proof that a field was filled successfully. For fields classified as safe to fill it writes the intended value, dispatches normal input/change/blur events, waits briefly for the ATS/React UI to settle, reads the field back, and compares the persisted value against the intended value with deterministic normalization.
 
 The verifier understands common boolean variants such as `Yes` / `true` / `Да` and checks both underlying and visible select values where available. If a supposedly safe fill does not persist, the field becomes an **Autofill failed / Verify fill** checkpoint instead of silent success.
 
@@ -74,9 +87,9 @@ Native radio/checkbox alternatives are handled so a non-matching option in the s
 
 After **Fill safe fields**, the popup automatically rescans the employer form, rebuilds the field plan and rerenders submission readiness with the latest verified state.
 
-A previously failed-fill warning can also be reconciled after the candidate manually corrects the field. The warning is cleared in the popup only when the current field value deterministically matches the truthful planned value. A different or blank value does not clear it, and employer-specific `review` fields are never promoted to safe merely because they contain text.
+A previously failed-fill warning can be reconciled after the candidate manually corrects the field. The warning is cleared only when the current field value deterministically matches the truthful planned value. A different or blank value does not clear it, and employer-specific `review` fields are never promoted to safe merely because they contain text.
 
-This reconciliation is intentionally local to the current application UI. It does not learn a new personal fact or weaken the backend resolver's safety classification.
+This reconciliation is local to the current application UI. It does not learn a new personal fact or weaken the backend resolver's safety classification.
 
 ## Submission-readiness checklist
 
@@ -110,10 +123,6 @@ For an HH vacancy scoring **75/100 or higher**, the extension can show **Apply o
 
 HH OAuth and an HH resume must be configured first. The extension does not bypass CAPTCHA/2FA or imitate hidden browser clicks for HH submission.
 
-## Daily queue
-
-The backend exposes a ranked application queue at `/queue.html`, prioritizing unapplied jobs using fit, freshness and eligibility while excluding likely-ineligible opportunities.
-
 ## Install locally
 
 1. Run the Job Search Assistant backend at `http://localhost:8080`.
@@ -130,6 +139,7 @@ After updating extension code, click **Reload** on the extension card.
 
 - `GET /health`
 - `GET /api/candidate`
+- `GET /api/application-queue?limit=20&minScore=75`
 - `POST /api/extension/analyze`
 - `POST /api/extension/resolve-fields`
 - `POST /api/import/hh`
@@ -137,17 +147,17 @@ After updating extension code, click **Reload** on the extension card.
 - `POST /api/vacancies/{id}/apply-tailored`
 - `POST /api/vacancies/{id}/mark-applied`
 - `GET /api/vacancies/{id}/application-draft`
-- `GET /api/application-queue`
 
 ## Privacy model
 
 Vacancy pages are not transmitted in the background. Page text/form metadata are sent to the configured backend only after the user requests analysis or a form action.
 
-Reusable answers and CV Vault files remain in the local Chrome profile. Failed-fill tracking does not store intended personal values in DOM attributes. The multi-step context uses ephemeral `chrome.storage.session` rather than persistent local storage and expires automatically.
+Reusable answers and CV Vault files remain in the local Chrome profile. Failed-fill tracking does not store intended personal values in DOM attributes. Multi-step application context uses ephemeral `chrome.storage.session` and expires automatically. The daily queue card reads only the backend's ranked vacancy metadata and opens a vacancy only after an explicit click.
 
 ## Next iteration
 
-- validate real multi-step application forms across Workday, SmartRecruiters, Teamtailor, Recruitee, Workable and Personio;
+- validate real application forms across Workday, SmartRecruiters, Teamtailor, Recruitee, Workable and Personio;
+- add a deliberate skip/defer workflow so a queue item can be postponed without pretending it was applied;
 - add safe cross-tab/new-window session handoff where a deterministic ATS job identity can be preserved;
 - add platform-specific adapters only where field/value mapping can be proven deterministic and safe;
 - optional company-specific writing provider with deterministic truthful fallback;
