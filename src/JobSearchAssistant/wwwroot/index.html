@@ -17,6 +17,7 @@
     .brand h1{font-size:28px;line-height:1.15;margin:0 0 6px}.subtitle{color:var(--muted);max-width:740px}
     .remote-pill{display:inline-flex;align-items:center;gap:7px;margin-top:10px;padding:7px 11px;border-radius:999px;background:#eaf6ef;color:#236b4b;font-weight:700;font-size:13px}
     .toolbar{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end}.btn{border:0;border-radius:10px;padding:10px 14px;background:var(--accent);color:#fff;cursor:pointer;text-decoration:none;font:inherit;font-weight:650}.btn:hover{filter:brightness(.97)}.btn.secondary{background:#fff;color:#513276;border:1px solid #d9cfe3}.btn.small{padding:8px 10px;font-size:13px}.btn.danger{color:#84313d;background:#fff;border:1px solid #ecd2d7}
+    .attention{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:6px 0 18px}.attention-card{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 15px;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:var(--shadow);text-decoration:none;color:var(--ink)}.attention-card:hover{border-color:#cdbedf}.attention-card .copy{min-width:0}.attention-card b{display:block;font-size:14px}.attention-card span{display:block;color:var(--muted);font-size:12px;margin-top:3px}.attention-count{font-size:26px;font-weight:850;line-height:1}.attention-card.due .attention-count{color:var(--warn)}.attention-card.ready .attention-count{color:var(--good)}
     .summary-grid{display:grid;grid-template-columns:repeat(8,minmax(105px,1fr));gap:10px;margin:18px 0}.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}.stat .label{color:var(--muted);font-size:12px}.stat strong{display:block;font-size:23px;line-height:1.2;margin-top:4px}
     .tabs{display:flex;gap:8px;overflow:auto;padding:3px 0 12px;scrollbar-width:thin}.tab{white-space:nowrap;border:1px solid var(--line);background:#fff;color:#4b3a55;padding:9px 12px;border-radius:999px;cursor:pointer;font:inherit;font-weight:650}.tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}.tab .count{opacity:.72;margin-left:5px}
     .layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}.main,.side{min-width:0}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}.panel h3{margin:0 0 10px;font-size:15px}.help{font-size:12px;color:var(--muted);margin-top:6px}
@@ -28,8 +29,8 @@
     .empty{padding:30px 18px;text-align:center;color:var(--muted);background:#fff;border:1px dashed #d9d0df;border-radius:14px}.notice{display:none;padding:9px 11px;border-radius:9px;margin-top:8px;font-size:13px}.notice.show{display:block}.notice.ok{background:#ebf6ef;color:#246b4b}.notice.err{background:#fff0f1;color:#8d3540}
     .legend{display:grid;gap:8px;font-size:13px;color:#594e60}.legend div{display:flex;gap:8px;align-items:center}.dot{width:9px;height:9px;border-radius:50%;background:#9d81bd;flex:none}
     .footer-note{color:var(--muted);font-size:12px;margin-top:18px}
-    @media(max-width:1040px){.summary-grid{grid-template-columns:repeat(4,1fr)}.layout{grid-template-columns:1fr}.side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.side .panel{margin:0}}
-    @media(max-width:680px){.shell{padding:18px 14px 40px}.header{flex-direction:column}.toolbar{justify-content:flex-start}.summary-grid{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:1fr}.side{grid-template-columns:1fr}.card-head,.pipeline-card{align-items:flex-start;flex-direction:column}.score small{text-align:left}.form-row{grid-template-columns:1fr}.actions>*{flex-grow:1;text-align:center}}
+    @media(max-width:1040px){.summary-grid{grid-template-columns:repeat(4,1fr)}.layout{grid-template-columns:1fr}.side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.side .panel{margin:0}.attention{grid-template-columns:1fr 1fr}}
+    @media(max-width:680px){.shell{padding:18px 14px 40px}.header{flex-direction:column}.toolbar{justify-content:flex-start}.attention{grid-template-columns:1fr}.summary-grid{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:1fr}.side{grid-template-columns:1fr}.card-head,.pipeline-card{align-items:flex-start;flex-direction:column}.score small{text-align:left}.form-row{grid-template-columns:1fr}.actions>*{flex-grow:1;text-align:center}}
   </style>
 </head>
 <body>
@@ -41,10 +42,27 @@
       <div class="remote-pill">● Remote Only · Full-Time · Contractor/B2B · Freelance · Internship</div>
     </div>
     <div class="toolbar">
+      <a class="btn secondary" href="/queue.html">🎯 Daily Queue</a>
+      <a class="btn secondary" href="/followups.html">⏳ Follow-ups</a>
       <a class="btn secondary" href="/api/hh/oauth/start">Подключить HH</a>
       <button class="btn" onclick="collectJobs()">Обновить вакансии</button>
     </div>
   </header>
+
+  <section class="attention" aria-label="Сегодня нужно сделать">
+    <a class="attention-card ready" href="/queue.html">
+      <div class="copy"><b>Сильные отклики сегодня</b><span>Fit 75+ · ещё не отправлены</span></div>
+      <div class="attention-count" id="attentionQueue">—</div>
+    </a>
+    <a class="attention-card due" href="/followups.html">
+      <div class="copy"><b>Пора сделать follow-up</b><span>5 рабочих дней без прогресса</span></div>
+      <div class="attention-count" id="attentionFollowups">—</div>
+    </a>
+    <a class="attention-card" href="#" onclick="event.preventDefault();openPipeline()">
+      <div class="copy"><b>Активная воронка</b><span>Отклики, HR, интервью, test task</span></div>
+      <div class="attention-count" id="attentionPipeline">—</div>
+    </a>
+  </section>
 
   <section class="summary-grid" id="stats"></section>
 
@@ -123,11 +141,17 @@ function marketClass(v){return v.market==='Russia'?'market-russia':'market-world
 function statusLabel(s){return ({Applied:'📤 Отклик',HrContact:'💬 HR contact',HrInterview:'🧑 HR interview',TechInterview:'💻 Tech interview',TestTask:'📝 Test task',Offer:'🏆 Offer'})[s]||s}
 function showNotice(text,ok=true){const el=$('importNotice');el.textContent=text;el.className='notice show '+(ok?'ok':'err');setTimeout(()=>el.className='notice',4500)}
 async function load(){
-  const [d,all]=await Promise.all([api('/api/dashboard'),api('/api/vacancies?status=New')]);
+  const [d,all,queue,followups]=await Promise.all([
+    api('/api/dashboard'),
+    api('/api/vacancies?status=New'),
+    api('/api/application-queue?limit=100&minScore=75'),
+    api('/api/followups?afterBusinessDays=5&limit=100&maxAttempts=2')
+  ]);
   state.dashboard=d;state.jobs=all;state.pipeline=d.pipeline||[];
   const s=d.stats,seg=d.segments;
   $('stats').innerHTML=[['Всего',s.vacancies],['Россия',seg.russia],['Международные',seg.international],['Стажировки',seg.internships],['Strong Match',s.strong],['Отклики',s.applied],['Интервью',s.interviews],['Офферы',s.offers]].map(x=>`<div class="stat"><span class="label">${x[0]}</span><strong>${x[1]}</strong></div>`).join('');
   $('countAll').textContent=all.length;$('countRussia').textContent=all.filter(v=>v.market==='Russia').length;$('countInternational').textContent=all.filter(v=>v.market==='International').length;$('countInternship').textContent=all.filter(v=>v.opportunityType==='Internship').length;$('countStrong').textContent=all.filter(v=>v.matchScore>=85).length;$('countPipeline').textContent=state.pipeline.length;
+  $('attentionQueue').textContent=queue.length;$('attentionFollowups').textContent=followups.length;$('attentionPipeline').textContent=state.pipeline.length;
   $('lastCollected').textContent=d.state.lastCollectedAt?new Date(d.state.lastCollectedAt).toLocaleString('ru-RU'):'Сбор ещё не запускался';
   renderJobs();renderPipeline();
 }
@@ -153,6 +177,7 @@ function renderJobs(){
 function renderPipeline(){
   $('pipeline').innerHTML=state.pipeline.map(v=>`<article class="card pipeline-card"><div class="pipeline-info"><span class="status">${esc(statusLabel(v.status))}</span><b>${esc(v.title)}</b><div class="meta">${esc(v.company)} · ${esc(v.marketLabel)} · ${esc(v.opportunityTypeLabel)}</div></div><div class="actions"><button onclick="statusJob('${v.id}','HrContact')">💬 HR</button><button onclick="statusJob('${v.id}','HrInterview')">🧑 HR</button><button onclick="statusJob('${v.id}','TechInterview')">💻 Tech</button><button onclick="statusJob('${v.id}','TestTask')">📝 Test</button><button onclick="statusJob('${v.id}','Rejected')">❌ Reject</button><button onclick="statusJob('${v.id}','Offer')">🏆 Offer</button><a target="_blank" rel="noopener" href="${esc(v.url)}">Открыть</a></div></article>`).join('')||'<div class="empty">Пока нет активных откликов.</div>'
 }
+function openPipeline(){const btn=document.querySelector('.tab[data-view="pipeline"]');if(btn)btn.click()}
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');state.view=btn.dataset.view;const pipeline=state.view==='pipeline';$('vacancyView').style.display=pipeline?'none':'block';$('pipelineView').style.display=pipeline?'block':'none';if(!pipeline)renderJobs()}));
 async function collectJobs(){try{showNotice('Собираю вакансии…');const r=await api('/api/collect',{method:'POST'});showNotice(`Готово: добавлено ${r.added}, strong ${r.strong}`);await load()}catch(e){showNotice(e.message,false)}}
 async function importAny(){try{const url=$('jobUrl').value.trim();if(!url)return;const isHh=/hh\.ru\/vacancy\//i.test(url);const endpoint=isHh?'/api/import/hh':'/api/import/manual';const body=isHh?{url}:{url,title:null,company:null};const r=await api(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});showNotice(`Добавлено: ${r.title||'вакансия'}`);$('jobUrl').value='';await load()}catch(e){showNotice(e.message,false)}}
