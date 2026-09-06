@@ -109,6 +109,16 @@
     const openerId = Number(openerTabId);
     if (!Number.isFinite(sourceId) || !Number.isFinite(openerId) || sourceId < 0 || openerId < 0) return false;
     if (sourceId !== openerId) return false;
+    if (!session || isExpired(session, now, ttlMs)) return false;
+
+    const source = safeUrl(session.sourceUrl || session.latestPage?.url);
+    const current = safeUrl(currentUrl);
+    if (!source || !current || !isApplicationLike(current)) return false;
+
+    const sourceTenant = tenantKey(source);
+    const currentTenant = tenantKey(current);
+    if (!sourceTenant || !currentTenant || sourceTenant !== currentTenant) return false;
+
     return canRestore(session, currentUrl, now, ttlMs);
   }
 
