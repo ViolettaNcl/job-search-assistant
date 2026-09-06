@@ -32,6 +32,7 @@ builder.Services.AddSingleton<SecretCipher>();
 builder.Services.AddSingleton<MatchScoringService>();
 builder.Services.AddSingleton<ApplicationDraftService>();
 builder.Services.AddSingleton<ApplicationQuestionService>();
+builder.Services.AddSingleton<CandidateProfileReadinessService>();
 builder.Services.AddScoped<HhClient>();
 builder.Services.AddScoped<RemotiveClient>();
 builder.Services.AddScoped<AdzunaClient>();
@@ -69,7 +70,7 @@ app.MapGet("/health", () => Results.Ok(new
 }));
 app.MapRuntimeHealth(persistentDatabase, databaseBootstrap);
 
-app.MapGet("/api/candidate", (IOptions<CandidateProfileOptions> options) =>
+app.MapGet("/api/candidate", (IOptions<CandidateProfileOptions> options, CandidateProfileReadinessService readiness) =>
 {
     var c = options.Value;
     return Results.Ok(new
@@ -78,6 +79,8 @@ app.MapGet("/api/candidate", (IOptions<CandidateProfileOptions> options) =>
         c.RussianName,
         c.GreekName,
         c.Email,
+        c.Phone,
+        c.LinkedInUrl,
         c.CurrentCountry,
         c.CurrentCity,
         c.GitHubUrl,
@@ -93,7 +96,8 @@ app.MapGet("/api/candidate", (IOptions<CandidateProfileOptions> options) =>
         c.FluentLanguages,
         c.CoreSkills,
         c.PreferredRoles,
-        c.EmploymentTypes
+        c.EmploymentTypes,
+        readiness = readiness.Get()
     });
 });
 
