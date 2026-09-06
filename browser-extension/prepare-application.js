@@ -20,14 +20,15 @@
 
     let state = "partial";
     if (!analyzed) state = "failed";
-    else if (!detectedFields) state = "analysis-only";
+    else if (!detectedFields && !hh) state = "analysis-only";
     else if (failed || review || blocked || cv === "failed" || cv === "missing") state = "needs-review";
     else state = "prepared";
 
     const parts = [];
     if (analyzed) parts.push("vacancy analyzed and tailored");
     if (detectedFields) parts.push(`${filled} safe field${filled === 1 ? "" : "s"} verified`);
-    else if (analyzed) parts.push("no application fields detected on this page");
+    else if (analyzed && !hh) parts.push("no application fields detected on this page");
+    else if (analyzed && hh) parts.push("HH application draft is ready");
 
     if (cv === "uploaded") parts.push("recommended CV inserted");
     else if (cv === "missing") parts.push("recommended CV is not stored in the local vault");
