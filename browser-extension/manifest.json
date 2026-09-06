@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "0.1.0",
-  "description": "Analyze a vacancy, prepare a truthful tailored application and autofill common job application fields.",
+  "version": "0.2.0",
+  "description": "Analyze vacancies, prepare truthful tailored applications, reuse confirmed answers and safely autofill common ATS fields.",
   "permissions": ["activeTab", "storage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
   "action": {
