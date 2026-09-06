@@ -26,6 +26,7 @@ jobs:
           node --check browser-extension/application-step-intelligence.js
           node --check browser-extension/daily-queue.js
           node --check browser-extension/queue-defer.js
+          node --check browser-extension/prepare-application.js
           node --check browser-extension/popup.js
           node --check browser-extension/cv-upload.js
           node --check browser-extension/cv-vault-popup.js
@@ -34,6 +35,7 @@ jobs:
           node --check browser-extension/multistep-session-popup.js
           node --check browser-extension/step-intelligence-popup.js
           node --check browser-extension/daily-loop-popup.js
+          node --check browser-extension/prepare-application-popup.js
           node --check browser-extension/options.js
           node --check browser-extension/ats-structured.test.js
           node --check browser-extension/ats-controls.test.js
@@ -44,6 +46,7 @@ jobs:
           node --check browser-extension/application-step-intelligence.test.js
           node --check browser-extension/daily-queue.test.js
           node --check browser-extension/queue-defer.test.js
+          node --check browser-extension/prepare-application.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls
@@ -62,6 +65,8 @@ jobs:
         run: node browser-extension/daily-queue.test.js
       - name: Test queue deferral request format
         run: node browser-extension/queue-defer.test.js
+      - name: Test one-click preparation result model
+        run: node browser-extension/prepare-application.test.js
       - name: Validate dashboard inline JavaScript
         run: |
           python3 - <<'PY'
