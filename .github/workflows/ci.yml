@@ -21,3 +21,23 @@ jobs:
           node --check browser-extension/cv-upload.js
           node --check browser-extension/cv-vault-popup.js
           node --check browser-extension/options.js
+      - name: Validate dashboard inline JavaScript
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          pages = [
+              "src/JobSearchAssistant/wwwroot/index.html",
+              "src/JobSearchAssistant/wwwroot/queue.html",
+              "src/JobSearchAssistant/wwwroot/followups.html",
+          ]
+          output = Path("/tmp/vja-inline-js")
+          output.mkdir(parents=True, exist_ok=True)
+          for page in pages:
+              html = Path(page).read_text(encoding="utf-8")
+              scripts = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", html, flags=re.IGNORECASE | re.DOTALL)
+              for index, script in enumerate(scripts):
+                  (output / f"{Path(page).stem}-{index}.js").write_text(script, encoding="utf-8")
+          PY
+          for file in /tmp/vja-inline-js/*.js; do node --check "$file"; done

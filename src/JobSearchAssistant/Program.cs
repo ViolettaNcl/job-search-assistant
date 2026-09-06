@@ -39,6 +39,7 @@ builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<TailoredHhApplyService>();
 builder.Services.AddScoped<BrowserVacancyImportService>();
 builder.Services.AddScoped<ApplicationQueueService>();
+builder.Services.AddScoped<FollowUpQueueService>();
 builder.Services.AddScoped<StatsService>();
 builder.Services.AddHostedService<VacancyCollectorWorker>();
 builder.Services.AddHostedService<TelegramBotWorker>();
@@ -137,6 +138,9 @@ app.MapGet("/api/dashboard", async (AppDbContext db, StatsService stats, Cancell
 
 app.MapGet("/api/application-queue", async (int? limit, int? minScore, ApplicationQueueService queue, CancellationToken ct)
     => Results.Ok(await queue.GetAsync(limit ?? 20, minScore ?? 65, ct)));
+
+app.MapGet("/api/followups", async (int? afterBusinessDays, int? limit, int? maxAttempts, FollowUpQueueService followUps, CancellationToken ct)
+    => Results.Ok(await followUps.GetAsync(afterBusinessDays ?? 5, limit ?? 30, maxAttempts ?? 2, ct)));
 
 app.MapGet("/api/vacancies", async (AppDbContext db, string? status, int? minScore, string? market, string? type, CancellationToken ct) =>
 {
@@ -259,6 +263,14 @@ app.MapPost("/api/vacancies/{id:guid}/mark-applied", async (Guid id, JobService 
     return Results.Ok();
 });
 
+app.MapPost("/api/vacancies/{id:guid}/followup-sent", async (Guid id, FollowUpSentRequest request, FollowUpQueueService followUps, CancellationToken ct) =>
+{
+    var marked = await followUps.MarkSentAsync(id, request.Note, ct);
+    return marked
+        ? Results.Ok(new { status = "recorded" })
+        : Results.BadRequest(new { error = "followup_not_available", message = "The vacancy must still be in Applied status with an application record." });
+});
+
 app.MapPost("/api/companies/{id:guid}/blacklist", async (Guid id, BoolRequest request, JobService jobs, CancellationToken ct) =>
 {
     await jobs.SetCompanyFlagAsync(id, request.Value, null, ct); return Results.Ok();
@@ -298,6 +310,7 @@ app.Run();
 public sealed record ManualImport(string Url);
 public sealed record ManualVacancyImport(string Url, string? Title, string? Company);
 public sealed record StatusRequest(string Status, string? Note);
+public sealed record FollowUpSentRequest(string? Note);
 public sealed record BoolRequest(bool Value);
 public sealed record ResumeRequest(string ResumeId);
 public sealed record AutoApplyRequest(bool Enabled, int MinimumScore, int DailyLimit);
