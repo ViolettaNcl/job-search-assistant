@@ -122,6 +122,13 @@ if (vjaResultNode) {
   }).observe(vjaResultNode, { attributes: true, attributeFilter: ["class"] });
 }
 
+const vjaScoreNode = $("score");
+if (vjaScoreNode) {
+  new MutationObserver(() => {
+    if (latest && latestPage) vjaScheduleSessionSave();
+  }).observe(vjaScoreNode, { childList: true, characterData: true, subtree: true });
+}
+
 $("coverLetter")?.addEventListener("input", () => vjaScheduleSessionSave(300));
 
 for (const id of ["trackJob", "markApplied", "applyHh"]) {
