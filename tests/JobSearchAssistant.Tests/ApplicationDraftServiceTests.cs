@@ -27,7 +27,7 @@ public sealed class ApplicationDraftServiceTests
         Assert.AreEqual("Виолетта Николау", draft.CandidateName);
         Assert.AreEqual("Violetta_Nicolaou_CV_RU_v2.pdf", draft.RecommendedCv);
         StringAssert.Contains(draft.CoverLetter, "DentalClinic");
-        StringAssert.Contains(draft.CoverLetter, "первый официальный developer role");
+        StringAssert.Contains(draft.CoverLetter, "официальная работа разработчиком");
     }
 
     [TestMethod]
