@@ -10,7 +10,8 @@ function vjaQueueCardNodes() {
     meta: $("nextJobMeta"),
     status: $("queueLoopStatus"),
     open: $("openNextJob"),
-    refresh: $("refreshNextJob")
+    refresh: $("refreshNextJob"),
+    defer: $("deferNextJob")
   };
 }
 
@@ -34,6 +35,10 @@ function vjaRenderNextJob(item, message = "") {
     nodes.meta.textContent = "Open the full queue or collect fresh vacancies from the dashboard.";
     nodes.open.disabled = true;
     nodes.open.textContent = "No next job";
+    if (nodes.defer) {
+      nodes.defer.disabled = true;
+      nodes.defer.textContent = "Defer 4h";
+    }
     nodes.status.textContent = message || "Queue checked.";
     return;
   }
@@ -47,6 +52,10 @@ function vjaRenderNextJob(item, message = "") {
   nodes.meta.textContent = details.join(" · ") || "Strong unapplied job from the ranked queue.";
   nodes.open.disabled = false;
   nodes.open.textContent = "Open next strong job";
+  if (nodes.defer) {
+    nodes.defer.disabled = false;
+    nodes.defer.textContent = "Defer 4h";
+  }
   nodes.status.textContent = message || "Ranked by the backend application queue.";
 }
 
@@ -57,6 +66,7 @@ async function vjaLoadNextStrongJob({ quiet = false } = {}) {
     nodes.card.classList.remove("hidden");
     nodes.status.textContent = "Checking ranked queue…";
     nodes.refresh.disabled = true;
+    if (nodes.defer) nodes.defer.disabled = true;
   }
 
   try {
@@ -80,6 +90,7 @@ async function vjaLoadNextStrongJob({ quiet = false } = {}) {
     nodes.status.textContent = error?.message || String(error);
     nodes.open.disabled = true;
     nodes.open.textContent = "Open next strong job";
+    if (nodes.defer) nodes.defer.disabled = true;
     return null;
   } finally {
     nodes.refresh.disabled = false;
@@ -114,6 +125,42 @@ async function vjaOpenNextStrongJob() {
   }
 }
 
+async function vjaDeferNextStrongJob() {
+  const nodes = vjaQueueCardNodes();
+  clearError();
+  if (!vjaNextQueueJob?.vacancyId) {
+    await vjaLoadNextStrongJob();
+    if (!vjaNextQueueJob?.vacancyId) return;
+  }
+
+  const request = window.vjaQueueDefer?.buildRequest?.(vjaNextQueueJob.vacancyId, 4);
+  if (!request) return showError("Could not build a safe deferral request for this queue item.");
+
+  const deferredTitle = vjaNextQueueJob.title || "this vacancy";
+  nodes.defer.disabled = true;
+  nodes.open.disabled = true;
+  nodes.status.textContent = `Deferring ${deferredTitle} for 4 hours…`;
+
+  try {
+    const api = await getApiBase();
+    const response = await fetch(`${api}${request.path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request.body)
+    });
+    if (!response.ok) throw new Error(`Could not defer this vacancy (${response.status}).`);
+
+    vjaNextQueueJob = null;
+    await vjaLoadNextStrongJob({ quiet: true });
+    nodes.status.textContent = `Deferred ${deferredTitle} for 4 hours. The next ranked job is ready.`;
+  } catch (error) {
+    nodes.defer.disabled = false;
+    nodes.open.disabled = false;
+    nodes.status.textContent = "Deferral failed; the vacancy remains in the queue.";
+    showError(error?.message || String(error));
+  }
+}
+
 function vjaScheduleQueueRefresh(delay = 350) {
   clearTimeout(vjaQueueRefreshTimer);
   vjaQueueRefreshTimer = setTimeout(() => {
@@ -123,6 +170,7 @@ function vjaScheduleQueueRefresh(delay = 350) {
 
 $("openNextJob")?.addEventListener("click", vjaOpenNextStrongJob);
 $("refreshNextJob")?.addEventListener("click", () => vjaLoadNextStrongJob());
+$("deferNextJob")?.addEventListener("click", vjaDeferNextStrongJob);
 $("openFullQueue")?.addEventListener("click", async () => {
   const api = await getApiBase();
   await chrome.tabs.create({ url: `${api}/queue.html`, active: true });
