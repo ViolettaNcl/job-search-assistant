@@ -60,14 +60,18 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         var label = Normalize(field.Label);
         var country = Normalize(request.Country ?? "");
         var memory = request.Memory ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var isCombobox = field.Type.Equals("combobox", StringComparison.OrdinalIgnoreCase);
 
         if (string.IsNullOrWhiteSpace(label))
             return Review(field, "unknown", "Field meaning could not be determined safely.", false);
 
-        if (Matches(label, "company name", "employer name", "название компании", "имя компании"))
-            return Review(field, "employer", "This appears to ask for an employer/company name, not the candidate's name.", false);
+        if (Matches(label, "verification code", "security code", "captcha", "confirm you are not a robot", "anti-bot", "код подтверждения", "проверочный код"))
+            return Block(field, "verification", "Human verification and anti-bot challenges are never automated.");
 
-        if (Matches(label, "salary", "compensation", "expected pay", "expected salary", "зарплат", "доход", "оклад"))
+        if (Matches(label, "company name", "employer name", "current company", "current employer", "название компании", "имя компании", "текущая компания"))
+            return Review(field, "employer", "This asks about an employer/company, not the candidate's identity.", false);
+
+        if (Matches(label, "salary", "compensation", "expected pay", "expected salary", "desired pay", "зарплат", "доход", "оклад"))
             return Review(field, "salary", "Salary should be chosen for this vacancy and market, not reused blindly.", false);
 
         if (Matches(label, "start date", "available from", "availability date", "notice period", "дата выхода", "когда можете начать", "срок выхода"))
@@ -76,8 +80,8 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         if (Matches(label, "criminal", "conviction", "background check", "security clearance", "passport", "national id", "identity document", "судим", "уголов", "допуск", "паспорт"))
             return Block(field, "legal", "Legal, security or identity-document declarations must be answered by the candidate.");
 
-        if (Matches(label, "date of birth", "birth date", "birthday", "age", "disability", "medical", "health condition", "gender", "sex", "race", "ethnicity", "veteran", "religion", "дата рождения", "возраст", "инвалид", "здоров", "пол ", "национальност", "религи"))
-            return Block(field, "sensitive", "Sensitive demographic or medical questions are never auto-filled.");
+        if (Matches(label, "date of birth", "birth date", "birthday", "age", "disability", "medical", "health condition", "gender", "sex", "pronoun", "race", "ethnicity", "veteran", "religion", "дата рождения", "возраст", "инвалид", "здоров", "пол ", "национальност", "религи"))
+            return Block(field, "sensitive", "Sensitive demographic, identity-preference or medical questions are never auto-filled.");
 
         if (Matches(label, "years of experience", "years experience", "commercial experience", "professional experience", "лет опыта", "коммерческ.*опыт"))
             return Review(field, "experience", "Do not convert project experience into invented years of commercial employment.", false);
@@ -100,7 +104,7 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         if (Matches(label, "last name", "surname", "family name", "фамили"))
             return Fill(field, request.Language == "ru" ? "Николау" : LastName(_candidate.Name), "lastName", "Verified candidate identity.");
 
-        if (Matches(label, "full name", "your name", "фио", "имя и фамилия"))
+        if (label is "name" or "candidate name" || Matches(label, "full name", "your name", "фио", "имя и фамилия"))
             return Fill(field, request.Language == "ru" ? _candidate.RussianName : _candidate.Name, "fullName", "Verified candidate identity.");
 
         if (Matches(label, "e-mail", "email", "почт"))
@@ -112,18 +116,36 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         if (Matches(label, "portfolio", "personal site", "website", "сайт", "портфолио"))
             return Fill(field, _candidate.CvUrl, "portfolio", "Verified portfolio URL.");
 
-        if (Matches(label, "city", "город"))
-            return Fill(field, _candidate.CurrentCity, "city", "Verified current city.");
+        if (Matches(label, "country of residence", "residence country", "country where you live", "страна проживания"))
+        {
+            if (isCombobox) return Review(field, "residenceCountry", "Autocomplete country fields require selecting a site-provided suggestion.", false);
+            return Fill(field, _candidate.CurrentCountry, "residenceCountry", "Verified current country.");
+        }
 
-        if (Matches(label, "current location", "location", "местополож"))
+        if (Matches(label, "city where you live", "city of residence", "город проживания"))
+        {
+            if (isCombobox) return Review(field, "city", "Autocomplete city fields require selecting a site-provided suggestion.", false);
+            return Fill(field, _candidate.CurrentCity, "city", "Verified current city.");
+        }
+
+        if (Matches(label, "current location", "where are you located", "location", "местополож"))
+        {
+            if (isCombobox) return Review(field, "location", "Autocomplete location fields require selecting a site-provided suggestion so the ATS stores a valid location object.", false);
             return Fill(field, $"{_candidate.CurrentCity}, {_candidate.CurrentCountry}", "location", "Verified current location.");
+        }
+
+        if (Matches(label, "city", "город"))
+        {
+            if (isCombobox) return Review(field, "city", "Autocomplete city fields require selecting a site-provided suggestion.", false);
+            return Fill(field, _candidate.CurrentCity, "city", "Verified current city.");
+        }
 
         if (Matches(label, "cover letter", "motivation letter", "сопровод", "мотивац"))
             return !string.IsNullOrWhiteSpace(request.CoverLetter)
                 ? Fill(field, request.CoverLetter!, "coverLetter", "Vacancy-specific tailored cover letter.", false)
                 : Review(field, "coverLetter", "Generate the vacancy-specific draft first.", false);
 
-        if (Regex.IsMatch(label, @"why.*(role|position|company)|why.*interested|почему.*(ваканс|компан)|интерес.*ваканс", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(label, @"why.*(role|position|company)|why.*interested|why.*suited|well suited|почему.*(ваканс|компан)|интерес.*ваканс", RegexOptions.IgnoreCase))
             return !string.IsNullOrWhiteSpace(request.ShortMessage)
                 ? Fill(field, request.ShortMessage!, "whyRole", "Vacancy-specific motivation answer.", false)
                 : Review(field, "whyRole", "Generate the vacancy-specific application draft first.", false);
@@ -136,12 +158,12 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
 
         if (Matches(label, "education", "degree", "qualification", "образован", "диплом"))
         {
-            if (field.Type.Equals("select", StringComparison.OrdinalIgnoreCase))
+            if (field.Type.Equals("select", StringComparison.OrdinalIgnoreCase) || isCombobox)
                 return Review(field, "education", "Degree-level dropdowns differ between employers; review the closest truthful option.", false);
             return Fill(field, _candidate.Education, "education", "Verified education description.");
         }
 
-        if (Matches(label, "authorized to work", "right to work", "work authorization", "eligible to work", "право на работу", "разрешение на работу"))
+        if (Matches(label, "authorized to work", "legally allowed to work", "right to work", "work authorization", "eligible to work", "право на работу", "разрешение на работу"))
         {
             if (IsRussia(country, label))
                 return FillYesNo(field, _candidate.RussiaWorkAuthorized, "workAuthRussia", "Russian work authorization is verified.");
@@ -150,7 +172,7 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
             return Review(field, "workAuthorization", "Country-specific work authorization could not be determined from the form.", false);
         }
 
-        if (Matches(label, "sponsor", "sponsorship", "visa sponsorship", "спонсор", "рабочая виза"))
+        if (Matches(label, "sponsor", "sponsorship", "visa sponsorship", "immigration case", "спонсор", "рабочая виза"))
         {
             if (IsRussia(country, label) && _candidate.RussiaWorkAuthorized)
                 return FillYesNo(field, false, "sponsorshipRussia", "No Russian work sponsorship is required.");
@@ -158,6 +180,9 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
                 return FillYesNo(field, false, "sponsorshipEu", "No EU work sponsorship is required.");
             return Review(field, "sponsorship", "Sponsorship depends on the employing country; verify before answering.", false);
         }
+
+        if (isCombobox)
+            return Review(field, $"custom:{label}", "This is an ATS autocomplete/combobox. Select a site-provided option manually so the hidden ATS value is valid.", false);
 
         var normalizedKey = $"custom:{label}";
         if (memory.TryGetValue(normalizedKey, out var remembered) && !string.IsNullOrWhiteSpace(remembered))
