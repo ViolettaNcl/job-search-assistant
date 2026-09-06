@@ -56,11 +56,9 @@ async function vjaNavigateNextReviewField() {
 
 $("nextReviewField")?.addEventListener("click", vjaNavigateNextReviewField);
 
-const vjaReviewPlanNode = document.querySelector(".formPlan");
-if (vjaReviewPlanNode) {
-  new MutationObserver(() => {
-    vjaReviewNavigatorToken = "";
-  }).observe(vjaReviewPlanNode, { childList: true, characterData: true, subtree: true });
-}
+// Do not reset the cursor when refreshFieldPlan updates count cards. Keeping the
+// last token lets repeated clicks cycle deterministically. If a corrected field
+// disappears from the unresolved list, next() simply starts from the first
+// remaining unresolved item because the old token is no longer present.
 
 window.vjaNavigateNextReviewField = vjaNavigateNextReviewField;
