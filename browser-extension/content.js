@@ -23,21 +23,21 @@ const atsSelectors = {
     location: ["[data-qa='vacancy-view-raw-address']", "[data-qa='vacancy-view-location']"]
   },
   greenhouse: {
-    title: ["h1.app-title", "h1", "[class*='job-title']"],
-    company: [".company-name", "[class*='company-name']", "header img[alt]"],
-    description: ["#content", ".job__description", "[class*='job-description']", "main"],
-    location: [".location", "[class*='location']"]
+    title: ["h1.app-title", "h1", "[class*='job-title']", "[data-testid*='job-title']"],
+    company: [".company-name", "[class*='company-name']", "header img[alt]", "[data-testid*='company']"],
+    description: ["#content", ".job__description", "[class*='job-description']", "[data-testid*='job-description']", "main"],
+    location: [".location", "[class*='location']", "[data-testid*='location']"]
   },
   lever: {
-    title: [".posting-headline h2", "h2", "h1"],
-    company: [".main-header-logo img[alt]", "[class*='company']"],
-    description: [".posting-page .content", ".posting", "main"],
-    location: [".posting-categories .location", ".location"]
+    title: [".posting-headline h2", ".posting-headline h1", "[data-qa='posting-name']", "h2", "h1"],
+    company: [".main-header-logo img[alt]", "[class*='company']", "header img[alt]"],
+    description: [".posting-page .content", ".posting-page .section-wrapper", ".posting", "main"],
+    location: [".posting-categories .location", ".posting-headline .location", ".location"]
   },
   ashby: {
-    title: ["h1", "[data-testid*='job-title']", "[class*='jobTitle']"],
-    company: ["[data-testid*='company']", "[class*='company']"],
-    description: ["[data-testid='job-description']", "[class*='jobDescription']", "main"],
+    title: ["[data-testid*='job-title']", "[class*='jobTitle']", "h1"],
+    company: ["[data-testid*='company']", "[class*='company']", "header img[alt]"],
+    description: ["[data-testid='job-description']", "[class*='jobDescription']", "[data-testid*='description']", "main"],
     location: ["[data-testid*='location']", "[class*='location']"]
   },
   generic: {
@@ -127,32 +127,85 @@ function extractPage() {
   };
 }
 
-function labelFor(el) {
-  const parts = [];
-  const id = el.id;
-  if (id) {
-    try {
-      const explicit = document.querySelector(`label[for="${CSS.escape(id)}"]`);
-      if (explicit) parts.push(textOf(explicit));
-    } catch { }
+function textByIds(value) {
+  return String(value || "")
+    .split(/\s+/)
+    .map(id => document.getElementById(id))
+    .filter(Boolean)
+    .map(textOf)
+    .filter(Boolean)
+    .join(" ");
+}
+
+function associatedLabel(el) {
+  if (!el?.id) return null;
+  try {
+    return document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+  } catch {
+    return null;
   }
-  const parentLabel = el.closest("label");
-  if (parentLabel) parts.push(textOf(parentLabel));
-  const fieldset = el.closest("fieldset");
+}
+
+function groupContext(el) {
+  const parts = [];
+  const fieldset = el.closest?.("fieldset");
   const legend = fieldset?.querySelector("legend");
   if (legend) parts.push(textOf(legend));
-  const near = el.parentElement?.querySelector("label, legend, [class*='label'], [class*='question']");
+
+  const group = el.closest?.("[role='radiogroup'], [role='group'], [class*='question'], [class*='field']");
+  if (group && group !== el) {
+    const labelled = textByIds(group.getAttribute?.("aria-labelledby"));
+    if (labelled) parts.push(labelled);
+    const heading = group.querySelector?.("legend, [class*='label'], [class*='question-title'], [data-testid*='label']");
+    if (heading) parts.push(textOf(heading));
+  }
+  return parts.filter(Boolean);
+}
+
+function labelFor(el) {
+  const parts = [];
+  const explicit = associatedLabel(el);
+  if (explicit) parts.push(textOf(explicit));
+
+  const parentLabel = el.closest?.("label");
+  if (parentLabel) parts.push(textOf(parentLabel));
+
+  parts.push(...groupContext(el));
+
+  const labelled = textByIds(el.getAttribute?.("aria-labelledby"));
+  if (labelled) parts.push(labelled);
+
+  const described = textByIds(el.getAttribute?.("aria-describedby"));
+  if (described && described.length < 500) parts.push(described);
+
+  const near = el.parentElement?.querySelector?.("label, legend, [class*='label'], [class*='question']");
   if (near) parts.push(textOf(near));
-  parts.push(el.getAttribute("aria-label") || "");
-  parts.push(el.getAttribute("placeholder") || "");
-  parts.push(el.getAttribute("name") || "");
+
+  parts.push(el.getAttribute?.("aria-label") || "");
+  parts.push(el.getAttribute?.("placeholder") || "");
+  parts.push(el.getAttribute?.("name") || "");
   parts.push(el.id || "");
-  return [...new Set(parts.filter(Boolean))].join(" ").trim();
+  parts.push(el.getAttribute?.("data-testid") || "");
+  return [...new Set(parts.map(x => String(x || "").trim()).filter(Boolean))].join(" ").trim().slice(0, 1200);
+}
+
+function isActuallyVisible(el) {
+  if (el.offsetParent !== null) return true;
+  if (el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox")) {
+    const label = associatedLabel(el) || el.closest("label");
+    return Boolean(label && label.offsetParent !== null);
+  }
+  return false;
 }
 
 function visibleFields() {
-  return [...document.querySelectorAll("input, textarea, select")]
-    .filter(el => !el.disabled && !el.readOnly && el.type !== "hidden" && el.type !== "submit" && el.type !== "button" && el.offsetParent !== null);
+  return [...document.querySelectorAll("input, textarea, select, [role='combobox']")]
+    .filter((el, index, all) => all.indexOf(el) === index)
+    .filter(el => {
+      if (el.disabled || el.readOnly) return false;
+      if (el instanceof HTMLInputElement && ["hidden", "submit", "button", "reset", "image"].includes(el.type)) return false;
+      return isActuallyVisible(el);
+    });
 }
 
 function ensureToken(el, index) {
@@ -164,13 +217,24 @@ function currentValue(el) {
   if (el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox")) {
     return el.checked ? (el.value || "checked") : "";
   }
-  return String(el.value || "").trim();
+  if ("value" in el) return String(el.value || "").trim();
+  return String(el.getAttribute?.("aria-valuetext") || el.textContent || "").trim();
+}
+
+function fieldTypeFor(el) {
+  const role = (el.getAttribute?.("role") || "").toLowerCase();
+  const ariaAutocomplete = (el.getAttribute?.("aria-autocomplete") || "").toLowerCase();
+  if (role === "combobox" || (ariaAutocomplete && ariaAutocomplete !== "none")) return "combobox";
+  if (el instanceof HTMLSelectElement) return el.multiple ? "multiselect" : "select";
+  if (el instanceof HTMLTextAreaElement) return "textarea";
+  if (el instanceof HTMLInputElement) return el.type || "text";
+  return role || "custom";
 }
 
 function scanFields() {
   const fields = visibleFields().map((el, index) => {
     const token = ensureToken(el, index);
-    const type = el instanceof HTMLSelectElement ? "select" : el instanceof HTMLTextAreaElement ? "textarea" : el.type || "text";
+    const type = fieldTypeFor(el);
     const options = el instanceof HTMLSelectElement
       ? [...el.options].map(o => (o.textContent || o.value || "").trim()).filter(Boolean)
       : null;
@@ -195,6 +259,7 @@ function setTextValue(el, value) {
   descriptor?.set?.call(el, value);
   el.dispatchEvent(new Event("input", { bubbles: true }));
   el.dispatchEvent(new Event("change", { bubbles: true }));
+  el.dispatchEvent(new Event("blur", { bubbles: true }));
 }
 
 function setSelectValue(el, value) {
@@ -207,12 +272,13 @@ function setSelectValue(el, value) {
     if (text === target || raw === target) return true;
     if (yes && ["yes", "да", "true"].includes(text)) return true;
     if (no && ["no", "нет", "false"].includes(text)) return true;
-    return target.length > 2 && text.includes(target);
+    return target.length > 2 && (text.includes(target) || raw.includes(target));
   });
   if (!option) return false;
   el.value = option.value;
   el.dispatchEvent(new Event("input", { bubbles: true }));
   el.dispatchEvent(new Event("change", { bubbles: true }));
+  el.dispatchEvent(new Event("blur", { bubbles: true }));
   return true;
 }
 
@@ -228,7 +294,8 @@ function setRadioOrCheckbox(el, value) {
 }
 
 function setFieldValue(el, value) {
-  if (value == null || value === "" || el.type === "file") return false;
+  if (value == null || value === "" || fieldTypeFor(el) === "combobox") return false;
+  if (el instanceof HTMLInputElement && el.type === "file") return false;
   if (el instanceof HTMLSelectElement) return setSelectValue(el, value);
   if (el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox")) return setRadioOrCheckbox(el, value);
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
@@ -284,13 +351,14 @@ function inspectUploads() {
 }
 
 function highlightCvUpload(filename) {
-  const inputs = visibleFields().filter(el => el instanceof HTMLInputElement && el.type === "file");
+  const inputs = [...document.querySelectorAll("input[type='file']")].filter(el => !el.disabled);
   if (!inputs.length) return { found: false };
-  const first = inputs[0];
+  const first = inputs.find(isActuallyVisible) || inputs[0];
   first.style.outline = "3px solid #2563eb";
   first.style.outlineOffset = "3px";
-  first.scrollIntoView({ behavior: "smooth", block: "center" });
-  const label = first.closest("label") || document.querySelector(`label[for="${CSS.escape(first.id || "")}"]`);
+  const target = associatedLabel(first) || first.closest("label") || first;
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  const label = first.closest("label") || associatedLabel(first);
   if (label && filename) label.title = `Recommended CV: ${filename}`;
   return { found: true, count: inputs.length, filename };
 }
