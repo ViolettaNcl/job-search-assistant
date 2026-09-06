@@ -9,6 +9,11 @@
     return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
   }
 
+  function finiteNumber(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
   function safeHttpUrl(value) {
     try {
       const parsed = new URL(String(value || ""));
@@ -29,12 +34,12 @@
       url,
       source: clean(value?.source, 80),
       market: clean(value?.market, 80),
-      matchScore: Math.max(0, Math.min(100, Number(value?.matchScore || 0))),
+      matchScore: Math.max(0, Math.min(100, finiteNumber(value?.matchScore))),
       appliedAt: clean(value?.appliedAt, 80),
       waitingSince: clean(value?.waitingSince, 80),
-      businessDaysWaiting: Math.max(0, Number(value?.businessDaysWaiting || 0)),
-      followUpCount: Math.max(0, Number(value?.followUpCount || 0)),
-      priorityScore: Number(value?.priorityScore || 0),
+      businessDaysWaiting: Math.max(0, finiteNumber(value?.businessDaysWaiting)),
+      followUpCount: Math.max(0, Math.floor(finiteNumber(value?.followUpCount))),
+      priorityScore: finiteNumber(value?.priorityScore),
       language: String(value?.language || "").toLowerCase() === "ru" ? "ru" : "en",
       recommendedChannel: clean(value?.recommendedChannel, 140),
       message: String(value?.message || "").trim().slice(0, 5000)
@@ -63,8 +68,8 @@
   }
 
   function attemptNumber(item) {
-    return Math.max(1, Number(item?.followUpCount || 0) + 1);
+    return Math.max(1, Math.floor(finiteNumber(item?.followUpCount)) + 1);
   }
 
-  return { clean, safeHttpUrl, normalizeItem, selectNext, buildMarkSentRequest, attemptNumber };
+  return { clean, finiteNumber, safeHttpUrl, normalizeItem, selectNext, buildMarkSentRequest, attemptNumber };
 });
