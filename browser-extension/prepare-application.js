@@ -21,8 +21,7 @@
     let state = "partial";
     if (!analyzed) state = "failed";
     else if (!detectedFields) state = "analysis-only";
-    else if (failed || review || blocked || cv === "failed") state = "needs-review";
-    else if (cv === "missing" || cv === "no-field") state = "needs-review";
+    else if (failed || review || blocked || cv === "failed" || cv === "missing") state = "needs-review";
     else state = "prepared";
 
     const parts = [];
@@ -32,7 +31,7 @@
 
     if (cv === "uploaded") parts.push("recommended CV inserted");
     else if (cv === "missing") parts.push("recommended CV is not stored in the local vault");
-    else if (cv === "no-field") parts.push("no unambiguous CV upload field found");
+    else if (cv === "no-field") parts.push("no CV upload field detected on this stage");
     else if (cv === "failed") parts.push("CV insertion needs manual attention");
 
     if (failed) parts.push(`${failed} autofill verification failure${failed === 1 ? "" : "s"}`);
