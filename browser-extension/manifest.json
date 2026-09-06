@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "0.7.0",
-  "description": "Analyze vacancies, tailor applications, verify safe ATS autofill, check submission readiness and insert the recommended stored CV.",
+  "version": "0.8.0",
+  "description": "Analyze vacancies, verify safe ATS autofill, automatically refresh submission readiness and insert the recommended stored CV.",
   "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
   "background": {
