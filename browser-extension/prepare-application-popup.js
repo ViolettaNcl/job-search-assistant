@@ -55,6 +55,10 @@ async function vjaPrepareCurrentApplication() {
       throw new Error("The vacancy could not be analyzed. Check the backend connection and try again.");
     }
 
+    // analyze() manages its own busy state. Lock the manual controls again for the rest of this explicit transaction.
+    setBusy(true);
+    if (button) button.disabled = true;
+
     await refreshFieldPlan();
     const detectedFields = Number(latestScan?.fields?.length || 0);
     let fillResult = { filled: 0, failed: 0, review: 0, blocked: 0 };
@@ -100,6 +104,7 @@ async function vjaPrepareCurrentApplication() {
     showError(error?.message || String(error));
     return summary;
   } finally {
+    setBusy(false);
     vjaPreparationRunning = false;
     if (button) button.disabled = false;
   }
