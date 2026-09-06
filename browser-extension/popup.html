@@ -23,6 +23,11 @@
     </div>
     <p id="profileStatus" class="note">Checking verified candidate profile…</p>
 
+    <div id="sessionBanner" class="sessionBanner hidden">
+      <span id="sessionStatus"></span>
+      <button id="clearSession" class="secondary">Forget</button>
+    </div>
+
     <button id="analyze" class="primary full">Analyze this vacancy</button>
 
     <section id="result" class="hidden">
@@ -95,9 +100,11 @@
   <script src="field-verification.js"></script>
   <script src="fill-reconciliation.js"></script>
   <script src="submission-readiness.js"></script>
+  <script src="application-session.js"></script>
   <script src="popup.js"></script>
   <script src="cv-vault-popup.js"></script>
   <script src="review-summary.js"></script>
   <script src="post-fill-auto-recheck.js"></script>
+  <script src="multistep-session-popup.js"></script>
 </body>
 </html>
