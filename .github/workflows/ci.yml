@@ -19,16 +19,19 @@ jobs:
           node --check browser-extension/ats-structured.js
           node --check browser-extension/ats-controls.js
           node --check browser-extension/field-verification.js
+          node --check browser-extension/fill-reconciliation.js
           node --check browser-extension/content.js
           node --check browser-extension/submission-readiness.js
           node --check browser-extension/popup.js
           node --check browser-extension/cv-upload.js
           node --check browser-extension/cv-vault-popup.js
           node --check browser-extension/review-summary.js
+          node --check browser-extension/post-fill-auto-recheck.js
           node --check browser-extension/options.js
           node --check browser-extension/ats-structured.test.js
           node --check browser-extension/ats-controls.test.js
           node --check browser-extension/field-verification.test.js
+          node --check browser-extension/fill-reconciliation.test.js
           node --check browser-extension/submission-readiness.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
@@ -36,6 +39,8 @@ jobs:
         run: node browser-extension/ats-controls.test.js
       - name: Test persisted autofill verification
         run: node browser-extension/field-verification.test.js
+      - name: Test corrected-fill reconciliation
+        run: node browser-extension/fill-reconciliation.test.js
       - name: Test submission readiness
         run: node browser-extension/submission-readiness.test.js
       - name: Validate dashboard inline JavaScript
