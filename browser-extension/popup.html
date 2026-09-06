@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Violetta Apply Assistant</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="prepare.css" />
 </head>
 <body>
   <main>
@@ -57,7 +58,9 @@
       <span id="stepMeta" class="stepMeta"></span>
     </div>
 
-    <button id="analyze" class="primary full">Analyze this vacancy</button>
+    <button id="prepareApplication" class="primary full prepareButton">Prepare application</button>
+    <p id="prepareStatus" class="prepareStatus">One click: analyze, tailor, fill verified-safe fields, try the local CV, then stop for your review.</p>
+    <button id="analyze" class="secondary full">Analyze this vacancy</button>
 
     <section id="result" class="hidden">
       <div class="scoreRow">
@@ -133,6 +136,7 @@
   <script src="application-step-intelligence.js"></script>
   <script src="daily-queue.js"></script>
   <script src="queue-defer.js"></script>
+  <script src="prepare-application.js"></script>
   <script src="popup.js"></script>
   <script src="cv-vault-popup.js"></script>
   <script src="review-summary.js"></script>
@@ -140,5 +144,6 @@
   <script src="multistep-session-popup.js"></script>
   <script src="step-intelligence-popup.js"></script>
   <script src="daily-loop-popup.js"></script>
+  <script src="prepare-application-popup.js"></script>
 </body>
 </html>
