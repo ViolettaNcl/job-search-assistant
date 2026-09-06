@@ -1,10 +1,16 @@
 let vjaReviewNavigatorToken = "";
+window.vjaReviewNavigatorSelection = window.vjaReviewNavigatorSelection || null;
 
 function vjaSetReviewNavigatorStatus(message, action = "") {
   const node = $("reviewNavigatorStatus");
   if (!node) return;
   node.textContent = message || "";
   node.dataset.action = action || "";
+}
+
+function vjaSetReviewNavigatorSelection(item) {
+  window.vjaReviewNavigatorSelection = item || null;
+  window.vjaUpdateCandidateConfirmationUi?.(window.vjaReviewNavigatorSelection);
 }
 
 async function vjaNavigateNextReviewField() {
@@ -24,6 +30,7 @@ async function vjaNavigateNextReviewField() {
 
     if (!selection.item) {
       vjaReviewNavigatorToken = "";
+      vjaSetReviewNavigatorSelection(null);
       vjaSetReviewNavigatorStatus("No unresolved detected fields. Review the full employer form and attachment before submitting.", "clear");
       return;
     }
@@ -36,11 +43,13 @@ async function vjaNavigateNextReviewField() {
 
     if (!result?.found) {
       vjaReviewNavigatorToken = "";
+      vjaSetReviewNavigatorSelection(null);
       await refreshFieldPlan();
       throw new Error(result?.error || "The field moved. The form was refreshed; try again.");
     }
 
     vjaReviewNavigatorToken = selection.item.token;
+    vjaSetReviewNavigatorSelection({ ...selection.item, currentValuePresent: Boolean(result.currentValuePresent) });
     vjaSetReviewNavigatorStatus(window.vjaReviewNavigator.summary(selection), selection.item.action);
     window.vjaCaptureApplicationStep?.();
   } catch (error) {
@@ -57,8 +66,9 @@ async function vjaNavigateNextReviewField() {
 $("nextReviewField")?.addEventListener("click", vjaNavigateNextReviewField);
 
 // Do not reset the cursor when refreshFieldPlan updates count cards. Keeping the
-// last token lets repeated clicks cycle deterministically. If a corrected field
-// disappears from the unresolved list, next() simply starts from the first
-// remaining unresolved item because the old token is no longer present.
+// last token lets repeated clicks cycle deterministically. If a corrected or
+// candidate-confirmed field disappears from the unresolved list, next() starts
+// from the first remaining unresolved item because the old token is absent.
 
 window.vjaNavigateNextReviewField = vjaNavigateNextReviewField;
+window.vjaSetReviewNavigatorSelection = vjaSetReviewNavigatorSelection;
