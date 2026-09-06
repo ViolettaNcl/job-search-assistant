@@ -16,7 +16,13 @@
     const title = normalize(input.title);
     const url = normalize(input.url);
 
-    if (/application (?:is |was )?not submitted|submission failed|could not submit|submit your application|before (?:you )?submit|ready to submit|заявка не отправлена|не удалось отправить/i.test(text)) {
+    const negativeOrInstructional = [
+      /application (?:is |was )?not submitted|submission failed|could not submit|submit your application|before (?:you )?submit|ready to submit|заявка не отправлена|не удалось отправить/i,
+      /(?:after|once|when) (?:you )?(?:submit|have submitted|send|have sent).{0,120}thank you for (?:your application|applying)/i,
+      /you (?:will|should|may) see.{0,120}thank you for (?:your application|applying)/i,
+      /(?:after|once|when) (?:вы )?(?:отправите|отправили).{0,120}(?:спасибо за (?:ваш )?отклик|отклик (?:успешно )?отправлен)/i
+    ];
+    if (negativeOrInstructional.some(pattern => pattern.test(text))) {
       return { confirmed: false, score: 0, signal: "negative-or-instructional" };
     }
 
