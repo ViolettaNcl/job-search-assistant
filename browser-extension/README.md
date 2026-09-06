@@ -2,7 +2,7 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **0.4** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, autofills safe ATS fields, stores applications in the CRM, and can insert the recommended CV from a local browser vault.
+Version **0.5** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, autofills safe ATS fields, stores applications in the CRM, and can insert the recommended CV from a local browser vault.
 
 ## External job sites
 
@@ -23,7 +23,7 @@ Version **0.4** is a review-first application autopilot for Russia and Europe. I
 
 ## ATS-aware extraction
 
-Version 0.4 prefers standards-based structured vacancy data before relying on fragile visual selectors. When a page publishes Schema.org `JobPosting` JSON-LD, the extension extracts title, company, description, location/country, remote status and experience hints from that structured record. ATS-specific CSS selectors and the generic DOM scanner remain fallbacks when structured data is absent or incomplete.
+The extension prefers standards-based structured vacancy data before relying on fragile visual selectors. When a page publishes Schema.org `JobPosting` JSON-LD, the extension extracts title, company, description, location/country, remote status and experience hints from that structured record. ATS-specific CSS selectors and the generic DOM scanner remain fallbacks when structured data is absent or incomplete.
 
 Host recognition currently identifies:
 
@@ -40,6 +40,20 @@ Host recognition currently identifies:
 - generic career/application pages
 
 This makes vacancy extraction less dependent on an ATS keeping the same React classes or visual markup. The parser is deterministic and covered by Node tests in GitHub Actions; malformed JSON-LD is ignored safely and falls back to DOM extraction.
+
+## Custom ATS controls
+
+Version 0.5 combines the hardened Greenhouse/Lever/Ashby field scanner with recognition for modern non-native controls common on Workday, Personio, SmartRecruiters and similar sites:
+
+- ARIA `combobox` controls;
+- styled buttons that open listboxes;
+- ARIA `radiogroup` controls;
+- labels connected through `aria-labelledby` / `aria-describedby`;
+- hidden native radio inputs represented by visible labeled groups.
+
+These controls are deliberately **review-first**. The extension includes them in the field analysis so they are no longer invisible, but it does not script clicks into custom dropdowns or radio widgets. Even a truthful known answer such as EU work authorization is left for manual selection when the ATS uses a custom interactive control. Native HTML selects/radios can still use the existing safe resolver when the answer is unambiguous.
+
+Legal, verification/CAPTCHA, security, identity-document, demographic and medical questions remain blocked regardless of whether the employer renders them as native fields or custom controls.
 
 ## Application Memory
 
@@ -140,6 +154,6 @@ Reusable answers and CV Vault files remain in this Chrome profile's local extens
 ## Next iteration
 
 - validate real application forms across Workday, SmartRecruiters, Teamtailor, Recruitee, Workable and Personio
-- strengthen custom/composite field handling without guessing legal or salary answers
+- consider narrowly scoped custom-control automation only where a platform adapter can prove the option mapping is deterministic and safe
 - optional company-specific writing provider with deterministic truthful fallback
 - continue using outcome analytics to decide which sources, role families and CV variants deserve more applications

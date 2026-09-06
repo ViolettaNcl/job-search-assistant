@@ -61,6 +61,8 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         var country = Normalize(request.Country ?? "");
         var memory = request.Memory ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var isCombobox = field.Type.Equals("combobox", StringComparison.OrdinalIgnoreCase);
+        var isRadioGroup = field.Type.Equals("radiogroup", StringComparison.OrdinalIgnoreCase);
+        var isInteractiveControl = isCombobox || isRadioGroup;
 
         if (string.IsNullOrWhiteSpace(label))
             return Review(field, "unknown", "Field meaning could not be determined safely.", false);
@@ -92,6 +94,62 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         if (Matches(label, "relocat", "переезд", "готовы.*переех"))
             return Review(field, "relocation", "Relocation is a job-specific commitment and should be confirmed before submission.", false);
 
+        if (Matches(label, "country of residence", "residence country", "country where you live", "страна проживания"))
+        {
+            if (isInteractiveControl) return InteractiveReview(field, "residenceCountry", "country");
+            return Fill(field, _candidate.CurrentCountry, "residenceCountry", "Verified current country.");
+        }
+
+        if (Matches(label, "city where you live", "city of residence", "город проживания"))
+        {
+            if (isInteractiveControl) return InteractiveReview(field, "city", "city");
+            return Fill(field, _candidate.CurrentCity, "city", "Verified current city.");
+        }
+
+        if (Matches(label, "current location", "where are you located", "location", "местополож"))
+        {
+            if (isInteractiveControl) return InteractiveReview(field, "location", "location");
+            return Fill(field, $"{_candidate.CurrentCity}, {_candidate.CurrentCountry}", "location", "Verified current location.");
+        }
+
+        if (Matches(label, "city", "город"))
+        {
+            if (isInteractiveControl) return InteractiveReview(field, "city", "city");
+            return Fill(field, _candidate.CurrentCity, "city", "Verified current city.");
+        }
+
+        if (Matches(label, "education", "degree", "qualification", "образован", "диплом"))
+        {
+            if (field.Type.Equals("select", StringComparison.OrdinalIgnoreCase) || isInteractiveControl)
+                return Review(field, "education", isInteractiveControl
+                    ? "This ATS uses a custom interactive education control. Review and choose the closest truthful site-provided option manually."
+                    : "Degree-level dropdowns differ between employers; review the closest truthful option.", false);
+            return Fill(field, _candidate.Education, "education", "Verified education description.");
+        }
+
+        if (Matches(label, "authorized to work", "legally allowed to work", "right to work", "work authorization", "eligible to work", "право на работу", "разрешение на работу"))
+        {
+            if (isInteractiveControl) return InteractiveReview(field, "workAuthorization", "work-authorization");
+            if (IsRussia(country, label))
+                return FillYesNo(field, _candidate.RussiaWorkAuthorized, "workAuthRussia", "Russian work authorization is verified.");
+            if (IsEu(country, label))
+                return FillYesNo(field, _candidate.EuWorkAuthorized, "workAuthEu", "EU/Cyprus work authorization is verified.");
+            return Review(field, "workAuthorization", "Country-specific work authorization could not be determined from the form.", false);
+        }
+
+        if (Matches(label, "sponsor", "sponsorship", "visa sponsorship", "immigration case", "спонсор", "рабочая виза"))
+        {
+            if (isInteractiveControl) return InteractiveReview(field, "sponsorship", "sponsorship");
+            if (IsRussia(country, label) && _candidate.RussiaWorkAuthorized)
+                return FillYesNo(field, false, "sponsorshipRussia", "No Russian work sponsorship is required.");
+            if (IsEu(country, label) && _candidate.EuWorkAuthorized)
+                return FillYesNo(field, false, "sponsorshipEu", "No EU work sponsorship is required.");
+            return Review(field, "sponsorship", "Sponsorship depends on the employing country; verify before answering.", false);
+        }
+
+        if (isInteractiveControl)
+            return InteractiveReview(field, $"custom:{label}", "field");
+
         if (Matches(label, "phone", "mobile", "телефон", "номер телефона"))
             return FromVerifiedOrMemoryOrReview(field, _candidate.Phone, memory, "phone", "Phone number has not been verified in the candidate profile yet.");
 
@@ -116,30 +174,6 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         if (Matches(label, "portfolio", "personal site", "website", "сайт", "портфолио"))
             return Fill(field, _candidate.CvUrl, "portfolio", "Verified portfolio URL.");
 
-        if (Matches(label, "country of residence", "residence country", "country where you live", "страна проживания"))
-        {
-            if (isCombobox) return Review(field, "residenceCountry", "Autocomplete country fields require selecting a site-provided suggestion.", false);
-            return Fill(field, _candidate.CurrentCountry, "residenceCountry", "Verified current country.");
-        }
-
-        if (Matches(label, "city where you live", "city of residence", "город проживания"))
-        {
-            if (isCombobox) return Review(field, "city", "Autocomplete city fields require selecting a site-provided suggestion.", false);
-            return Fill(field, _candidate.CurrentCity, "city", "Verified current city.");
-        }
-
-        if (Matches(label, "current location", "where are you located", "location", "местополож"))
-        {
-            if (isCombobox) return Review(field, "location", "Autocomplete location fields require selecting a site-provided suggestion so the ATS stores a valid location object.", false);
-            return Fill(field, $"{_candidate.CurrentCity}, {_candidate.CurrentCountry}", "location", "Verified current location.");
-        }
-
-        if (Matches(label, "city", "город"))
-        {
-            if (isCombobox) return Review(field, "city", "Autocomplete city fields require selecting a site-provided suggestion.", false);
-            return Fill(field, _candidate.CurrentCity, "city", "Verified current city.");
-        }
-
         if (Matches(label, "cover letter", "motivation letter", "сопровод", "мотивац"))
             return !string.IsNullOrWhiteSpace(request.CoverLetter)
                 ? Fill(field, request.CoverLetter!, "coverLetter", "Vacancy-specific tailored cover letter.", false)
@@ -156,40 +190,19 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         if (Matches(label, "languages", "language", "язык"))
             return Fill(field, string.Join(", ", _candidate.FluentLanguages), "languages", "Verified fluent languages.");
 
-        if (Matches(label, "education", "degree", "qualification", "образован", "диплом"))
-        {
-            if (field.Type.Equals("select", StringComparison.OrdinalIgnoreCase) || isCombobox)
-                return Review(field, "education", "Degree-level dropdowns differ between employers; review the closest truthful option.", false);
-            return Fill(field, _candidate.Education, "education", "Verified education description.");
-        }
-
-        if (Matches(label, "authorized to work", "legally allowed to work", "right to work", "work authorization", "eligible to work", "право на работу", "разрешение на работу"))
-        {
-            if (IsRussia(country, label))
-                return FillYesNo(field, _candidate.RussiaWorkAuthorized, "workAuthRussia", "Russian work authorization is verified.");
-            if (IsEu(country, label))
-                return FillYesNo(field, _candidate.EuWorkAuthorized, "workAuthEu", "EU/Cyprus work authorization is verified.");
-            return Review(field, "workAuthorization", "Country-specific work authorization could not be determined from the form.", false);
-        }
-
-        if (Matches(label, "sponsor", "sponsorship", "visa sponsorship", "immigration case", "спонсор", "рабочая виза"))
-        {
-            if (IsRussia(country, label) && _candidate.RussiaWorkAuthorized)
-                return FillYesNo(field, false, "sponsorshipRussia", "No Russian work sponsorship is required.");
-            if (IsEu(country, label) && _candidate.EuWorkAuthorized)
-                return FillYesNo(field, false, "sponsorshipEu", "No EU work sponsorship is required.");
-            return Review(field, "sponsorship", "Sponsorship depends on the employing country; verify before answering.", false);
-        }
-
-        if (isCombobox)
-            return Review(field, $"custom:{label}", "This is an ATS autocomplete/combobox. Select a site-provided option manually so the hidden ATS value is valid.", false);
-
         var normalizedKey = $"custom:{label}";
         if (memory.TryGetValue(normalizedKey, out var remembered) && !string.IsNullOrWhiteSpace(remembered))
             return Fill(field, remembered, normalizedKey, "Using a user-confirmed reusable answer.", true);
 
         return Review(field, normalizedKey, "Employer-specific or unfamiliar question; review once before answering.", false);
     }
+
+    private static ExtensionFieldResolution InteractiveReview(ExtensionFieldInput field, string key, string subject)
+        => Review(
+            field,
+            key,
+            $"This ATS uses a custom interactive {subject} control. Review and choose the truthful site-provided option manually; the assistant will not guess or script this control.",
+            false);
 
     private static ExtensionFieldResolution FromVerifiedOrMemoryOrReview(
         ExtensionFieldInput field,

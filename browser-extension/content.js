@@ -198,12 +198,26 @@ function isActuallyVisible(el) {
   return false;
 }
 
+function elementMeta(el) {
+  return {
+    tagName: el.tagName || "",
+    role: el.getAttribute?.("role") || "",
+    ariaHasPopup: el.getAttribute?.("aria-haspopup") || ""
+  };
+}
+
+function customFieldType(el) {
+  return window.vjaAtsControls?.classifyElementMeta?.(elementMeta(el)) || "";
+}
+
 function visibleFields() {
-  return [...document.querySelectorAll("input, textarea, select, [role='combobox']")]
+  const selector = "input, textarea, select, [role='combobox'], [role='radiogroup'], button[aria-haspopup='listbox'], [role='button'][aria-haspopup='listbox']";
+  return [...document.querySelectorAll(selector)]
     .filter((el, index, all) => all.indexOf(el) === index)
     .filter(el => {
-      if (el.disabled || el.readOnly) return false;
+      if (el.disabled || el.readOnly || el.getAttribute?.("aria-disabled") === "true") return false;
       if (el instanceof HTMLInputElement && ["hidden", "submit", "button", "reset", "image"].includes(el.type)) return false;
+      if (el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox") && el.closest("[role='radiogroup']")) return false;
       return isActuallyVisible(el);
     });
 }
@@ -213,15 +227,9 @@ function ensureToken(el, index) {
   return el.dataset.vjaFieldToken;
 }
 
-function currentValue(el) {
-  if (el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox")) {
-    return el.checked ? (el.value || "checked") : "";
-  }
-  if ("value" in el) return String(el.value || "").trim();
-  return String(el.getAttribute?.("aria-valuetext") || el.textContent || "").trim();
-}
-
 function fieldTypeFor(el) {
+  const custom = customFieldType(el);
+  if (custom) return custom;
   const role = (el.getAttribute?.("role") || "").toLowerCase();
   const ariaAutocomplete = (el.getAttribute?.("aria-autocomplete") || "").toLowerCase();
   if (role === "combobox" || (ariaAutocomplete && ariaAutocomplete !== "none")) return "combobox";
@@ -231,13 +239,36 @@ function fieldTypeFor(el) {
   return role || "custom";
 }
 
+function currentValue(el) {
+  const type = fieldTypeFor(el);
+  if (type === "radiogroup") {
+    const selected = el.querySelector?.("[role='radio'][aria-checked='true']");
+    return selected ? textOf(selected) : "";
+  }
+  if (type === "combobox") {
+    if (el instanceof HTMLInputElement) return String(el.value || "").trim();
+    return String(el.getAttribute?.("aria-valuetext") || el.getAttribute?.("data-value") || "").trim();
+  }
+  if (el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox")) {
+    return el.checked ? (el.value || "checked") : "";
+  }
+  if ("value" in el) return String(el.value || "").trim();
+  return String(el.getAttribute?.("aria-valuetext") || "").trim();
+}
+
+function customOptions(el, type) {
+  if (type !== "radiogroup") return null;
+  const options = [...el.querySelectorAll?.("[role='radio']") || []].map(textOf).filter(Boolean);
+  return options.length ? [...new Set(options)] : null;
+}
+
 function scanFields() {
   const fields = visibleFields().map((el, index) => {
     const token = ensureToken(el, index);
     const type = fieldTypeFor(el);
     const options = el instanceof HTMLSelectElement
       ? [...el.options].map(o => (o.textContent || o.value || "").trim()).filter(Boolean)
-      : null;
+      : customOptions(el, type);
     return {
       token,
       label: labelFor(el),
@@ -294,7 +325,8 @@ function setRadioOrCheckbox(el, value) {
 }
 
 function setFieldValue(el, value) {
-  if (value == null || value === "" || fieldTypeFor(el) === "combobox") return false;
+  if (value == null || value === "") return false;
+  if (window.vjaAtsControls?.isInteractiveReviewType?.(fieldTypeFor(el))) return false;
   if (el instanceof HTMLInputElement && el.type === "file") return false;
   if (el instanceof HTMLSelectElement) return setSelectValue(el, value);
   if (el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox")) return setRadioOrCheckbox(el, value);
