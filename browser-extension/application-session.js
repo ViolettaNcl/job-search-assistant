@@ -5,6 +5,7 @@
 })(typeof window !== "undefined" ? window : null, function () {
   const DEFAULT_TTL_MS = 8 * 60 * 60 * 1000;
   const SESSION_VERSION = 1;
+  const MAX_STEP_HISTORY = 12;
   const SHARED_ATS_FAMILIES = new Set([
     "smartrecruiters.com",
     "greenhouse.io",
@@ -95,6 +96,24 @@
     return /(?:^|[\s\/_?=&.-])(apply|application|applications|candidate|questionnaire|screening|jobapplication|job-application|applynow|apply-now)(?:$|[\s\/_?=&.-])/.test(text);
   }
 
+  function sanitizeStepHistory(value) {
+    if (!Array.isArray(value)) return [];
+    return value.slice(-MAX_STEP_HISTORY).map(item => ({
+      at: Number(item?.at || 0),
+      jobKey: String(item?.jobKey || "").slice(0, 80),
+      route: String(item?.route || "").slice(0, 1200),
+      ats: String(item?.ats || "").slice(0, 80),
+      fingerprint: String(item?.fingerprint || "").slice(0, 120),
+      signatures: Array.isArray(item?.signatures) ? item.signatures.map(x => String(x || "").slice(0, 160)).slice(0, 120) : [],
+      fieldCount: Number(item?.fieldCount || 0),
+      autofillCount: Number(item?.autofillCount || 0),
+      reviewCount: Number(item?.reviewCount || 0),
+      blockedCount: Number(item?.blockedCount || 0),
+      failedCount: Number(item?.failedCount || 0),
+      stage: Number(item?.stage || 0)
+    }));
+  }
+
   function create(input, now = Date.now()) {
     if (!input?.latest || !input?.latestPage?.url) return null;
     return {
@@ -104,7 +123,8 @@
       latestPage: input.latestPage,
       latest: input.latest,
       latestTrackedId: input.latestTrackedId || null,
-      coverLetter: String(input.coverLetter || input.latest?.draft?.coverLetter || "")
+      coverLetter: String(input.coverLetter || input.latest?.draft?.coverLetter || ""),
+      stepHistory: sanitizeStepHistory(input.stepHistory)
     };
   }
 
@@ -165,10 +185,12 @@
   return {
     DEFAULT_TTL_MS,
     SESSION_VERSION,
+    MAX_STEP_HISTORY,
     normalizedUrl,
     hostFamily,
     tenantKey,
     isApplicationLike,
+    sanitizeStepHistory,
     create,
     isExpired,
     canRestore,
