@@ -1,3 +1,5 @@
+window.vjaLastUploadedCvName = null;
+
 async function vjaGetRecommendedStoredCv() {
   if (!latest?.draft) return { key: null, data: null, language: null };
   const language = latest.draft.language === "ru" ? "ru" : "en";
@@ -35,9 +37,11 @@ async function vjaUploadRecommendedCv() {
   try {
     const result = await sendToPage({ type: "uploadCv", fileData: data });
     if (!result?.success) throw new Error(result?.error || "The CV could not be inserted into this page.");
+    window.vjaLastUploadedCvName = result.filename;
     $("cvVaultStatus").textContent = `Uploaded: ${result.filename}`;
-    $("fillNote").textContent = `${result.filename} was inserted into the visible resume/CV upload field. Check that the site displays the correct attachment before submitting.`;
+    $("fillNote").textContent = `${result.filename} was inserted into the resume/CV upload field. Check that the site displays the correct attachment before submitting.`;
   } catch (error) {
+    window.vjaLastUploadedCvName = null;
     showError(error?.message || String(error));
   } finally {
     $("uploadCv").disabled = false;
@@ -49,6 +53,9 @@ $("uploadCv")?.addEventListener("click", vjaUploadRecommendedCv);
 
 const cvNameNode = $("cvName");
 if (cvNameNode) {
-  new MutationObserver(() => vjaRefreshCvVaultStatus()).observe(cvNameNode, { childList: true, characterData: true, subtree: true });
+  new MutationObserver(() => {
+    window.vjaLastUploadedCvName = null;
+    vjaRefreshCvVaultStatus();
+  }).observe(cvNameNode, { childList: true, characterData: true, subtree: true });
 }
 vjaRefreshCvVaultStatus();
