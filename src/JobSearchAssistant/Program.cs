@@ -40,6 +40,8 @@ builder.Services.AddScoped<TailoredHhApplyService>();
 builder.Services.AddScoped<BrowserVacancyImportService>();
 builder.Services.AddScoped<ApplicationQueueService>();
 builder.Services.AddScoped<FollowUpQueueService>();
+builder.Services.AddScoped<ApplicationAttributionService>();
+builder.Services.AddScoped<OutcomeAnalyticsService>();
 builder.Services.AddScoped<StatsService>();
 builder.Services.AddHostedService<VacancyCollectorWorker>();
 builder.Services.AddHostedService<TelegramBotWorker>();
@@ -141,6 +143,9 @@ app.MapGet("/api/application-queue", async (int? limit, int? minScore, Applicati
 
 app.MapGet("/api/followups", async (int? afterBusinessDays, int? limit, int? maxAttempts, FollowUpQueueService followUps, CancellationToken ct)
     => Results.Ok(await followUps.GetAsync(afterBusinessDays ?? 5, limit ?? 30, maxAttempts ?? 2, ct)));
+
+app.MapGet("/api/analytics/outcomes", async (OutcomeAnalyticsService analytics, CancellationToken ct)
+    => Results.Ok(await analytics.GetAsync(ct)));
 
 app.MapGet("/api/vacancies", async (AppDbContext db, string? status, int? minScore, string? market, string? type, CancellationToken ct) =>
 {
@@ -261,6 +266,14 @@ app.MapPost("/api/vacancies/{id:guid}/mark-applied", async (Guid id, JobService 
 {
     await jobs.MarkExternalAppliedAsync(id, ct);
     return Results.Ok();
+});
+
+app.MapPost("/api/vacancies/{id:guid}/cv-attribution", async (Guid id, string? resumeLabel, ApplicationAttributionService attribution, CancellationToken ct) =>
+{
+    var recorded = await attribution.RecordExternalCvAsync(id, resumeLabel, ct);
+    return recorded
+        ? Results.Ok(new { status = "recorded", resumeLabel })
+        : Results.BadRequest(new { error = "cv_attribution_not_recorded" });
 });
 
 app.MapPost("/api/vacancies/{id:guid}/followup-sent", async (Guid id, FollowUpSentRequest request, FollowUpQueueService followUps, CancellationToken ct) =>
