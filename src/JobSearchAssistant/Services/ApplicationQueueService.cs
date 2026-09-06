@@ -36,17 +36,19 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
         var rows = await db.Vacancies
             .AsNoTracking()
             .Include(x => x.Company)
-            .Where(x => x.Status == VacancyStatus.New &&
+            .Include(x => x.Events)
+            .Where(x => (x.Status == VacancyStatus.New || x.Status == VacancyStatus.Saved) &&
                         !x.Company.IsBlacklisted &&
                         x.MatchScore >= minimumScore &&
                         x.EligibilityStatus != "Likely ineligible")
             .OrderByDescending(x => x.MatchScore)
             .ThenByDescending(x => x.PublishedAt ?? x.FirstSeenAt)
-            .Take(200)
+            .Take(300)
             .ToListAsync(ct);
 
         var now = DateTimeOffset.UtcNow;
         return rows
+            .Where(v => QueueDeferralPolicy.ShouldAppearInQueue(v, now))
             .Select(v =>
             {
                 var priorityScore = CalculatePriorityScore(v, now);
