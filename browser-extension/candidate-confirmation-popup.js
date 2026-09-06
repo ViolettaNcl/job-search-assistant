@@ -1,6 +1,30 @@
 window.vjaCandidateConfirmationState = null;
 window.vjaReviewNavigatorSelection = window.vjaReviewNavigatorSelection || null;
 
+function vjaEnsureCandidateConfirmationUi() {
+  let button = $("confirmReviewField");
+  let note = $("candidateConfirmationStatus");
+  if (button && note) return { button, note };
+
+  const anchor = $("reviewNavigatorStatus");
+  if (!anchor) return { button: null, note: null };
+
+  button = document.createElement("button");
+  button.id = "confirmReviewField";
+  button.className = "secondary full compactFull";
+  button.textContent = "I reviewed this field — next";
+  button.disabled = true;
+
+  note = document.createElement("p");
+  note.id = "candidateConfirmationStatus";
+  note.className = "note";
+  note.dataset.state = "idle";
+
+  anchor.insertAdjacentElement("afterend", note);
+  anchor.insertAdjacentElement("afterend", button);
+  return { button, note };
+}
+
 function vjaSanitizedCandidateConfirmationState() {
   return window.vjaCandidateConfirmation?.sanitizeState?.(window.vjaCandidateConfirmationState) || { salt: "", records: [] };
 }
@@ -15,12 +39,12 @@ async function vjaReadCandidateConfirmationStateFromSession() {
 }
 
 function vjaUpdateCandidateConfirmationUi(item = window.vjaReviewNavigatorSelection) {
-  const button = $("confirmReviewField");
-  const note = $("candidateConfirmationStatus");
+  const { button, note } = vjaEnsureCandidateConfirmationUi();
   if (!button || !note) return;
 
   if (!item) {
     button.disabled = true;
+    button.textContent = "I reviewed this field — next";
     note.textContent = "Open a field with Review Navigator, check or answer it on the employer page, then confirm that checkpoint here.";
     note.dataset.state = "idle";
     return;
@@ -99,7 +123,7 @@ if (typeof window.vjaRestoreApplicationSession === "function" && !window.vjaRest
 }
 
 async function vjaConfirmCurrentReviewField() {
-  const button = $("confirmReviewField");
+  const { button, note } = vjaEnsureCandidateConfirmationUi();
   const item = window.vjaReviewNavigatorSelection;
   if (!latest || !item) return showError("Use Next field needing me first.");
   clearError();
@@ -131,22 +155,25 @@ async function vjaConfirmCurrentReviewField() {
     await window.vjaSaveApplicationSession?.();
     window.vjaRenderSubmissionReadiness?.();
     vjaRefreshConfirmationCounts();
-    $("candidateConfirmationStatus").textContent = "Checkpoint confirmed for this application session without storing the answer. Moving to the next unresolved field…";
-    $("candidateConfirmationStatus").dataset.state = "confirmed";
+    if (note) {
+      note.textContent = "Checkpoint confirmed for this application session without storing the answer. Moving to the next unresolved field…";
+      note.dataset.state = "confirmed";
+    }
     window.vjaReviewNavigatorSelection = null;
     await window.vjaNavigateNextReviewField?.();
   } catch (error) {
     showError(error?.message || String(error));
-    if ($("candidateConfirmationStatus")) {
-      $("candidateConfirmationStatus").textContent = error?.message || String(error);
-      $("candidateConfirmationStatus").dataset.state = "error";
+    if (note) {
+      note.textContent = error?.message || String(error);
+      note.dataset.state = "error";
     }
   } finally {
     vjaUpdateCandidateConfirmationUi(window.vjaReviewNavigatorSelection);
   }
 }
 
-$("confirmReviewField")?.addEventListener("click", vjaConfirmCurrentReviewField);
+const vjaCandidateConfirmationUi = vjaEnsureCandidateConfirmationUi();
+vjaCandidateConfirmationUi.button?.addEventListener("click", vjaConfirmCurrentReviewField);
 
 for (const id of ["analyze", "prepareApplication"]) {
   $(id)?.addEventListener("click", () => {
