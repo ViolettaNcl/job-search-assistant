@@ -1,67 +1,93 @@
-# Violetta Global Job Search Assistant
+# Violetta Job Search Assistant
 
-Personal worldwide job-search CRM + Telegram assistant for Violetta Nicolaou.
+Personal Russia + Europe job-search CRM and application assistant for **Violetta Nicolaou**.
 
-The system is designed as a **multi-source international platform**, not an HH-only bot. HeadHunter is one adapter; international sources and company career pages are separate adapters feeding the same database and duplicate-protection layer.
+The project is built around one principle: find fewer but stronger opportunities, tailor the application to the actual vacancy, keep every claim truthful, and remove as much repetitive form-filling as possible.
 
 ## Current capabilities
 
-- Collects C#/.NET vacancies from **HeadHunter**, **Remotive**, and optionally **Adzuna**.
-- Searches international remote roles and selected country markets including the US, UK, Germany, Canada, Australia and Europe.
-- Calculates both **technical Match Score** and a separate **Eligibility** hint for geography/work authorization.
-- Flags obvious restrictions such as `US only`, `must be authorized to work in the United States`, and `no sponsorship`.
-- Gives priority signals to `Worldwide`, `Anywhere`, `visa sponsorship`, and `relocation support`.
-- Deduplicates the same vacancy inside a source and across multiple aggregators.
-- Maintains one company history across sources, so previous applications remain visible.
-- Tracks: New, Saved, Applied, HR Contact, HR Interview, Tech Interview, Test Task, Rejected, Offer, Skipped.
-- Telegram commands and inline buttons.
-- Web dashboard at `/`.
-- HH OAuth2 + encrypted tokens + existing-application import + official HH apply endpoint.
-- External jobs open the official/source application URL and have a one-click **Mark Applied** action.
-- Blacklist and watchlist companies.
-- Docker, PostgreSQL, GitHub Actions, MSTest.
+- Collects vacancies from **HeadHunter**, **Remotive**, and optionally **Adzuna**.
+- Focuses Violetta's search on Russia and Europe with Russia/EU work-authorization awareness.
+- Scores each vacancy for C#/.NET fit, junior suitability, eligibility and obvious skill gaps.
+- Deduplicates vacancies across sources and maintains one application history per job.
+- Tracks New, Saved, Applied, HR Contact, HR Interview, Tech Interview, Test Task, Rejected, Offer and Skipped.
+- Generates vacancy-specific Russian or English application drafts using verified candidate facts.
+- Repositions truthfully for .NET/backend/full-stack, QA and technical/implementation roles.
+- HH OAuth2 + encrypted tokens + resume selection + existing-application import.
+- Direct HH submission through HH's official applicant-authorized API for strong jobs after explicit confirmation.
+- Chrome extension companion with HH, Greenhouse, Lever, Ashby and generic ATS detection.
+- Safe form resolver classifies fields as **fill / review / blocked**.
+- Browser-local Application Memory can reuse explicitly confirmed answers such as phone or LinkedIn.
+- Salary, start-date, relocation, commercial-experience years, legal/security, ID, medical and demographic answers are not blindly automated.
+- External vacancies can be saved with their full browser-extracted description, location, remote status, eligibility and calculated match score.
+- Daily ranked application queue at **`/queue.html`**.
+- Telegram commands and responsive web dashboard.
+- PostgreSQL, Docker, GitHub Actions and MSTest.
 
-## Important application policy
+## Daily workflow
 
-There is no safe universal candidate API that can submit a resume to every job board worldwide.
+1. Run/visit the Job Search Assistant.
+2. Open **`/queue.html`** for the strongest current applications ranked by fit + freshness + eligibility.
+3. For HH.ru, use the official API apply flow when available.
+4. For Greenhouse, Lever, Ashby or another employer site, open the vacancy and use the Chrome extension.
+5. Review the generated message and any fields marked **review** or **blocked**.
+6. Submit the external form yourself, then click **Mark applied** so the CRM stays accurate.
 
-- HH supports applicant OAuth and application APIs, so direct submission is supported there.
-- Greenhouse and Lever have application APIs, but submission requires credentials/API keys controlled by the employer account, not a random candidate.
-- LinkedIn prohibits unauthorized bots/scraping/automated activity.
-- Other platforms have their own terms and application flows.
+The queue intentionally excludes jobs already marked Applied and jobs classified as likely ineligible.
 
-Therefore the global mode uses **official APIs where candidate submission is genuinely available**, and otherwise opens the official apply page and records the application after user confirmation. This protects the account from duplicate/spam submissions and platform bans.
+## Candidate truth source
+
+The `Candidate` section of `src/JobSearchAssistant/appsettings.json` contains the verified non-secret profile used for matching and autofill.
+
+The system knows, among other verified facts, that Violetta has Russian and Cyprus/EU work authorization, speaks Russian/English/Greek, has an honours programming diploma, and has a real-client DentalClinic project. It must never convert project work into invented years of salaried commercial employment.
+
+## Application policy
+
+There is no safe universal candidate API that can submit applications to every employer website.
+
+- **HH.ru:** direct application is supported through an applicant-authorized official API when OAuth and resume selection are configured.
+- **External ATS / company sites:** the extension analyzes and safely fills forms, but the final Submit/Apply action remains with the candidate.
+- CAPTCHA, 2FA and employer-specific legal declarations are never bypassed.
+
+This avoids account-risky mass-apply automation while still removing most repetitive work.
 
 ## Architecture
 
 ```text
-HH API ────────────────┐
-Remotive API ──────────┤
-Adzuna country APIs ───┤
-Manual/ATS links ──────┼──> JobService
-                       │       ↓
-                       │  cross-source dedup
-                       │       ↓
-                       │ match + eligibility
-                       │       ↓
-                       └──> PostgreSQL
-                              ↙      ↘
-                         Telegram   Dashboard
-                              ↓
-                  API apply or official apply URL
+HH / Remotive / Adzuna ──────────────┐
+Browser: HH / Greenhouse / Lever ────┤
+Browser: Ashby / other career sites ─┤
+                                      ↓
+                              vacancy normalization
+                                      ↓
+                         match + eligibility scoring
+                                      ↓
+                               PostgreSQL CRM
+                               ↙      ↓       ↘
+                         Telegram  Dashboard  /queue.html
+                                      ↓
+                     application draft + field resolver
+                               ↙              ↘
+                       HH official API      Chrome extension
+                                             ↓
+                                      candidate final submit
 ```
 
-Tech: .NET 10 LTS, ASP.NET Core Minimal API, EF Core, PostgreSQL, HttpClient, Docker, GitHub Actions, MSTest.
+Tech: **.NET 10 LTS, ASP.NET Core Minimal API, EF Core, PostgreSQL, HttpClient, Chrome Manifest V3, Docker, GitHub Actions, MSTest**.
 
 ## Setup
 
-For a complete Windows + **Visual Studio Code** walkthrough see:
+For the full Windows + Visual Studio Code walkthrough:
 
 **[`docs/SETUP_VSCODE_RU.md`](docs/SETUP_VSCODE_RU.md)**
 
-International architecture and roadmap:
+Apply Assistant architecture and safety rules:
 
-**[`docs/INTERNATIONAL_MODE_RU.md`](docs/INTERNATIONAL_MODE_RU.md)**
+**[`docs/APPLY_AUTOPILOT_V2.md`](docs/APPLY_AUTOPILOT_V2.md)**
+
+Chrome extension instructions:
+
+**[`browser-extension/README.md`](browser-extension/README.md)**
 
 ## Minimal Docker start
 
@@ -73,51 +99,41 @@ docker compose up --build -d
 
 Dashboard: `http://localhost:8080`
 
+Daily queue: `http://localhost:8080/queue.html`
+
+## Main API routes
+
+```text
+GET  /api/dashboard
+GET  /api/application-queue?limit=20&minScore=75
+POST /api/collect
+POST /api/extension/analyze
+POST /api/extension/resolve-fields
+POST /api/import/browser
+POST /api/import/hh
+POST /api/vacancies/{id}/apply-tailored
+POST /api/vacancies/{id}/mark-applied
+```
+
 ## Telegram commands
 
-- `/start` — help
-- `/today` — best new vacancies from all sources
+- `/today` — best new vacancies
 - `/best` — top matches
-- `/world` — international/non-HH jobs
-- `/sources` — source counts
+- `/world` — international jobs
 - `/applied` — applications
 - `/interviews` — interview/test pipeline
 - `/stats` — funnel statistics
 - `/resumes` — HH resumes
 - `/setresume ID` — choose HH resume
-- `/sync` — import existing HH application history
+- `/sync` — import HH application history
 - `/blacklist company` — block company
 - `/watch company` — watch company
-- send an HH URL — rich import through HH API
-- send any other job URL — store it in the unified CRM without duplicating the same URL
-
-## International sources
-
-### Remotive
-
-Enabled by default; no API key required. Remotive requires attribution and linking back to the source job URL. Its public API feed may be delayed compared with live listings.
-
-### Adzuna
-
-Disabled until credentials are configured. Register at `https://developer.adzuna.com/`, then set:
-
-```env
-ADZUNA_ENABLED=true
-ADZUNA_APP_ID=...
-ADZUNA_APP_KEY=...
-```
-
-Default country codes are configurable in `appsettings.json`.
-
-### HeadHunter
-
-HH can be used as another source before OAuth. Personal response history and direct application require applicant OAuth.
 
 ## Automatic submission
 
-`ENABLE_AUTOMATIC_SUBMISSION=false` by default.
+`Security__EnableAutomaticSubmission=false` remains the safe default.
 
-Current automatic submission is intentionally limited to HH because the system has a real applicant-authorized API there. International external sources never receive blind background submissions. For them the user opens the official application URL, completes any employer-specific questions, and clicks `✅ Я откликнулась` / `Mark Applied`.
+Background automatic submission is deliberately limited. HH's explicit applicant-authorized flow is the supported direct-submit path; external job sites remain review-first.
 
 ## Tests
 
@@ -125,61 +141,18 @@ Current automatic submission is intentionally limited to HH because the system h
 dotnet test tests/JobSearchAssistant.Tests/JobSearchAssistant.Tests.csproj
 ```
 
-Tests include strong-match scoring, Senior/Lead penalties, missing skills, and US-only work-authorization filtering.
+CI also validates the Chrome extension JavaScript syntax.
 
-## Roadmap
+## Deployment
 
-1. Public **Greenhouse / Lever / Ashby** readers for a configurable list of watched international companies.
-2. English Backend and Full-Stack CV variants with automatic recommendation of which one to use.
-3. Cover-letter generation with preview/approval.
-4. Email application adapter where the employer explicitly accepts email CVs.
-5. Calendar/interview reminders and reply ingestion.
-6. EF Core migrations before long-term production use.
+The repository contains `vercel.json` and `Dockerfile.vercel` for Vercel Container Services. The app can start in in-memory demo mode without PostgreSQL, but **do not use the in-memory fallback for real application history**, because container restarts can erase it.
 
-## Remote-only markets and employment types
+For persistent production use, configure PostgreSQL and the relevant HH/Telegram secrets through environment variables. Never commit access tokens, bot tokens or encryption keys to the repository.
 
-The assistant treats Russia and the international market as two equal search tracks. It does not hide Russian opportunities behind international feeds and keeps a single deduplicated CRM across sources.
+## Next development priorities
 
-**Markets**
-- 🇷🇺 Russia — primarily HeadHunter remote vacancies and internships.
-- 🌍 International — Remotive, Adzuna and manually added company/career-site vacancies.
-
-**Accepted remote employment types**
-- 💼 Remote Full-Time
-- 🤝 International Contractor / B2B
-- 🧩 Freelance / Project
-- 🎓 Internship / Trainee / Graduate
-
-Hybrid and on-site positions are intentionally excluded when `Search:RemoteOnly=true`.
-
-### Dashboard navigation
-
-The dashboard has dedicated views for **All**, **Russia**, **International**, **Internships**, **Strong Match**, and **Applications**, plus a separate employment-type filter and a job/company search field. The UI is responsive and optimized for quick daily review rather than displaying every source as one long feed.
-
-## Vercel deployment
-
-The repository now includes `vercel.json` and `Dockerfile.vercel` for Vercel Container Services.
-The container listens on Vercel's `$PORT`. If `ConnectionStrings__Postgres` is not configured,
-the application starts in an **in-memory demo mode** so the dashboard can be deployed and verified.
-For real application tracking, connect a persistent PostgreSQL database (recommended: Neon via the
-Vercel Marketplace) and set `ConnectionStrings__Postgres` in Production/Preview environment variables.
-
-Recommended production environment variables:
-
-```text
-ConnectionStrings__Postgres=postgresql connection string
-Telegram__BotToken=...
-Telegram__AllowedChatId=...
-HH__Enabled=true
-HH__ClientId=...
-HH__ClientSecret=...
-HH__RedirectUri=https://YOUR-PROJECT.vercel.app/api/hh/oauth/callback
-Remotive__Enabled=true
-Adzuna__Enabled=false
-Adzuna__AppId=...
-Adzuna__AppKey=...
-Security__EncryptionKeyBase64=...
-Security__EnableAutomaticSubmission=false
-```
-
-Do not use the in-memory fallback for real application history: container restarts can erase it.
+- validate and refine ATS selectors against real Greenhouse/Lever/Ashby applications;
+- optional deeper language-model tailoring with a deterministic truthful fallback;
+- follow-up queue for high-value applications with no response;
+- verified profile fields for phone/LinkedIn after explicit user confirmation;
+- production database migrations and deployment hardening.
