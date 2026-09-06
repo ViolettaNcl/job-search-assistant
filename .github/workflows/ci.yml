@@ -17,14 +17,18 @@ jobs:
         run: |
           node --check browser-extension/background.js
           node --check browser-extension/ats-structured.js
+          node --check browser-extension/ats-controls.js
           node --check browser-extension/content.js
           node --check browser-extension/popup.js
           node --check browser-extension/cv-upload.js
           node --check browser-extension/cv-vault-popup.js
           node --check browser-extension/options.js
           node --check browser-extension/ats-structured.test.js
+          node --check browser-extension/ats-controls.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
+      - name: Test ATS custom controls
+        run: node browser-extension/ats-controls.test.js
       - name: Validate dashboard inline JavaScript
         run: |
           python3 - <<'PY'
