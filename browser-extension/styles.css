@@ -47,6 +47,7 @@ button:disabled { opacity: .55; cursor: default; }
 .readinessItemTop strong { font-size: 10px; line-height: 1.35; min-width: 0; }
 .readinessBadge { flex: none; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; padding: 2px 5px; border-radius: 999px; background: #fff0d5; color: #854d0e; }
 .readinessItem-blocked .readinessBadge { background: #fde8ea; color: #9f1239; }
+.readinessItem-failed .readinessBadge { background: #ffe8d9; color: #9a3412; }
 .readinessReason { display: block; color: #6b7280; font-size: 9px; line-height: 1.4; margin: 3px 0 0; }
 .readinessMore { font-size: 9px; color: #6b7280; margin-top: 7px; }
 .readinessCv { display: grid; gap: 2px; margin-top: 9px; padding: 7px 8px; border-radius: 8px; background: #f5f6f8; }
