@@ -41,7 +41,7 @@ function clearError() {
 }
 
 function setBusy(busy) {
-  for (const id of ["analyze", "fillForm", "copyLetter", "applyHh", "findCv", "rememberAnswers", "clearMemory", "trackJob", "markApplied"]) {
+  for (const id of ["analyze", "fillForm", "copyLetter", "applyHh", "findCv", "rememberAnswers", "clearMemory", "trackJob", "markApplied", "nextReviewField", "confirmReviewField"]) {
     if ($(id)) $(id).disabled = busy;
   }
   $("analyze").textContent = busy ? "Working…" : "Analyze this vacancy";
@@ -109,6 +109,12 @@ async function refreshFieldPlan() {
   const api = await getApiBase();
   latestScan = await sendToPage({ type: "scanFields" });
   if (latestScan?.error) throw new Error(latestScan.error);
+  if (window.vjaCandidateConfirmation?.annotate) {
+    latestScan.fields = await window.vjaCandidateConfirmation.annotate(
+      latestScan.fields || [],
+      window.vjaCandidateConfirmationState
+    );
+  }
 
   const memory = await getMemory();
   const response = await fetch(`${api}/api/extension/resolve-fields`, {
@@ -139,6 +145,9 @@ async function analyze() {
   setBusy(true);
   try {
     latestTrackedId = null;
+    window.vjaCandidateConfirmationState = null;
+    window.vjaReviewNavigatorSelection = null;
+    window.vjaUpdateCandidateConfirmationUi?.(null);
     latestPage = await sendToPage({ type: "extractPage" });
     if (latestPage?.error) throw new Error(latestPage.error);
     const api = await getApiBase();

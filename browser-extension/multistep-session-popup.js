@@ -1,5 +1,6 @@
 let vjaSessionSaveTimer = null;
 window.vjaCurrentStepHistory = Array.isArray(window.vjaCurrentStepHistory) ? window.vjaCurrentStepHistory : [];
+window.vjaCandidateConfirmationState = window.vjaCandidateConfirmationState || null;
 
 async function vjaSessionSlot() {
   if (!chrome.storage?.session || !window.vjaApplicationSession) return null;
@@ -31,7 +32,8 @@ async function vjaSaveApplicationSession() {
     latestPage,
     latestTrackedId,
     coverLetter: $("coverLetter")?.value || latest?.draft?.coverLetter || "",
-    stepHistory: window.vjaCurrentStepHistory || []
+    stepHistory: window.vjaCurrentStepHistory || [],
+    candidateConfirmations: window.vjaCandidateConfirmationState
   });
   if (!session) return;
   await chrome.storage.session.set({ [slot.key]: session });
@@ -50,7 +52,10 @@ async function vjaClearApplicationSession({ resetUi = false } = {}) {
   if (slot) await chrome.storage.session.remove(slot.key);
   vjaShowSessionStatus("");
   window.vjaCurrentStepHistory = [];
+  window.vjaCandidateConfirmationState = null;
+  window.vjaReviewNavigatorSelection = null;
   window.vjaRenderApplicationStep?.(null);
+  window.vjaUpdateCandidateConfirmationUi?.(null);
 
   if (resetUi) {
     latest = null;
@@ -132,6 +137,8 @@ async function vjaRestoreApplicationSession() {
   latestPage = session.latestPage;
   latestTrackedId = session.latestTrackedId || null;
   window.vjaCurrentStepHistory = Array.isArray(session.stepHistory) ? session.stepHistory : [];
+  window.vjaCandidateConfirmationState = window.vjaApplicationSession.sanitizeCandidateConfirmations(session.candidateConfirmations);
+  window.vjaReviewNavigatorSelection = null;
   vjaRenderRestoredAnalysis(session);
 
   const restoredLabel = restoredViaHandoff
@@ -142,11 +149,14 @@ async function vjaRestoreApplicationSession() {
     await refreshFieldPlan();
     window.vjaRenderSubmissionReadiness?.();
     window.vjaCaptureApplicationStep?.();
-    const review = Number(latestPlan?.reviewCount || 0);
-    const blocked = Number(latestPlan?.blockedCount || 0);
+    window.vjaUpdateCandidateConfirmationUi?.(null);
+    const readiness = typeof vjaCurrentReadiness === "function" ? vjaCurrentReadiness() : null;
+    const review = Number(readiness?.reviewCount ?? latestPlan?.reviewCount ?? 0) + Number(readiness?.failedCount || 0);
+    const blocked = Number(readiness?.blockedCount ?? latestPlan?.blockedCount ?? 0);
+    const confirmed = Number(readiness?.confirmedCount || 0);
     $("fillNote").textContent = review || blocked
-      ? `Restored this application session on the current ATS step. ${review} fields need review and ${blocked} are manual-only.`
-      : "Restored this application session on the current ATS step. No unresolved fields were detected by the assistant; review the full form before submitting.";
+      ? `Restored this application session on the current ATS step. ${review} fields need review and ${blocked} are manual-only.${confirmed ? ` ${confirmed} previously reviewed checkpoint${confirmed === 1 ? " is" : "s are"} still confirmed.` : ""}`
+      : `Restored this application session on the current ATS step.${confirmed ? ` ${confirmed} candidate-reviewed checkpoint${confirmed === 1 ? " remains" : "s remain"} confirmed.` : " No unresolved fields were detected by the assistant;"} Review the full form before submitting.`;
     vjaShowSessionStatus(restoredLabel);
     setDot(true);
   } catch (error) {
