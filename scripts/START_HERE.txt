@@ -1,0 +1,49 @@
+VIOLETTA APPLY ASSISTANT — WINDOWS QUICK START
+=============================================
+
+1. Extract the whole ZIP to a normal folder.
+
+2. Double-click:
+   start-assistant.cmd
+
+   The launcher starts the local backend at:
+   http://127.0.0.1:8080
+
+3. FIRST INSTALL ONLY — install the Chrome extension locally:
+   - Open chrome://extensions
+   - Enable Developer mode
+   - Click Load unpacked
+   - Select the included "extension" folder
+   - Pin "Violetta Apply Assistant"
+
+4. Open the extension's options page / Setup & Readiness.
+   Run the system check.
+
+5. Store the two CV PDFs once:
+   - English CV
+   - Russian CV
+
+6. If you want HH.ru direct API submission, configure HH applicant API credentials locally:
+   - Copy user-settings.example.cmd to user-settings.cmd
+   - Fill HH__ClientId and HH__ClientSecret
+   - Keep user-settings.cmd private
+   - Restart start-assistant.cmd
+   - In Setup & Readiness click Connect / refresh HH.ru
+   - Complete HH OAuth in the browser
+
+   HH is optional. External ATS application preparation works without HH direct API access.
+
+7. Normal application workflow:
+   - Open a vacancy (or use Open next strong job)
+   - Click Prepare application
+   - Review any highlighted checkpoints
+   - Verify the CV attachment
+   - Submit the employer form yourself on external ATS sites
+   - Record the verified submission in the assistant
+
+IMPORTANT
+---------
+- Never share user-settings.cmd.
+- Never paste passwords, SMS codes, CAPTCHA answers or 2FA codes into configuration files.
+- The bundled default database is in-memory unless you configure PostgreSQL, so local history resets when the backend stops. Use persistent PostgreSQL if application history must survive restarts.
+- CV Vault PDFs are stored in Chrome local extension storage, not in this backend bundle.
