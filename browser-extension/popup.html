@@ -11,7 +11,7 @@
     <header>
       <div>
         <h1>Violetta Apply Assistant</h1>
-        <p>Analyze → tailor → fill → review → submit yourself.</p>
+        <p>Analyze → tailor → fill. HH can also submit through its official API.</p>
       </div>
       <span id="statusDot" class="dot"></span>
     </header>
@@ -50,7 +50,9 @@
         <button id="fillForm" class="primary">Fill application</button>
       </div>
 
-      <p id="fillNote" class="note">The extension fills common fields but never presses the final Submit/Apply button.</p>
+      <button id="applyHh" class="primary full hidden">Apply on HH via official API</button>
+
+      <p id="fillNote" class="note">External sites: review the filled form before submitting. HH: the dedicated button can submit directly after an explicit confirmation when HH OAuth and a resume are configured.</p>
     </section>
 
     <p id="error" class="error hidden"></p>
