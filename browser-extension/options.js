@@ -18,16 +18,30 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
+function hasPdfSignature(buffer) {
+  const bytes = new Uint8Array(buffer);
+  return bytes.length >= 5
+    && bytes[0] === 0x25
+    && bytes[1] === 0x50
+    && bytes[2] === 0x44
+    && bytes[3] === 0x46
+    && bytes[4] === 0x2d;
+}
+
 async function serializeFile(file) {
   if (!file) throw new Error("Choose a PDF first.");
-  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-  if (!isPdf) throw new Error("Only PDF CV files are supported.");
+  const looksLikePdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  if (!looksLikePdf) throw new Error("Only PDF CV files are supported.");
   if (file.size > 15 * 1024 * 1024) throw new Error("Please use a PDF smaller than 15 MB.");
+
+  const buffer = await file.arrayBuffer();
+  if (!hasPdfSignature(buffer)) throw new Error("This file does not contain a valid PDF signature.");
+
   return {
     name: file.name,
-    type: file.type || "application/pdf",
+    type: "application/pdf",
     size: file.size,
-    base64: arrayBufferToBase64(await file.arrayBuffer()),
+    base64: arrayBufferToBase64(buffer),
     savedAt: new Date().toISOString()
   };
 }
