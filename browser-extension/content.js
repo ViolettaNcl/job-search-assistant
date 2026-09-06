@@ -385,6 +385,10 @@ function waitForUiSettle(milliseconds = 90) {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
+function isRadioAlternative(el) {
+  return el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox");
+}
+
 async function applyFieldPlan(resolutions) {
   let filled = 0;
   let skippedExisting = 0;
@@ -405,13 +409,13 @@ async function applyFieldPlan(resolutions) {
       continue;
     }
     if (item.action !== "fill") continue;
-    if (currentValue(el) && !(el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox"))) {
+    if (currentValue(el) && !isRadioAlternative(el)) {
       skippedExisting++;
       continue;
     }
     if (setFieldValue(el, item.value)) {
       attempts.push({ token: item.token, expected: item.value, element: el });
-    } else {
+    } else if (!isRadioAlternative(el)) {
       markFillFailure(el, item.token);
       failed++;
     }
