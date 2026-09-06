@@ -14,6 +14,7 @@ async function vjaRefreshCvVaultStatus() {
   if (!status) return;
   if (!latest?.draft) {
     status.textContent = "Analyze a vacancy to choose the CV";
+    window.vjaRenderSubmissionReadiness?.();
     return;
   }
   const { data, language } = await vjaGetRecommendedStoredCv();
@@ -22,6 +23,7 @@ async function vjaRefreshCvVaultStatus() {
   } else {
     status.textContent = `${language === "ru" ? "Russian" : "English"} CV not stored yet`;
   }
+  window.vjaRenderSubmissionReadiness?.();
 }
 
 async function vjaUploadRecommendedCv() {
@@ -30,6 +32,7 @@ async function vjaUploadRecommendedCv() {
   const { data, language } = await vjaGetRecommendedStoredCv();
   if (!data?.base64) {
     $("cvVaultStatus").textContent = `${language === "ru" ? "Russian" : "English"} CV is not stored yet.`;
+    window.vjaRenderSubmissionReadiness?.();
     await chrome.runtime.openOptionsPage();
     return;
   }
@@ -42,9 +45,11 @@ async function vjaUploadRecommendedCv() {
     window.vjaLastAttributedApplicationKey = null;
     $("cvVaultStatus").textContent = `Uploaded: ${result.filename}`;
     $("fillNote").textContent = `${result.filename} was inserted into the resume/CV upload field. Check that the site displays the correct attachment before submitting.`;
+    window.vjaRenderSubmissionReadiness?.();
   } catch (error) {
     window.vjaLastUploadedCvName = null;
     window.vjaLastAttributedApplicationKey = null;
+    window.vjaRenderSubmissionReadiness?.();
     showError(error?.message || String(error));
   } finally {
     $("uploadCv").disabled = false;
@@ -81,6 +86,7 @@ if (cvNameNode) {
     window.vjaLastUploadedCvName = null;
     window.vjaLastAttributedApplicationKey = null;
     vjaRefreshCvVaultStatus();
+    window.vjaRenderSubmissionReadiness?.();
   }).observe(cvNameNode, { childList: true, characterData: true, subtree: true });
 }
 
