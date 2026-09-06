@@ -136,6 +136,11 @@ function labelFor(el) {
       if (explicit) parts.push(textOf(explicit));
     } catch { }
   }
+  const labelledBy = (el.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean);
+  for (const ref of labelledBy) {
+    const labelled = document.getElementById(ref);
+    if (labelled) parts.push(textOf(labelled));
+  }
   const parentLabel = el.closest("label");
   if (parentLabel) parts.push(textOf(parentLabel));
   const fieldset = el.closest("fieldset");
@@ -150,9 +155,37 @@ function labelFor(el) {
   return [...new Set(parts.filter(Boolean))].join(" ").trim();
 }
 
+function elementMeta(el) {
+  return {
+    tagName: el.tagName || "",
+    role: el.getAttribute("role") || "",
+    ariaHasPopup: el.getAttribute("aria-haspopup") || ""
+  };
+}
+
+function customFieldType(el) {
+  return window.vjaAtsControls?.classifyElementMeta?.(elementMeta(el)) || "";
+}
+
+function fieldType(el) {
+  const custom = customFieldType(el);
+  if (custom) return custom;
+  if (el instanceof HTMLSelectElement) return "select";
+  if (el instanceof HTMLTextAreaElement) return "textarea";
+  return el.type || "text";
+}
+
 function visibleFields() {
   return [...document.querySelectorAll("input, textarea, select")]
-    .filter(el => !el.disabled && !el.readOnly && el.type !== "hidden" && el.type !== "submit" && el.type !== "button" && el.offsetParent !== null);
+    .filter(el => !el.disabled && !el.readOnly && el.type !== "hidden" && el.type !== "submit" && el.type !== "button" && el.offsetParent !== null)
+    .filter(el => !(el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox") && el.closest("[role='radiogroup']")));
+}
+
+function visibleCustomControls() {
+  const selector = "[role='combobox'], [role='radiogroup'], button[aria-haspopup='listbox'], [role='button'][aria-haspopup='listbox']";
+  return [...document.querySelectorAll(selector)]
+    .filter(el => !(el instanceof HTMLInputElement) && !(el instanceof HTMLSelectElement) && !(el instanceof HTMLTextAreaElement))
+    .filter(el => el.offsetParent !== null && el.getAttribute("aria-disabled") !== "true");
 }
 
 function ensureToken(el, index) {
@@ -161,19 +194,35 @@ function ensureToken(el, index) {
 }
 
 function currentValue(el) {
+  const custom = customFieldType(el);
+  if (custom === "radiogroup") {
+    const selected = el.querySelector("[role='radio'][aria-checked='true']");
+    return selected ? textOf(selected) : "";
+  }
+  if (custom === "combobox") {
+    if (el instanceof HTMLInputElement) return String(el.value || "").trim();
+    return String(el.getAttribute("aria-valuetext") || el.getAttribute("data-value") || "").trim();
+  }
   if (el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox")) {
     return el.checked ? (el.value || "checked") : "";
   }
   return String(el.value || "").trim();
 }
 
+function customOptions(el, type) {
+  if (type !== "radiogroup") return null;
+  const options = [...el.querySelectorAll("[role='radio']")].map(textOf).filter(Boolean);
+  return options.length ? [...new Set(options)] : null;
+}
+
 function scanFields() {
-  const fields = visibleFields().map((el, index) => {
+  const elements = [...visibleFields(), ...visibleCustomControls()];
+  const fields = elements.map((el, index) => {
     const token = ensureToken(el, index);
-    const type = el instanceof HTMLSelectElement ? "select" : el instanceof HTMLTextAreaElement ? "textarea" : el.type || "text";
+    const type = fieldType(el);
     const options = el instanceof HTMLSelectElement
       ? [...el.options].map(o => (o.textContent || o.value || "").trim()).filter(Boolean)
-      : null;
+      : customOptions(el, type);
     return {
       token,
       label: labelFor(el),
@@ -229,6 +278,7 @@ function setRadioOrCheckbox(el, value) {
 
 function setFieldValue(el, value) {
   if (value == null || value === "" || el.type === "file") return false;
+  if (window.vjaAtsControls?.isInteractiveReviewType?.(fieldType(el))) return false;
   if (el instanceof HTMLSelectElement) return setSelectValue(el, value);
   if (el instanceof HTMLInputElement && (el.type === "radio" || el.type === "checkbox")) return setRadioOrCheckbox(el, value);
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
