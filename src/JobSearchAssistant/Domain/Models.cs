@@ -106,12 +106,36 @@ public sealed class AppState
 public sealed record CandidateProfileOptions
 {
     public string Name { get; init; } = "Violetta Nicolaou";
+    public string RussianName { get; init; } = "Виолетта Николау";
+    public string GreekName { get; init; } = "Βιολέττα Νικολάου";
     public string Email { get; init; } = "violettanicolaou@gmail.com";
     public string CurrentCountry { get; init; } = "Russia";
+    public string CurrentCity { get; init; } = "Volgograd";
     public string GitHubUrl { get; init; } = "https://github.com/ViolettaNcl";
     public string CvUrl { get; init; } = "https://violetta-cv.vercel.app/";
+    public string EnglishCvFileName { get; init; } = "Violetta_Nicolaou_CV_EN_v2.pdf";
+    public string RussianCvFileName { get; init; } = "Violetta_Nicolaou_CV_RU_v2.pdf";
+    public string Education { get; init; } = "09.02.07 Information Systems and Programming — Programmer, honours diploma, TOP Academy, July 2026";
+    public string MainProjectUrl { get; init; } = "https://github.com/ViolettaNcl/DentalClinic";
+    public string MainProjectSummary { get; init; } = "Independent real-client dental-practice platform built with ASP.NET Core, EF Core, SQL Server, JWT, SignalR, background jobs, Docker, testing and AI integrations.";
+    public bool RussiaWorkAuthorized { get; init; } = true;
+    public bool EuWorkAuthorized { get; init; } = true;
     public bool OpenToWorldwideRemote { get; init; } = true;
     public bool OpenToRelocationWithVisaSponsorship { get; init; } = false;
+    public string[] Citizenships { get; init; } = ["Russia", "Cyprus / EU"];
+    public string[] FluentLanguages { get; init; } = ["Russian", "English", "Greek"];
+    public string[] CoreSkills { get; init; } =
+    [
+        "C#", ".NET", "ASP.NET Core", "Web API", "Entity Framework Core", "EF Core", "SQL Server", "SQL",
+        "REST API", "REST", "LINQ", "Docker", "Git", "GitHub Actions", "Automated Testing", "MSTest", "xUnit",
+        "JavaScript", "TypeScript", "React", "Next.js", "SignalR", "JWT", "WPF", "XAML"
+    ];
+    public string[] PreferredRoles { get; init; } =
+    [
+        "Junior C# Developer", "Junior .NET Developer", "Junior ASP.NET Core Developer", "Junior Backend Developer",
+        "Junior Full-Stack Developer", "Associate Software Engineer", "Graduate Software Engineer", ".NET Intern",
+        "Junior QA Engineer", "Junior QA Automation Engineer", "Junior Implementation Engineer", "Technical Support Engineer"
+    ];
     public string[] EmploymentTypes { get; init; } = ["Full-time", "Contractor/B2B", "Freelance/Project", "Internship"];
 }
 
@@ -178,7 +202,7 @@ public sealed record AdzunaOptions
     public bool Enabled { get; init; } = false;
     public string AppId { get; init; } = "";
     public string AppKey { get; init; } = "";
-    public string[] CountryCodes { get; init; } = ["us", "gb", "de", "ca", "au", "fr", "nl", "pl"];
+    public string[] CountryCodes { get; init; } = ["gb", "de", "fr", "nl", "pl", "es", "pt", "ie"];
     public int ResultsPerPage { get; init; } = 25;
 }
 
