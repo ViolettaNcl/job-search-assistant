@@ -67,6 +67,7 @@ app.MapGet("/health", () => Results.Ok(new
     latestMigration = databaseBootstrap.LatestMigration,
     appliedMigrations = databaseBootstrap.AppliedMigrations
 }));
+app.MapRuntimeHealth(persistentDatabase, databaseBootstrap);
 
 app.MapGet("/api/candidate", (IOptions<CandidateProfileOptions> options) =>
 {
