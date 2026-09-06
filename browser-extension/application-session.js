@@ -37,6 +37,24 @@
     return families.find(domain => host === domain || host.endsWith(`.${domain}`)) || host;
   }
 
+  function tenantKey(value) {
+    const parsed = safeUrl(value);
+    if (!parsed) return "";
+    const host = parsed.hostname.toLowerCase();
+
+    const workday = host.match(/^([^.]+)\.wd\d+\.myworkdayjobs\.com$/);
+    if (workday) return `workday:${workday[1]}`;
+
+    for (const domain of ["teamtailor.com", "recruitee.com", "workable.com", "personio.de", "personio.com"]) {
+      if (host.endsWith(`.${domain}`)) {
+        const tenant = host.slice(0, -(domain.length + 1)).split(".")[0];
+        return tenant ? `${domain}:${tenant}` : "";
+      }
+    }
+
+    return "";
+  }
+
   function isApplicationLike(value) {
     const parsed = safeUrl(value);
     if (!parsed) return false;
@@ -76,9 +94,14 @@
     const sameOrigin = source.origin === current.origin;
     const sourceFamily = hostFamily(source);
     const currentFamily = hostFamily(current);
-    const sameKnownFamily = sourceFamily && currentFamily && sourceFamily === currentFamily && sourceFamily.includes(".");
+    const sourceTenant = tenantKey(source);
+    const currentTenant = tenantKey(current);
+    const sameKnownTenant = Boolean(
+      sourceFamily && currentFamily && sourceFamily === currentFamily &&
+      sourceTenant && currentTenant && sourceTenant === currentTenant
+    );
 
-    return Boolean((sameOrigin || sameKnownFamily) && isApplicationLike(current));
+    return Boolean((sameOrigin || sameKnownTenant) && isApplicationLike(current));
   }
 
   function slotKey(tabId) {
@@ -91,6 +114,7 @@
     SESSION_VERSION,
     normalizedUrl,
     hostFamily,
+    tenantKey,
     isApplicationLike,
     create,
     isExpired,
