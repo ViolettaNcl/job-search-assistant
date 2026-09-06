@@ -31,6 +31,7 @@ builder.Services.AddHttpClient("adzuna");
 builder.Services.AddSingleton<SecretCipher>();
 builder.Services.AddSingleton<MatchScoringService>();
 builder.Services.AddSingleton<ApplicationDraftService>();
+builder.Services.AddSingleton<ApplicationQuestionService>();
 builder.Services.AddScoped<HhClient>();
 builder.Services.AddScoped<RemotiveClient>();
 builder.Services.AddScoped<AdzunaClient>();
@@ -187,6 +188,9 @@ app.MapPost("/api/extension/analyze", (ExtensionAnalyzeRequest request, MatchSco
         draft
     });
 });
+
+app.MapPost("/api/extension/resolve-fields", (ResolveApplicationFieldsRequest request, ApplicationQuestionService questions)
+    => Results.Ok(questions.Resolve(request)));
 
 app.MapPost("/api/collect", async (JobService jobs, IOptions<SearchOptions> options, CancellationToken ct)
     => Results.Ok(await jobs.CollectAsync(options.Value, ct)));

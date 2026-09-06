@@ -1,6 +1,9 @@
 const $ = (id) => document.getElementById(id);
 let latest = null;
 let latestPage = null;
+let latestScan = null;
+let latestPlan = null;
+let latestTrackedId = null;
 
 async function getApiBase() {
   const stored = await chrome.storage.sync.get({ apiBase: "http://localhost:8080" });
@@ -11,6 +14,15 @@ async function saveApiBase() {
   const value = $("apiBase").value.trim().replace(/\/$/, "");
   await chrome.storage.sync.set({ apiBase: value });
   setDot(true);
+}
+
+async function getMemory() {
+  const stored = await chrome.storage.local.get({ applicationMemory: {} });
+  return stored.applicationMemory || {};
+}
+
+async function setMemory(memory) {
+  await chrome.storage.local.set({ applicationMemory: memory || {} });
 }
 
 function setDot(ok) {
@@ -28,10 +40,9 @@ function clearError() {
 }
 
 function setBusy(busy) {
-  $("analyze").disabled = busy;
-  $("fillForm").disabled = busy;
-  $("copyLetter").disabled = busy;
-  $("applyHh").disabled = busy;
+  for (const id of ["analyze", "fillForm", "copyLetter", "applyHh", "findCv", "rememberAnswers", "clearMemory", "trackJob", "markApplied"]) {
+    if ($(id)) $(id).disabled = busy;
+  }
   $("analyze").textContent = busy ? "Working…" : "Analyze this vacancy";
 }
 
@@ -64,11 +75,48 @@ function isHhVacancy(url) {
   }
 }
 
+function prettyAts(value) {
+  const labels = { hh: "HH.ru", greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", generic: "Generic form" };
+  return labels[value] || value || "Generic form";
+}
+
+async function refreshFieldPlan() {
+  if (!latest || !latestPage) throw new Error("Analyze the vacancy first.");
+  const api = await getApiBase();
+  latestScan = await sendToPage({ type: "scanFields" });
+  if (latestScan?.error) throw new Error(latestScan.error);
+
+  const memory = await getMemory();
+  const response = await fetch(`${api}/api/extension/resolve-fields`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      country: latestPage.country || "",
+      language: latest.draft.language,
+      coverLetter: $("coverLetter").value || latest.draft.coverLetter,
+      shortMessage: latest.draft.shortMessage,
+      memory,
+      fields: latestScan.fields || []
+    })
+  });
+  if (!response.ok) throw new Error(`Field resolver returned ${response.status}.`);
+  latestPlan = await response.json();
+
+  $("atsName").textContent = prettyAts(latestScan.ats || latestPage.ats);
+  $("autofillCount").textContent = latestPlan.autofillCount ?? 0;
+  $("reviewCount").textContent = latestPlan.reviewCount ?? 0;
+  $("blockedCount").textContent = latestPlan.blockedCount ?? 0;
+  $("cvName").textContent = latest.draft.recommendedCv || "Choose CV manually";
+  return latestPlan;
+}
+
 async function analyze() {
   clearError();
   setBusy(true);
   try {
+    latestTrackedId = null;
     latestPage = await sendToPage({ type: "extractPage" });
+    if (latestPage?.error) throw new Error(latestPage.error);
     const api = await getApiBase();
     const response = await fetch(`${api}/api/extension/analyze`, {
       method: "POST",
@@ -87,8 +135,17 @@ async function analyze() {
     chips($("missing"), latest.match.missing);
     $("result").classList.remove("hidden");
 
-    const canDirectApply = isHhVacancy(latestPage?.url) && latest.match.score >= 75;
+    await refreshFieldPlan();
+
+    const hh = isHhVacancy(latestPage?.url);
+    const canDirectApply = hh && latest.match.score >= 75;
     $("applyHh").classList.toggle("hidden", !canDirectApply);
+    $("externalActions").classList.toggle("hidden", hh);
+    $("trackJob").textContent = "Save to tracker";
+    $("markApplied").textContent = "Mark applied";
+    $("fillNote").textContent = latestPlan.reviewCount || latestPlan.blockedCount
+      ? `${latestPlan.autofillCount} fields can be filled safely. ${latestPlan.reviewCount} need review and ${latestPlan.blockedCount} are intentionally blocked from automation.`
+      : `${latestPlan.autofillCount} fields can be filled safely. Review the final form before submitting.`;
     setDot(true);
   } catch (error) {
     setDot(false);
@@ -114,16 +171,116 @@ async function fillForm() {
   if (!latest) return showError("Analyze the vacancy first.");
   setBusy(true);
   try {
+    await refreshFieldPlan();
+    const result = await sendToPage({ type: "applyFieldPlan", resolutions: latestPlan.fields || [] });
+    if (result?.error) throw new Error(result.error);
+    $("fillNote").textContent = `Filled ${result?.filled || 0} safe fields. ${result?.review || 0} need your review; ${result?.blocked || 0} are intentionally left to you. Existing answers were not overwritten.`;
+  } catch (error) {
+    showError(error?.message || String(error));
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function rememberAnswers() {
+  clearError();
+  if (!latest) return showError("Analyze the vacancy first.");
+  setBusy(true);
+  try {
+    await refreshFieldPlan();
+    const confirmed = await sendToPage({ type: "collectRememberable", resolutions: latestPlan.fields || [] });
+    if (confirmed?.error) throw new Error(confirmed.error);
+    const entries = Object.entries(confirmed || {}).filter(([, value]) => String(value || "").trim());
+    if (!entries.length) {
+      $("memoryNote").textContent = "Nothing new to remember. Fill a reusable field such as phone or LinkedIn first, then click this button.";
+      return;
+    }
+    const memory = await getMemory();
+    for (const [key, value] of entries) memory[key] = value;
+    await setMemory(memory);
+    $("memoryNote").textContent = `Saved ${entries.length} confirmed reusable answer${entries.length === 1 ? "" : "s"} in this browser. Sensitive and job-specific fields are excluded.`;
+    await refreshFieldPlan();
+  } catch (error) {
+    showError(error?.message || String(error));
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function clearMemory() {
+  clearError();
+  const confirmed = window.confirm("Clear the reusable application answers saved by this extension on this browser?");
+  if (!confirmed) return;
+  await setMemory({});
+  $("memoryNote").textContent = "Saved application answers cleared. Verified candidate facts still come from the Job Search Assistant profile.";
+  if (latest) {
+    try { await refreshFieldPlan(); } catch { }
+  }
+}
+
+async function findCvUpload() {
+  clearError();
+  if (!latest) return showError("Analyze the vacancy first.");
+  try {
+    const result = await sendToPage({ type: "highlightCvUpload", filename: latest.draft.recommendedCv });
+    if (result?.error) throw new Error(result.error);
+    if (!result?.found) {
+      $("fillNote").textContent = `No visible file-upload field was found on this page. Recommended CV: ${latest.draft.recommendedCv}.`;
+      return;
+    }
+    $("fillNote").textContent = `Highlighted the CV upload field. Choose ${latest.draft.recommendedCv}. Browsers do not allow extensions to silently select a local file for security reasons.`;
+  } catch (error) {
+    showError(error?.message || String(error));
+  }
+}
+
+async function ensureTracked() {
+  if (latestTrackedId) return latestTrackedId;
+  if (!latestPage?.url) throw new Error("Analyze a vacancy first.");
+  const api = await getApiBase();
+  const hh = isHhVacancy(latestPage.url);
+  const response = await fetch(hh ? `${api}/api/import/hh` : `${api}/api/import/manual`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(hh
+      ? { url: latestPage.url }
+      : { url: latestPage.url, title: latestPage.title || null, company: latestPage.company || null })
+  });
+  if (!response.ok) throw new Error(`Could not save this vacancy to the tracker (${response.status}).`);
+  const payload = await response.json();
+  latestTrackedId = payload.id;
+  return latestTrackedId;
+}
+
+async function trackJob() {
+  clearError();
+  if (!latest) return showError("Analyze the vacancy first.");
+  setBusy(true);
+  try {
+    await ensureTracked();
+    $("trackJob").textContent = "Saved ✓";
+    $("fillNote").textContent = "Vacancy saved in Job Search Assistant. Duplicate URLs are protected by the existing import logic.";
+  } catch (error) {
+    showError(error?.message || String(error));
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function markApplied() {
+  clearError();
+  if (!latest) return showError("Analyze the vacancy first.");
+  const confirmed = window.confirm("Mark this external vacancy as applied in Job Search Assistant? Do this after you have submitted the application on the employer site.");
+  if (!confirmed) return;
+  setBusy(true);
+  try {
+    const id = await ensureTracked();
     const api = await getApiBase();
-    const candidateResponse = await fetch(`${api}/api/candidate`);
-    if (!candidateResponse.ok) throw new Error("Could not load candidate profile from backend.");
-    const candidate = await candidateResponse.json();
-    const result = await sendToPage({
-      type: "fillApplication",
-      candidate,
-      draft: { ...latest.draft, coverLetter: $("coverLetter").value }
-    });
-    $("fillNote").textContent = `Filled ${result?.filled || 0} fields. Review every answer before pressing the site's final Submit/Apply button.`;
+    const response = await fetch(`${api}/api/vacancies/${id}/mark-applied`, { method: "POST" });
+    if (!response.ok) throw new Error(`Could not mark the vacancy as applied (${response.status}).`);
+    $("trackJob").textContent = "Saved ✓";
+    $("markApplied").textContent = "Applied ✓";
+    $("fillNote").textContent = "Application recorded in the CRM as Applied.";
   } catch (error) {
     showError(error?.message || String(error));
   } finally {
@@ -149,6 +306,7 @@ async function applyOnHh() {
     });
     if (!importedResponse.ok) throw new Error("Could not import this HH vacancy into Job Assistant.");
     const imported = await importedResponse.json();
+    latestTrackedId = imported.id;
 
     const applyResponse = await fetch(`${api}/api/vacancies/${imported.id}/apply-tailored`, { method: "POST" });
     const payload = await applyResponse.json().catch(() => ({}));
@@ -173,6 +331,11 @@ async function applyOnHh() {
   $("analyze").addEventListener("click", analyze);
   $("copyLetter").addEventListener("click", copyLetter);
   $("fillForm").addEventListener("click", fillForm);
+  $("rememberAnswers").addEventListener("click", rememberAnswers);
+  $("clearMemory").addEventListener("click", clearMemory);
+  $("findCv").addEventListener("click", findCvUpload);
+  $("trackJob").addEventListener("click", trackJob);
+  $("markApplied").addEventListener("click", markApplied);
   $("applyHh").addEventListener("click", applyOnHh);
 
   try {
