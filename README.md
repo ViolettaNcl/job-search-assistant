@@ -18,6 +18,8 @@ The project is built around one principle: find fewer but stronger opportunities
 - Chrome extension companion with HH, Greenhouse, Lever, Ashby and generic ATS detection.
 - Safe form resolver classifies fields as **fill / review / blocked**.
 - Browser-local Application Memory can reuse explicitly confirmed answers such as phone or LinkedIn.
+- Candidate profile supports verified **Phone** and **LinkedInUrl** slots; configured values take precedence over stale browser memory.
+- Extension shows profile readiness before applying and flags missing verified contact facts instead of guessing them.
 - Secure local **CV Vault** stores the English/Russian PDFs and can insert the recommended CV into ATS upload fields after explicit user action.
 - Salary, start-date, relocation, commercial-experience years, legal/security, ID, medical and demographic answers are not blindly automated.
 - External vacancies can be saved with their full browser-extracted description, location, remote status, eligibility and calculated match score.
@@ -26,6 +28,8 @@ The project is built around one principle: find fewer but stronger opportunities
 - Follow-up attempts are recorded as CRM events and stop surfacing once the vacancy advances beyond Applied.
 - Outcome analytics at **`/analytics.html`** for response/interview/offer rates by source, market, role type, match-score band and CV variant.
 - External CV attribution records a filename only when the extension actually inserted that PDF before the application was marked Applied.
+- Persistent PostgreSQL uses EF migrations; existing pre-migration databases are adopted by the idempotent baseline migration.
+- Liveness/readiness endpoints and container health checks protect production startup.
 - Telegram commands and responsive web dashboard.
 - PostgreSQL, Docker, GitHub Actions and MSTest.
 
@@ -35,11 +39,12 @@ The project is built around one principle: find fewer but stronger opportunities
 2. Open **`/queue.html`** for the strongest current applications ranked by fit + freshness + eligibility.
 3. For HH.ru, use the official API apply flow when available.
 4. For Greenhouse, Lever, Ashby or another employer site, open the vacancy and use the Chrome extension.
-5. Review the generated message and any fields marked **review** or **blocked**.
-6. Upload the recommended CV from CV Vault when appropriate, verify the attachment, and submit the external form yourself.
-7. Click **Mark applied** so the CRM stays accurate. If the extension actually inserted the PDF, that filename is attributed to the application for analytics.
-8. Check **`/followups.html`** for applications that are due a polite recruiter follow-up.
-9. Use **`/analytics.html`** to learn which sources/markets/role types and CV variants are producing real responses.
+5. Check the extension's candidate-profile readiness message. Missing phone/LinkedIn remain review/manual until Violetta confirms them.
+6. Review the generated message and any fields marked **review** or **blocked**.
+7. Upload the recommended CV from CV Vault when appropriate, verify the attachment, and submit the external form yourself.
+8. Click **Mark applied** so the CRM stays accurate. If the extension actually inserted the PDF, that filename is attributed to the application for analytics.
+9. Check **`/followups.html`** for applications that are due a polite recruiter follow-up.
+10. Use **`/analytics.html`** to learn which sources/markets/role types and CV variants are producing real responses.
 
 The application queue excludes jobs already marked Applied and jobs classified as likely ineligible. The follow-up queue only includes applications still in Applied status; HR contact/interview/rejection/offer states automatically leave the queue.
 
@@ -48,6 +53,8 @@ The application queue excludes jobs already marked Applied and jobs classified a
 The `Candidate` section of `src/JobSearchAssistant/appsettings.json` contains the verified non-secret profile used for matching and autofill.
 
 The system knows, among other verified facts, that Violetta has Russian and Cyprus/EU work authorization, speaks Russian/English/Greek, has an honours programming diploma, and has a real-client DentalClinic project. It must never convert project work into invented years of salaried commercial employment.
+
+`Phone` and `LinkedInUrl` intentionally default to blank until Violetta explicitly confirms the values. When they are configured, the backend becomes the authoritative source for those fields. Until then the extension may reuse a value that the user explicitly confirmed in browser-local Application Memory, or it leaves the field for review.
 
 ## Application policy
 
@@ -79,6 +86,8 @@ Browser: Ashby / other career sites ─┤
                        ↙              ↘
                HH official API      Chrome extension
                                      ↓
+                       verified profile + memory
+                                     ↓
                               autofill + CV Vault
                                      ↓
                               candidate final submit
@@ -102,6 +111,10 @@ Chrome extension instructions:
 
 **[`browser-extension/README.md`](browser-extension/README.md)**
 
+Database migration/upgrade policy:
+
+**[`docs/DATABASE_MIGRATIONS.md`](docs/DATABASE_MIGRATIONS.md)**
+
 ## Minimal Docker start
 
 ```bash
@@ -118,9 +131,14 @@ Follow-up queue: `http://localhost:8080/followups.html`
 
 Outcome analytics: `http://localhost:8080/analytics.html`
 
+Liveness: `http://localhost:8080/health/live`
+
+Readiness: `http://localhost:8080/health/ready`
+
 ## Main API routes
 
 ```text
+GET  /api/candidate
 GET  /api/dashboard
 GET  /api/application-queue?limit=20&minScore=75
 GET  /api/followups?afterBusinessDays=5&maxAttempts=2&limit=30
@@ -188,17 +206,18 @@ Background automatic submission is deliberately limited. HH's explicit applicant
 dotnet test tests/JobSearchAssistant.Tests/JobSearchAssistant.Tests.csproj
 ```
 
-Tests cover vacancy scoring, application queue ordering, rich browser import, safe application-field resolution, follow-up timing/attempt behavior, CV attribution and outcome analytics. CI also validates all Chrome extension JavaScript and inline dashboard/queue/analytics JavaScript syntax.
+Tests cover vacancy scoring, application queue ordering, rich browser import, safe application-field resolution, verified profile readiness, follow-up timing/attempt behavior, CV attribution, runtime readiness and outcome analytics. CI also validates all Chrome extension JavaScript and inline dashboard/queue/analytics JavaScript syntax.
 
 ## Deployment
 
 The repository contains `vercel.json` and `Dockerfile.vercel` for Vercel Container Services. The app can start in in-memory demo mode without PostgreSQL, but **do not use the in-memory fallback for real application history**, because container restarts can erase it.
 
-For persistent production use, configure PostgreSQL and the relevant HH/Telegram secrets through environment variables. Never commit access tokens, bot tokens or encryption keys to the repository.
+Persistent PostgreSQL startup applies registered EF migrations automatically. The container exposes `/health/live` and database-aware `/health/ready`; Docker health checks use readiness. For persistent production use, configure PostgreSQL and the relevant HH/Telegram secrets through environment variables. Never commit access tokens, bot tokens or encryption keys to the repository.
 
 ## Next development priorities
 
 - validate and refine ATS selectors against real Greenhouse/Lever/Ashby applications;
-- verified profile fields for phone/LinkedIn after explicit user confirmation;
+- enter Violetta's real Phone/LinkedIn only after explicit confirmation;
 - optional deeper language-model tailoring with a deterministic truthful fallback;
-- production database migrations and deployment hardening.
+- production deployment smoke test with persistent PostgreSQL, HH OAuth and extension end-to-end;
+- backups/restore drill and operational monitoring once real application history is accumulating.
