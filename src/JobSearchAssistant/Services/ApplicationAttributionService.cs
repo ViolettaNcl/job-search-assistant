@@ -17,7 +17,11 @@ public sealed class ApplicationAttributionService(AppDbContext db)
         if (vacancy?.Application is null || vacancy.Source.Equals("hh", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        vacancy.Application.ResumeExternalId = $"external/{clean}";
+        var reference = $"external/{clean}";
+        if (vacancy.Application.ResumeExternalId.Equals(reference, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        vacancy.Application.ResumeExternalId = reference;
         db.ApplicationEvents.Add(new Domain.ApplicationEvent
         {
             VacancyId = vacancy.Id,
