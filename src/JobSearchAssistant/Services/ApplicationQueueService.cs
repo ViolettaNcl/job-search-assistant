@@ -33,6 +33,9 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
         limit = Math.Clamp(limit, 1, 50);
         minimumScore = Math.Clamp(minimumScore, 50, 100);
 
+        // Keep the database query provider-neutral. SQLite cannot reliably ORDER BY
+        // DateTimeOffset values. Freshness is already part of the final in-memory
+        // priority calculation below, so ordering by score here is sufficient.
         var rows = await db.Vacancies
             .AsNoTracking()
             .Include(x => x.Company)
@@ -42,7 +45,6 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
                         x.MatchScore >= minimumScore &&
                         x.EligibilityStatus != "Likely ineligible")
             .OrderByDescending(x => x.MatchScore)
-            .ThenByDescending(x => x.PublishedAt ?? x.FirstSeenAt)
             .Take(300)
             .ToListAsync(ct);
 
