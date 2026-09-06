@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "1.4.0",
-  "description": "Prepare applications in one explicit review-first action: tailor, verify safe autofill, try the local CV, track ATS stages and stop before final submit.",
+  "version": "1.5.0",
+  "description": "Prepare applications, then navigate review/manual/failed ATS fields one by one without auto-answering sensitive questions.",
   "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
   "background": {
@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "matches": ["https://*/*", "http://*/*"],
-      "js": ["ats-structured.js", "ats-controls.js", "field-verification.js", "content.js", "cv-upload.js"],
+      "js": ["ats-structured.js", "ats-controls.js", "field-verification.js", "content.js", "cv-upload.js", "review-navigator-content.js"],
       "run_at": "document_idle"
     }
   ]

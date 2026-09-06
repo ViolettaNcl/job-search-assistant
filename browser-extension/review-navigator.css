@@ -1,0 +1,6 @@
+.reviewNavigatorButton { margin-bottom: 5px; }
+.reviewNavigatorStatus { margin: 0 0 12px; padding: 7px 8px; border-radius: 8px; background: #fffaf1; border: 1px solid #f0d6a8; color: #6b5b3e; font-size: 10px; line-height: 1.4; }
+.reviewNavigatorStatus[data-action="failed"] { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+.reviewNavigatorStatus[data-action="blocked"] { background: #fff8f8; border-color: #efc6cb; color: #9f1239; }
+.reviewNavigatorStatus[data-action="clear"] { background: #f7fcf9; border-color: #bde5ca; color: #166534; }
+.reviewNavigatorStatus[data-action="error"] { background: #fff1f2; border-color: #fecdd3; color: #9f1239; }
