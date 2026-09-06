@@ -15,7 +15,10 @@
     let value = 0;
     if (/submit application|complete application|send application|finish application/i.test(text)) value += 12;
     else if (/\bsubmit\b/i.test(text)) value += 9;
-    else if (/\bapply now\b|\bapply\b/i.test(text)) value += 7;
+    else if (/\bapply now\b|^apply$/i.test(text)) {
+      if (!metadata.inForm && !metadata.applicationRoute) return -100;
+      value += 7;
+    }
     else if (/подать (заявку|отклик)|отправить (заявку|отклик)|откликнуться/i.test(text)) value += 10;
     else return -100;
 
