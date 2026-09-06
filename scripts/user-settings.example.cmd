@@ -14,5 +14,13 @@ rem Optional Telegram integration:
 set "Telegram__BotToken="
 set "Telegram__AllowedChatId="
 
-rem Optional persistent PostgreSQL database. Leave empty for local in-memory mode.
+rem Database settings are optional.
+rem Leave both values empty for the default persistent local SQLite database at:
+rem %LOCALAPPDATA%\ViolettaApplyAssistant\jobassistant.db
+rem
+rem Advanced: override the SQLite connection string if you want another local path.
+set "ConnectionStrings__Sqlite="
+
+rem Advanced/server mode: configure PostgreSQL here. PostgreSQL takes precedence
+rem over local SQLite when this value is non-empty.
 set "ConnectionStrings__Postgres="
