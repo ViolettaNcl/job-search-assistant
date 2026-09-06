@@ -239,16 +239,29 @@ async function ensureTracked() {
   if (!latestPage?.url) throw new Error("Analyze a vacancy first.");
   const api = await getApiBase();
   const hh = isHhVacancy(latestPage.url);
-  const response = await fetch(hh ? `${api}/api/import/hh` : `${api}/api/import/manual`, {
+  const endpoint = hh ? `${api}/api/import/hh` : `${api}/api/import/browser`;
+  const payload = hh
+    ? { url: latestPage.url }
+    : {
+        url: latestPage.url,
+        title: latestPage.title || null,
+        company: latestPage.company || null,
+        description: latestPage.description || null,
+        country: latestPage.country || null,
+        location: latestPage.location || null,
+        remoteScope: latestPage.remoteScope || null,
+        experience: latestPage.experience || null,
+        source: latestPage.source || null,
+        remote: Boolean(latestPage.remote)
+      };
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(hh
-      ? { url: latestPage.url }
-      : { url: latestPage.url, title: latestPage.title || null, company: latestPage.company || null })
+    body: JSON.stringify(payload)
   });
   if (!response.ok) throw new Error(`Could not save this vacancy to the tracker (${response.status}).`);
-  const payload = await response.json();
-  latestTrackedId = payload.id;
+  const result = await response.json();
+  latestTrackedId = result.id;
   return latestTrackedId;
 }
 
@@ -259,7 +272,7 @@ async function trackJob() {
   try {
     await ensureTracked();
     $("trackJob").textContent = "Saved ✓";
-    $("fillNote").textContent = "Vacancy saved in Job Search Assistant. Duplicate URLs are protected by the existing import logic.";
+    $("fillNote").textContent = "Vacancy saved with its description, fit score and eligibility in Job Search Assistant.";
   } catch (error) {
     showError(error?.message || String(error));
   } finally {
