@@ -5,6 +5,13 @@
 })(typeof window !== "undefined" ? window : null, function () {
   const DEFAULT_TTL_MS = 8 * 60 * 60 * 1000;
   const SESSION_VERSION = 1;
+  const SHARED_ATS_FAMILIES = new Set([
+    "smartrecruiters.com",
+    "greenhouse.io",
+    "lever.co",
+    "ashbyhq.com",
+    "workable.com"
+  ]);
 
   function safeUrl(value) {
     try { return new URL(String(value || "")); }
@@ -37,6 +44,32 @@
     return families.find(domain => host === domain || host.endsWith(`.${domain}`)) || host;
   }
 
+  function firstPathSegment(parsed) {
+    return parsed.pathname.split("/").map(x => x.trim()).filter(Boolean)[0]?.toLowerCase() || "";
+  }
+
+  function sharedPathTenant(parsed) {
+    const host = parsed.hostname.toLowerCase();
+    const first = firstPathSegment(parsed);
+    if (!first) return "";
+
+    const allowed = [
+      ["jobs.smartrecruiters.com", "smartrecruiters.com"],
+      ["boards.greenhouse.io", "greenhouse.io"],
+      ["job-boards.greenhouse.io", "greenhouse.io"],
+      ["jobs.lever.co", "lever.co"],
+      ["jobs.ashbyhq.com", "ashbyhq.com"],
+      ["apply.workable.com", "workable.com"]
+    ];
+
+    const match = allowed.find(([sharedHost]) => host === sharedHost);
+    if (!match) return "";
+
+    const reserved = new Set(["apply", "application", "applications", "job", "jobs", "career", "careers"]);
+    if (reserved.has(first)) return "";
+    return `${match[1]}:path:${first}`;
+  }
+
   function tenantKey(value) {
     const parsed = safeUrl(value);
     if (!parsed) return "";
@@ -45,14 +78,14 @@
     const workday = host.match(/^([^.]+)\.wd\d+\.myworkdayjobs\.com$/);
     if (workday) return `workday:${workday[1]}`;
 
-    for (const domain of ["teamtailor.com", "recruitee.com", "workable.com", "personio.de", "personio.com"]) {
+    for (const domain of ["teamtailor.com", "recruitee.com", "personio.de", "personio.com"]) {
       if (host.endsWith(`.${domain}`)) {
         const tenant = host.slice(0, -(domain.length + 1)).split(".")[0];
         return tenant ? `${domain}:${tenant}` : "";
       }
     }
 
-    return "";
+    return sharedPathTenant(parsed);
   }
 
   function isApplicationLike(value) {
@@ -100,8 +133,10 @@
       sourceFamily && currentFamily && sourceFamily === currentFamily &&
       sourceTenant && currentTenant && sourceTenant === currentTenant
     );
+    const sharedOrigin = sourceFamily && sourceFamily === currentFamily && SHARED_ATS_FAMILIES.has(sourceFamily);
+    const safeSameOrigin = sameOrigin && (!sharedOrigin || sameKnownTenant);
 
-    return Boolean((sameOrigin || sameKnownTenant) && isApplicationLike(current));
+    return Boolean((safeSameOrigin || sameKnownTenant) && isApplicationLike(current));
   }
 
   function canHandoffFromOpener(session, currentUrl, sourceTabId, openerTabId, now = Date.now(), ttlMs = DEFAULT_TTL_MS) {
