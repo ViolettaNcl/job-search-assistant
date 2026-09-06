@@ -35,6 +35,7 @@ builder.Services.AddScoped<HhClient>();
 builder.Services.AddScoped<RemotiveClient>();
 builder.Services.AddScoped<AdzunaClient>();
 builder.Services.AddScoped<JobService>();
+builder.Services.AddScoped<TailoredHhApplyService>();
 builder.Services.AddScoped<StatsService>();
 builder.Services.AddHostedService<VacancyCollectorWorker>();
 builder.Services.AddHostedService<TelegramBotWorker>();
@@ -211,6 +212,12 @@ app.MapPost("/api/vacancies/{id:guid}/status", async (Guid id, StatusRequest req
 app.MapPost("/api/vacancies/{id:guid}/apply", async (Guid id, JobService jobs, CancellationToken ct) =>
 {
     var result = await jobs.ApplyAsync(id, ct);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
+app.MapPost("/api/vacancies/{id:guid}/apply-tailored", async (Guid id, TailoredHhApplyService apply, CancellationToken ct) =>
+{
+    var result = await apply.ApplyAsync(id, ct);
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
 });
 
