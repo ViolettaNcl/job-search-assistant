@@ -64,20 +64,26 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         if (string.IsNullOrWhiteSpace(label))
             return Review(field, "unknown", "Field meaning could not be determined safely.", false);
 
+        if (Matches(label, "company name", "employer name", "название компании", "имя компании"))
+            return Review(field, "employer", "This appears to ask for an employer/company name, not the candidate's name.", false);
+
         if (Matches(label, "salary", "compensation", "expected pay", "expected salary", "зарплат", "доход", "оклад"))
             return Review(field, "salary", "Salary should be chosen for this vacancy and market, not reused blindly.", false);
 
         if (Matches(label, "start date", "available from", "availability date", "notice period", "дата выхода", "когда можете начать", "срок выхода"))
             return Review(field, "availability", "Exact availability can change and should be confirmed for this application.", false);
 
-        if (Matches(label, "criminal", "conviction", "background check", "security clearance", "судим", "уголов", "допуск"))
-            return Block(field, "legal", "Legal/security declarations must be answered by the candidate.");
+        if (Matches(label, "criminal", "conviction", "background check", "security clearance", "passport", "national id", "identity document", "судим", "уголов", "допуск", "паспорт"))
+            return Block(field, "legal", "Legal, security or identity-document declarations must be answered by the candidate.");
 
-        if (Matches(label, "disability", "medical", "health condition", "gender", "sex", "race", "ethnicity", "veteran", "religion", "инвалид", "здоров", "пол ", "национальност", "религи"))
+        if (Matches(label, "date of birth", "birth date", "birthday", "age", "disability", "medical", "health condition", "gender", "sex", "race", "ethnicity", "veteran", "religion", "дата рождения", "возраст", "инвалид", "здоров", "пол ", "национальност", "религи"))
             return Block(field, "sensitive", "Sensitive demographic or medical questions are never auto-filled.");
 
         if (Matches(label, "years of experience", "years experience", "commercial experience", "professional experience", "лет опыта", "коммерческ.*опыт"))
             return Review(field, "experience", "Do not convert project experience into invented years of commercial employment.", false);
+
+        if (Matches(label, "visa status", "immigration status", "type of visa", "статус визы", "тип визы"))
+            return Review(field, "visaStatus", "Visa/immigration wording varies by country and must be checked before answering.", false);
 
         if (Matches(label, "relocat", "переезд", "готовы.*переех"))
             return Review(field, "relocation", "Relocation is a job-specific commitment and should be confirmed before submission.", false);
@@ -88,7 +94,7 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         if (Matches(label, "linkedin"))
             return FromMemoryOrReview(field, memory, "linkedin", "LinkedIn URL has not been configured yet.", true);
 
-        if (Matches(label, "first name", "given name", "имя"))
+        if (Matches(label, "first name", "given name") || Regex.IsMatch(label, @"(^|\s)имя($|\s)", RegexOptions.IgnoreCase))
             return Fill(field, request.Language == "ru" ? "Виолетта" : FirstName(_candidate.Name), "firstName", "Verified candidate identity.");
 
         if (Matches(label, "last name", "surname", "family name", "фамили"))
@@ -197,6 +203,7 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
 
     private static bool IsEu(string country, string label)
     {
+        if (country.Equals("eu", StringComparison.OrdinalIgnoreCase)) return true;
         if (label.Contains("eu") || label.Contains("european union") || label.Contains("ес ") || label.EndsWith(" ес")) return true;
         return EuCountries.Any(country.Contains);
     }
