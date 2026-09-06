@@ -3,23 +3,40 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Violetta Apply Assistant — CV Vault</title>
+  <title>Violetta Apply Assistant — Setup & CV Vault</title>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; background: #f6f7f9; color: #17191f; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    main { max-width: 760px; margin: 0 auto; padding: 38px 20px 70px; }
+    main { max-width: 820px; margin: 0 auto; padding: 38px 20px 70px; }
     h1 { margin: 0 0 8px; font-size: 30px; }
     p { color: #656c78; line-height: 1.55; }
     .card { margin-top: 18px; padding: 18px; background: white; border: 1px solid #e1e4e9; border-radius: 14px; }
     .card h2 { margin: 0 0 6px; font-size: 17px; }
     .row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; margin-top: 14px; }
-    input[type=file] { width: 100%; padding: 10px; border: 1px solid #d6dae1; border-radius: 9px; background: #fafbfc; }
+    .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+    input[type=file], input[type=url], input[type=text] { width: 100%; padding: 10px; border: 1px solid #d6dae1; border-radius: 9px; background: #fafbfc; font: inherit; }
     button { border: 1px solid #d4d8df; border-radius: 9px; background: white; color: #17191f; padding: 9px 12px; font: inherit; font-weight: 700; cursor: pointer; }
     button.primary { background: #17191f; color: white; border-color: #17191f; }
     button.danger { color: #9f1239; }
+    button:disabled { opacity: .55; cursor: wait; }
     .status { margin-top: 10px; font-size: 12px; color: #6a717d; }
     .ok { color: #14723b; }
     .warning { color: #92570c; }
+    .bad { color: #b42318; }
+    .readinessSummary { margin-top: 14px; padding: 14px; border-radius: 12px; background: #f7f8fa; border: 1px solid #e5e7eb; }
+    .readinessSummary[data-state="ready"] { background: #effaf3; border-color: #cdebd7; }
+    .readinessSummary[data-state="attention"] { background: #fff8eb; border-color: #f1dfb3; }
+    .readinessSummary[data-state="blocked"] { background: #fff1f0; border-color: #f3c7c3; }
+    .readinessSummary strong { display: block; margin-bottom: 4px; }
+    .readinessList { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+    .readinessItem { display: grid; grid-template-columns: 18px 1fr; gap: 9px; padding: 10px 0; border-top: 1px solid #eef0f3; }
+    .readinessItem:first-child { border-top: 0; }
+    .readinessIcon { font-weight: 900; }
+    .readinessItem strong { display: block; font-size: 14px; }
+    .readinessItem span:last-child { color: #6a717d; font-size: 12px; line-height: 1.45; }
+    .capabilities { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .capability { padding: 6px 9px; border-radius: 999px; background: #f1f3f6; color: #5d6470; font-size: 12px; font-weight: 700; }
+    .capability.on { background: #e8f7ed; color: #146c39; }
     .privacy { margin-top: 24px; padding: 14px 16px; border-radius: 12px; background: #eef3ff; color: #33466d; font-size: 13px; line-height: 1.5; }
     code { background: #f0f1f3; padding: 2px 5px; border-radius: 5px; }
     @media (max-width: 560px) { .row { grid-template-columns: 1fr; } }
@@ -27,7 +44,32 @@
 </head>
 <body>
 <main>
-  <h1>CV Vault</h1>
+  <h1>Setup & Readiness</h1>
+  <p>Run one check before an application session. This verifies the local extension state and the configured Job Search Assistant backend without storing employer answers or sensitive application data.</p>
+
+  <section class="card">
+    <h2>System readiness</h2>
+    <p>External ATS applications need a reachable backend and a verified core candidate profile. HH.ru direct submission is checked separately and never blocks other job sites.</p>
+    <label class="status" for="apiBase">Backend URL</label>
+    <div class="row">
+      <input id="apiBase" type="url" value="http://localhost:8080" />
+      <button id="saveApi" class="primary">Save backend</button>
+    </div>
+    <div class="actions">
+      <button id="runReadiness" class="primary">Run system check</button>
+      <button id="openDashboard">Open dashboard</button>
+      <button id="openQueue">Open apply queue</button>
+      <button id="connectHh">Connect / refresh HH.ru</button>
+    </div>
+    <div id="readinessSummary" class="readinessSummary" data-state="neutral">
+      <strong>Not checked yet</strong>
+      <span>Run the system check to verify the application workflow.</span>
+    </div>
+    <div id="capabilities" class="capabilities"></div>
+    <ul id="readinessList" class="readinessList"></ul>
+  </section>
+
+  <h1 style="margin-top:32px;font-size:24px">CV Vault</h1>
   <p>Choose each PDF once. The files are stored only inside this Chrome profile and can then be inserted into a visible application upload field when the Apply Assistant recommends that CV.</p>
 
   <section class="card">
@@ -59,9 +101,10 @@
   </section>
 
   <div class="privacy">
-    <strong>Privacy:</strong> CV files are kept in <code>chrome.storage.local</code> for this extension. They are not uploaded to the Job Search Assistant backend. A CV is sent only to the currently open application page when you explicitly click <strong>Upload recommended CV</strong>.
+    <strong>Privacy:</strong> CV files are kept in <code>chrome.storage.local</code> for this extension. They are not uploaded to the Job Search Assistant backend. Setup checks read only backend health/configuration and whether the two local CV slots exist. HH authorization is performed by HH.ru through the backend OAuth flow.
   </div>
 
+  <script src="setup-readiness.js"></script>
   <script src="options.js"></script>
 </main>
 </body>

@@ -46,6 +46,134 @@ async function serializeFile(file) {
   };
 }
 
+async function getApiBase() {
+  const stored = await chrome.storage.sync.get({ apiBase: "http://localhost:8080" });
+  return String(stored.apiBase || "http://localhost:8080").trim().replace(/\/$/, "");
+}
+
+function normalizedHttpUrl(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    if (!/^https?:$/.test(parsed.protocol)) return "";
+    parsed.hash = "";
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
+async function saveApiBase() {
+  const value = normalizedHttpUrl($("apiBase").value);
+  if (!value) {
+    alert("Enter a valid http:// or https:// backend URL.");
+    return;
+  }
+  await chrome.storage.sync.set({ apiBase: value });
+  $("apiBase").value = value;
+  await runSystemCheck();
+}
+
+async function safeFetchJson(url) {
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    let data = null;
+    try { data = await response.json(); } catch { }
+    return { reachable: true, ok: response.ok, status: response.status, data };
+  } catch (error) {
+    return { reachable: false, ok: false, status: 0, data: null, error: error?.message || String(error) };
+  }
+}
+
+function renderReadiness(result) {
+  const summary = $("readinessSummary");
+  summary.dataset.state = result.state;
+  summary.replaceChildren();
+  const title = document.createElement("strong");
+  title.textContent = `${result.title} · ${result.passed}/${result.total} checks`;
+  const detail = document.createElement("span");
+  detail.textContent = result.detail;
+  summary.append(title, detail);
+
+  const capabilities = $("capabilities");
+  capabilities.replaceChildren();
+  const labels = [
+    ["externalAts", "External ATS"],
+    ["cvAutoload", "Both CVs ready"],
+    ["dailyQueue", "Daily queue"],
+    ["hhDirect", "HH direct apply"]
+  ];
+  for (const [key, label] of labels) {
+    const chip = document.createElement("span");
+    chip.className = `capability ${result.capabilities[key] ? "on" : ""}`;
+    chip.textContent = `${result.capabilities[key] ? "✓" : "○"} ${label}`;
+    capabilities.append(chip);
+  }
+
+  const list = $("readinessList");
+  list.replaceChildren();
+  for (const check of result.items) {
+    const row = document.createElement("li");
+    row.className = "readinessItem";
+    const icon = document.createElement("span");
+    icon.className = `readinessIcon ${check.ok ? "ok" : check.level === "required" ? "bad" : "warning"}`;
+    icon.textContent = check.ok ? "✓" : check.level === "required" ? "!" : "○";
+    const body = document.createElement("div");
+    const label = document.createElement("strong");
+    label.textContent = check.label;
+    const detail = document.createElement("span");
+    detail.textContent = check.detail;
+    body.append(label, detail);
+    row.append(icon, body);
+    list.append(row);
+  }
+}
+
+async function runSystemCheck() {
+  const button = $("runReadiness");
+  button.disabled = true;
+  button.textContent = "Checking…";
+  const summary = $("readinessSummary");
+  summary.dataset.state = "neutral";
+  summary.innerHTML = "<strong>Checking setup…</strong><span>Verifying backend, profile, local CVs, queue and HH capability.</span>";
+
+  try {
+    const api = await getApiBase();
+    $("apiBase").value = api;
+    const local = await chrome.storage.local.get([keys.en, keys.ru]);
+
+    const [health, candidate, dashboard, queue, hhResumes] = await Promise.all([
+      safeFetchJson(`${api}/health/ready`),
+      safeFetchJson(`${api}/api/candidate`),
+      safeFetchJson(`${api}/api/dashboard`),
+      safeFetchJson(`${api}/api/application-queue?limit=20&minScore=75`),
+      safeFetchJson(`${api}/api/hh/resumes`)
+    ]);
+
+    const result = window.vjaSetupReadiness.build({
+      backend: { reachable: health.reachable, ready: health.ok },
+      candidate: { coreReady: candidate.ok && candidate.data?.readiness?.coreReady === true },
+      cv: { english: Boolean(local[keys.en]?.base64), russian: Boolean(local[keys.ru]?.base64) },
+      queue: { strongCount: queue.ok && Array.isArray(queue.data) ? queue.data.length : 0 },
+      hh: {
+        authorized: hhResumes.ok && Array.isArray(hhResumes.data),
+        resumeSelected: dashboard.ok && Boolean(dashboard.data?.state?.hhResumeId)
+      }
+    });
+    renderReadiness(result);
+  } catch (error) {
+    renderReadiness(window.vjaSetupReadiness.build({ backend: { reachable: false, ready: false } }));
+  } finally {
+    button.disabled = false;
+    button.textContent = "Run system check";
+  }
+}
+
+async function openBackendPath(path) {
+  const api = await getApiBase();
+  const url = `${api}${path.startsWith("/") ? path : `/${path}`}`;
+  window.open(url, "_blank", "noopener");
+}
+
 async function save(kind) {
   const fileInput = $(kind === "en" ? "enFile" : "ruFile");
   const status = $(kind === "en" ? "enStatus" : "ruStatus");
@@ -57,6 +185,7 @@ async function save(kind) {
     status.className = "status ok";
     status.textContent = `Stored locally: ${data.name} · ${formatBytes(data.size)}`;
     fileInput.value = "";
+    await runSystemCheck();
   } catch (error) {
     status.className = "status warning";
     status.textContent = error?.message || String(error);
@@ -76,15 +205,23 @@ async function refresh() {
       status.textContent = "No CV stored yet.";
     }
   }
+  $("apiBase").value = await getApiBase();
 }
 
 async function clearAll() {
   if (!confirm("Remove both stored CV copies from the extension?")) return;
   await chrome.storage.local.remove([keys.en, keys.ru]);
   await refresh();
+  await runSystemCheck();
 }
 
+$("saveApi").addEventListener("click", saveApiBase);
+$("runReadiness").addEventListener("click", runSystemCheck);
+$("openDashboard").addEventListener("click", () => openBackendPath("/"));
+$("openQueue").addEventListener("click", () => openBackendPath("/queue.html"));
+$("connectHh").addEventListener("click", () => openBackendPath("/api/hh/oauth/start"));
 $("saveEn").addEventListener("click", () => save("en"));
 $("saveRu").addEventListener("click", () => save("ru"));
 $("clearAll").addEventListener("click", clearAll);
-refresh();
+
+refresh().then(runSystemCheck).catch(() => {});
