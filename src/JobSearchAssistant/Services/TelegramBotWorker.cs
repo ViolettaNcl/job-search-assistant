@@ -79,10 +79,11 @@ public sealed class TelegramBotWorker(
         var jobs = scope.ServiceProvider.GetRequiredService<JobService>();
         var stats = scope.ServiceProvider.GetRequiredService<StatsService>();
         var hh = scope.ServiceProvider.GetRequiredService<HhClient>();
+        var followUps = scope.ServiceProvider.GetRequiredService<FollowUpQueueService>();
 
         if (text.StartsWith("/start"))
         {
-            await SendAsync(chatId, "<b>Violetta Job Assistant</b>\n🌐 Только удалённая работа\n\n/today — новые\n/best — лучшие совпадения\n/russia — вакансии РФ\n/world — международные\n/internships — удалённые стажировки\n/applied — отклики\n/interviews — интервью\n/stats — статистика\n/sources — источники\n/resumes — HH резюме\n/sync — синхронизация HH\n\nМожно прислать ссылку hh.ru/vacancy/... или ссылку с другой площадки", null, ct);
+            await SendAsync(chatId, "<b>Violetta Job Assistant</b>\n🌐 Только удалённая работа\n\n/today — новые\n/best — лучшие совпадения\n/russia — вакансии РФ\n/world — международные\n/internships — удалённые стажировки\n/applied — отклики\n/followups — пора написать рекрутеру\n/interviews — интервью\n/stats — статистика\n/sources — источники\n/resumes — HH резюме\n/sync — синхронизация HH\n\nМожно прислать ссылку hh.ru/vacancy/... или ссылку с другой площадки", null, ct);
             return;
         }
         if (text.StartsWith("/stats"))
@@ -174,6 +175,18 @@ public sealed class TelegramBotWorker(
             foreach (var v in list) await SendPipelineCardAsync(chatId, v, ct);
             return;
         }
+        if (text.StartsWith("/followups"))
+        {
+            var list = await followUps.GetAsync(5, 8, 2, ct);
+            if (list.Count == 0)
+            {
+                await SendAsync(chatId, "✅ Сейчас follow-up не требуется. Очередь появится после 5 рабочих дней без прогресса по отклику.", null, ct);
+                return;
+            }
+            await SendAsync(chatId, $"<b>Follow-up Queue</b>\nНужно проверить: {list.Count}. Сообщение ниже — черновик для копирования, бот сам рекрутеру ничего не отправляет.", null, ct);
+            foreach (var item in list) await SendFollowUpCardAsync(chatId, item, ct);
+            return;
+        }
         if (text.StartsWith("/interviews"))
         {
             var list = await db.Vacancies.Include(x => x.Company).Where(x => x.Status == VacancyStatus.HrContact || x.Status == VacancyStatus.HrInterview || x.Status == VacancyStatus.TechInterview || x.Status == VacancyStatus.TestTask).OrderByDescending(x => x.UpdatedAt).Take(10).ToListAsync(ct);
@@ -217,6 +230,7 @@ public sealed class TelegramBotWorker(
         using var scope = scopeFactory.CreateScope();
         var jobs = scope.ServiceProvider.GetRequiredService<JobService>();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var followUps = scope.ServiceProvider.GetRequiredService<FollowUpQueueService>();
 
         switch (parts[0])
         {
@@ -237,6 +251,10 @@ public sealed class TelegramBotWorker(
             case "manualapplied":
                 await jobs.MarkExternalAppliedAsync(vacancyId, ct);
                 await SendAsync(chatId, "✅ Отклик на внешней площадке отмечен. Повторно эта вакансия не будет предлагаться как новая.", null, ct);
+                break;
+            case "followupsent":
+                var marked = await followUps.MarkSentAsync(vacancyId, "Follow-up marked sent from Telegram", ct);
+                await SendAsync(chatId, marked ? "✅ Follow-up записан в CRM. Следующая попытка появится не раньше чем через 5 рабочих дней." : "Follow-up уже недоступен: статус отклика мог измениться.", null, ct);
                 break;
             case "hr": await jobs.SetStatusAsync(vacancyId, VacancyStatus.HrContact, "HR contact", ct); break;
             case "hri": await jobs.SetStatusAsync(vacancyId, VacancyStatus.HrInterview, "HR interview", ct); break;
@@ -307,6 +325,23 @@ public sealed class TelegramBotWorker(
                 new object[] { new { text = "💻 Tech", callback_data = $"tech:{v.Id}" }, new { text = "📝 Test", callback_data = $"test:{v.Id}" } },
                 new object[] { new { text = "❌ Reject", callback_data = $"reject:{v.Id}" }, new { text = "🏆 Offer", callback_data = $"offer:{v.Id}" } },
                 new object[] { new { text = "🌐 Открыть", url = v.Url } }
+            }
+        };
+        await SendAsync(chatId, text, keyboard, ct);
+    }
+
+    private async Task SendFollowUpCardAsync(long chatId, FollowUpQueueItem item, CancellationToken ct)
+    {
+        var text = $"<b>⏳ Follow-up due · {item.BusinessDaysWaiting} рабочих дней</b>\n" +
+                   $"<b>{Esc(item.Title)}</b>\n{Esc(item.Company)} · Fit {item.MatchScore}/100\n" +
+                   $"Попытка: {item.FollowUpCount + 1} · {Esc(item.RecommendedChannel)}\n\n" +
+                   $"<pre>{Esc(item.Message)}</pre>";
+        var keyboard = new
+        {
+            inline_keyboard = new object[]
+            {
+                new object[] { new { text = "🌐 Открыть вакансию", url = item.Url } },
+                new object[] { new { text = "✅ Follow-up отправлен", callback_data = $"followupsent:{item.VacancyId}" } }
             }
         };
         await SendAsync(chatId, text, keyboard, ct);
