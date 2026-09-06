@@ -8,6 +8,14 @@ public static class RuntimeHealthEndpoints
         this IEndpointRouteBuilder endpoints,
         bool persistentDatabase,
         DatabaseBootstrapResult bootstrap)
+        => endpoints.MapRuntimeHealth(
+            persistentDatabase ? DatabaseStorageMode.Postgres : DatabaseStorageMode.InMemory,
+            bootstrap);
+
+    public static IEndpointRouteBuilder MapRuntimeHealth(
+        this IEndpointRouteBuilder endpoints,
+        DatabaseStorageMode storageMode,
+        DatabaseBootstrapResult bootstrap)
     {
         endpoints.MapGet("/health/live", () => Results.Ok(new
         {
@@ -17,13 +25,13 @@ public static class RuntimeHealthEndpoints
 
         endpoints.MapGet("/health/ready", async (AppDbContext db, CancellationToken ct) =>
         {
-            var result = await CheckReadinessAsync(db, persistentDatabase, bootstrap, ct);
+            var result = await CheckReadinessAsync(db, storageMode, bootstrap, ct);
             var payload = new
             {
                 status = result.Ready ? "ready" : "not_ready",
                 utc = DateTimeOffset.UtcNow,
-                database = persistentDatabase ? "postgres" : "in-memory",
-                persistent = persistentDatabase,
+                database = LocalSqliteDatabase.Label(storageMode),
+                persistent = LocalSqliteDatabase.IsPersistent(storageMode),
                 schemaMode = bootstrap.Mode,
                 latestMigration = bootstrap.LatestMigration,
                 appliedMigrations = bootstrap.AppliedMigrations,
@@ -39,13 +47,25 @@ public static class RuntimeHealthEndpoints
         return endpoints;
     }
 
-    public static async Task<RuntimeReadinessResult> CheckReadinessAsync(
+    public static Task<RuntimeReadinessResult> CheckReadinessAsync(
         AppDbContext db,
         bool persistentDatabase,
         DatabaseBootstrapResult bootstrap,
         CancellationToken ct = default)
+        => CheckReadinessAsync(
+            db,
+            persistentDatabase ? DatabaseStorageMode.Postgres : DatabaseStorageMode.InMemory,
+            bootstrap,
+            ct);
+
+    public static async Task<RuntimeReadinessResult> CheckReadinessAsync(
+        AppDbContext db,
+        DatabaseStorageMode storageMode,
+        DatabaseBootstrapResult bootstrap,
+        CancellationToken ct = default)
     {
-        if (persistentDatabase)
+        var persistent = LocalSqliteDatabase.IsPersistent(storageMode);
+        if (persistent)
         {
             try
             {
@@ -61,13 +81,18 @@ public static class RuntimeHealthEndpoints
         try
         {
             var appStateReady = await db.AppStates.AsNoTracking().AnyAsync(x => x.Id == 1, ct);
-            var schemaReady = !persistentDatabase ||
-                              (bootstrap.Mode == "postgres-migrations" && !string.IsNullOrWhiteSpace(bootstrap.LatestMigration));
+            var schemaReady = storageMode switch
+            {
+                DatabaseStorageMode.Postgres => bootstrap.Mode == "postgres-migrations" &&
+                                                !string.IsNullOrWhiteSpace(bootstrap.LatestMigration),
+                DatabaseStorageMode.LocalSqlite => bootstrap.Mode == "sqlite-ensure-created",
+                _ => true
+            };
             return new RuntimeReadinessResult(schemaReady && appStateReady, true, appStateReady);
         }
         catch
         {
-            return new RuntimeReadinessResult(false, persistentDatabase ? false : true, false);
+            return new RuntimeReadinessResult(false, persistent ? false : true, false);
         }
     }
 }
