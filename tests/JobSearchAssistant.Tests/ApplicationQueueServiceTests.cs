@@ -1,6 +1,7 @@
 using JobSearchAssistant.Data;
 using JobSearchAssistant.Domain;
 using JobSearchAssistant.Services;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -33,6 +34,34 @@ public sealed class ApplicationQueueServiceTests
         Assert.IsTrue(queue[0].PriorityScore > queue[1].PriorityScore);
         Assert.IsFalse(queue.Any(x => x.VacancyId == ineligible.Id));
         Assert.IsFalse(string.IsNullOrWhiteSpace(queue[0].RecommendedCv));
+    }
+
+    [TestMethod]
+    public async Task Queue_RunsAgainstSqlite_WithDateTimeOffsetPublishedDates()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new AppDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var company = new Company { Name = "SQLite Example", Source = "browser", ExternalId = "sqlite-example" };
+        db.Companies.Add(company);
+        var now = DateTimeOffset.UtcNow;
+        var fresh = CreateVacancy(company, "Junior C# Developer", 90, "Eligible", now.AddHours(-2));
+        var older = CreateVacancy(company, "Junior QA Automation", 80, "Eligible", now.AddDays(-10));
+        db.Vacancies.AddRange(fresh, older);
+        await db.SaveChangesAsync();
+
+        var drafts = new ApplicationDraftService(Options.Create(new CandidateProfileOptions()));
+        var sut = new ApplicationQueueService(db, drafts);
+        var queue = await sut.GetAsync(20, 65, CancellationToken.None);
+
+        Assert.AreEqual(2, queue.Count);
+        Assert.AreEqual(fresh.Id, queue[0].VacancyId);
+        Assert.IsTrue(queue[0].PriorityScore > queue[1].PriorityScore);
     }
 
     [TestMethod]
