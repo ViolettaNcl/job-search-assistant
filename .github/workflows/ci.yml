@@ -24,6 +24,8 @@ jobs:
           node --check browser-extension/review-navigator-content.js
           node --check browser-extension/final-submit-control.js
           node --check browser-extension/final-submit-locator.js
+          node --check browser-extension/submission-receipt.js
+          node --check browser-extension/submission-receipt-content.js
           node --check browser-extension/submission-readiness.js
           node --check browser-extension/application-session.js
           node --check browser-extension/application-step-intelligence.js
@@ -45,6 +47,7 @@ jobs:
           node --check browser-extension/review-navigator-popup.js
           node --check browser-extension/candidate-confirmation-popup.js
           node --check browser-extension/final-review-popup.js
+          node --check browser-extension/submission-receipt-popup.js
           node --check browser-extension/options.js
           node --check browser-extension/ats-structured.test.js
           node --check browser-extension/ats-controls.test.js
@@ -61,6 +64,8 @@ jobs:
           node --check browser-extension/candidate-confirmation-session.test.js
           node --check browser-extension/final-submit-control.test.js
           node --check browser-extension/final-review-gate.test.js
+          node --check browser-extension/submission-receipt.test.js
+          node --check browser-extension/submission-receipt-session.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls
@@ -91,6 +96,10 @@ jobs:
         run: node browser-extension/final-submit-control.test.js
       - name: Test Final Review Gate states
         run: node browser-extension/final-review-gate.test.js
+      - name: Test Submission Receipt signals
+        run: node browser-extension/submission-receipt.test.js
+      - name: Test Submission Receipt ATS session restoration
+        run: node browser-extension/submission-receipt-session.test.js
       - name: Validate dashboard inline JavaScript
         run: |
           python3 - <<'PY'

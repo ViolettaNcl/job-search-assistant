@@ -94,7 +94,7 @@
     const parsed = safeUrl(value);
     if (!parsed) return false;
     const text = `${parsed.pathname} ${parsed.search}`.toLowerCase();
-    return /(?:^|[\s\/_?=&.-])(apply|application|applications|candidate|questionnaire|screening|jobapplication|job-application|applynow|apply-now)(?:$|[\s\/_?=&.-])/.test(text);
+    return /(?:^|[\s\/_?=&.-])(apply|application|applications|candidate|questionnaire|screening|jobapplication|job-application|applynow|apply-now|thank-you|thankyou|submitted|confirmation|submission-success|application-complete|application-submitted)(?:$|[\s\/_?=&.-])/.test(text);
   }
 
   function sanitizeStepHistory(value) {

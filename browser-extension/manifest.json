@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "1.7.0",
-  "description": "Prepare applications, resolve review checkpoints, and hand off safely to a final human review without clicking employer Submit/Apply.",
+  "version": "1.8.0",
+  "description": "Prepare and review applications safely, then detect strong employer submission receipts and record Applied only after explicit candidate confirmation.",
   "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
   "background": {
@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "matches": ["https://*/*", "http://*/*"],
-      "js": ["ats-structured.js", "ats-controls.js", "field-verification.js", "content.js", "cv-upload.js", "review-navigator-content.js", "final-submit-control.js", "final-submit-locator.js"],
+      "js": ["ats-structured.js", "ats-controls.js", "field-verification.js", "content.js", "cv-upload.js", "review-navigator-content.js", "final-submit-control.js", "final-submit-locator.js", "submission-receipt.js", "submission-receipt-content.js"],
       "run_at": "document_idle"
     }
   ]
