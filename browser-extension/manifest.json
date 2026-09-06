@@ -5,6 +5,9 @@
   "description": "Analyze vacancies, tailor applications, reuse confirmed answers, autofill ATS forms and insert the recommended stored CV.",
   "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "options_page": "options.html",
   "action": {
     "default_title": "Violetta Apply Assistant",
