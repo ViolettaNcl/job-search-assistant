@@ -12,12 +12,7 @@ function firstText(selectors) {
 }
 
 function detectAts() {
-  const host = location.hostname.toLowerCase();
-  if (/(^|\.)hh\.ru$/.test(host)) return "hh";
-  if (host.includes("greenhouse.io")) return "greenhouse";
-  if (host.includes("lever.co")) return "lever";
-  if (host.includes("ashbyhq.com")) return "ashby";
-  return "generic";
+  return window.vjaAtsStructured?.detectAtsHost?.(location.hostname) || "generic";
 }
 
 const atsSelectors = {
@@ -110,19 +105,21 @@ function inferCountry(ats, locationText, bodyText) {
 
 function extractPage() {
   const ats = detectAts();
+  const structured = window.vjaAtsStructured?.readStructuredJobPosting?.(document) || null;
   const bodyRaw = textOf(document.body);
   const body = bodyRaw.toLowerCase();
-  const locationText = detectLocation(ats);
-  const country = inferCountry(ats, locationText, bodyRaw);
-  const remote = /remote|удален|удалён|work from home|home office|fully distributed/i.test(body);
+  const locationText = structured?.location || detectLocation(ats);
+  const country = structured?.country || inferCountry(ats, locationText, bodyRaw);
+  const remoteOnPage = /remote|удален|удалён|work from home|home office|fully distributed/i.test(body);
+  const remote = Boolean(structured?.remote || remoteOnPage);
   return {
-    title: detectTitle(ats),
-    company: detectCompany(ats),
-    description: detectDescription(ats),
+    title: structured?.title || detectTitle(ats),
+    company: structured?.company || detectCompany(ats),
+    description: structured?.description || detectDescription(ats),
     country,
     location: locationText,
-    remoteScope: remote ? "Remote detected on page" : "",
-    experience: "",
+    remoteScope: remote ? (structured?.remote ? "Remote detected in structured job data" : "Remote detected on page") : "",
+    experience: structured?.experience || "",
     source: location.hostname.replace(/^www\./, ""),
     ats,
     remote,
