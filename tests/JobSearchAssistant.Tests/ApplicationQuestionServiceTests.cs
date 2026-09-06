@@ -74,6 +74,42 @@ public sealed class ApplicationQuestionServiceTests
     }
 
     [TestMethod]
+    public void VerifiedPhoneProfile_BeatsStaleBrowserMemory()
+    {
+        var sut = new ApplicationQuestionService(Options.Create(new CandidateProfileOptions
+        {
+            Phone = "+357 99 123456"
+        }));
+        var request = new ResolveApplicationFieldsRequest(
+            "Cyprus", "en", "", "",
+            new Dictionary<string, string> { ["phone"] = "+357 00 000000" },
+            [new ExtensionFieldInput("f1", "Phone number", "tel", "", null)]);
+
+        var field = sut.Resolve(request).Fields.Single();
+        Assert.AreEqual("fill", field.Action);
+        Assert.AreEqual("+357 99 123456", field.Value);
+        Assert.IsFalse(field.CanRemember);
+        StringAssert.Contains(field.Reason, "verified candidate-profile");
+    }
+
+    [TestMethod]
+    public void VerifiedLinkedInProfile_IsAutofilled()
+    {
+        var sut = new ApplicationQuestionService(Options.Create(new CandidateProfileOptions
+        {
+            LinkedInUrl = "https://www.linkedin.com/in/violetta-example/"
+        }));
+        var request = new ResolveApplicationFieldsRequest(
+            "Cyprus", "en", "", "", null,
+            [new ExtensionFieldInput("f1", "LinkedIn profile", "url", "", null)]);
+
+        var field = sut.Resolve(request).Fields.Single();
+        Assert.AreEqual("fill", field.Action);
+        Assert.AreEqual("https://www.linkedin.com/in/violetta-example/", field.Value);
+        Assert.IsFalse(field.CanRemember);
+    }
+
+    [TestMethod]
     public void Salary_IsAlwaysReviewedEvenIfMemoryContainsValue()
     {
         var request = new ResolveApplicationFieldsRequest(

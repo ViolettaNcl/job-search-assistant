@@ -109,6 +109,8 @@ public sealed record CandidateProfileOptions
     public string RussianName { get; init; } = "Виолетта Николау";
     public string GreekName { get; init; } = "Βιολέττα Νικολάου";
     public string Email { get; init; } = "violettanicolaou@gmail.com";
+    public string Phone { get; init; } = "";
+    public string LinkedInUrl { get; init; } = "";
     public string CurrentCountry { get; init; } = "Russia";
     public string CurrentCity { get; init; } = "Volgograd";
     public string GitHubUrl { get; init; } = "https://github.com/ViolettaNcl";
