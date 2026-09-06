@@ -35,6 +35,60 @@ public sealed class ApplicationQueueServiceTests
         Assert.IsFalse(string.IsNullOrWhiteSpace(queue[0].RecommendedCv));
     }
 
+    [TestMethod]
+    public async Task Queue_HidesActiveDeferral_RestoresExpiredDeferral_AndDoesNotExposeOrdinarySavedJob()
+    {
+        await using var db = CreateDb();
+        var company = new Company { Name = "Deferred Example", Source = "global", ExternalId = "deferred-example" };
+        db.Companies.Add(company);
+        var now = DateTimeOffset.UtcNow;
+
+        var active = CreateVacancy(company, "Active defer", 91, "Eligible", now.AddHours(-1));
+        active.Status = VacancyStatus.Saved;
+        active.Events.Add(new ApplicationEvent
+        {
+            Vacancy = active,
+            VacancyId = active.Id,
+            Type = VacancyStatus.Saved.ToString(),
+            Note = QueueDeferralPolicy.BuildNote(now.AddHours(4)),
+            CreatedAt = now
+        });
+
+        var expired = CreateVacancy(company, "Expired defer", 89, "Eligible", now.AddHours(-2));
+        expired.Status = VacancyStatus.Saved;
+        expired.Events.Add(new ApplicationEvent
+        {
+            Vacancy = expired,
+            VacancyId = expired.Id,
+            Type = VacancyStatus.Saved.ToString(),
+            Note = QueueDeferralPolicy.BuildNote(now.AddMinutes(-5)),
+            CreatedAt = now.AddHours(-5)
+        });
+
+        var ordinarySaved = CreateVacancy(company, "Manual bookmark", 95, "Eligible", now.AddMinutes(-30));
+        ordinarySaved.Status = VacancyStatus.Saved;
+        ordinarySaved.Events.Add(new ApplicationEvent
+        {
+            Vacancy = ordinarySaved,
+            VacancyId = ordinarySaved.Id,
+            Type = VacancyStatus.Saved.ToString(),
+            Note = "Saved for manual review",
+            CreatedAt = now
+        });
+
+        db.Vacancies.AddRange(active, expired, ordinarySaved);
+        await db.SaveChangesAsync();
+
+        var drafts = new ApplicationDraftService(Options.Create(new CandidateProfileOptions()));
+        var sut = new ApplicationQueueService(db, drafts);
+        var queue = await sut.GetAsync(20, 65, CancellationToken.None);
+
+        Assert.AreEqual(1, queue.Count);
+        Assert.AreEqual(expired.Id, queue[0].VacancyId);
+        Assert.IsFalse(queue.Any(x => x.VacancyId == active.Id));
+        Assert.IsFalse(queue.Any(x => x.VacancyId == ordinarySaved.Id));
+    }
+
     private static Vacancy CreateVacancy(Company company, string title, int score, string eligibility, DateTimeOffset published)
         => new()
         {
