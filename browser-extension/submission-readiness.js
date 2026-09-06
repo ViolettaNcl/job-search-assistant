@@ -17,10 +17,12 @@
     const fields = Array.isArray(scan?.fields) ? scan.fields : [];
     const resolutions = Array.isArray(plan?.fields) ? plan.fields : [];
     const scanned = new Map(fields.map(field => [field.token, field]));
+    const confirmedCount = fields.filter(field => field?.candidateConfirmed === true).length;
 
     const items = resolutions
       .filter(item => {
         const source = scanned.get(item?.token) || {};
+        if (source.candidateConfirmed === true) return false;
         return item?.action === "review" || item?.action === "blocked" || (item?.action === "fill" && source.fillFailed === true);
       })
       .map(item => {
@@ -82,7 +84,9 @@
         : "Review these employer-specific or interactive controls before final submission.";
     } else {
       title = "Assistant checklist clear";
-      detail = "No unresolved fields were detected by the assistant. Review the entire employer form before final Submit/Apply.";
+      detail = confirmedCount
+        ? `${confirmedCount} candidate-reviewed checkpoint${confirmedCount === 1 ? " was" : "s were"} confirmed for this session. Review the entire employer form before final Submit/Apply.`
+        : "No unresolved fields were detected by the assistant. Review the entire employer form before final Submit/Apply.";
     }
 
     return {
@@ -92,6 +96,7 @@
       reviewCount,
       failedCount,
       blockedCount,
+      confirmedCount,
       items,
       cvCheckpoint
     };
