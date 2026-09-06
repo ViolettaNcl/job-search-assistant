@@ -1,4 +1,5 @@
 let vjaSessionSaveTimer = null;
+window.vjaCurrentStepHistory = Array.isArray(window.vjaCurrentStepHistory) ? window.vjaCurrentStepHistory : [];
 
 async function vjaSessionSlot() {
   if (!chrome.storage?.session || !window.vjaApplicationSession) return null;
@@ -29,7 +30,8 @@ async function vjaSaveApplicationSession() {
     latest,
     latestPage,
     latestTrackedId,
-    coverLetter: $("coverLetter")?.value || latest?.draft?.coverLetter || ""
+    coverLetter: $("coverLetter")?.value || latest?.draft?.coverLetter || "",
+    stepHistory: window.vjaCurrentStepHistory || []
   });
   if (!session) return;
   await chrome.storage.session.set({ [slot.key]: session });
@@ -47,6 +49,8 @@ async function vjaClearApplicationSession({ resetUi = false } = {}) {
   const slot = await vjaSessionSlot();
   if (slot) await chrome.storage.session.remove(slot.key);
   vjaShowSessionStatus("");
+  window.vjaCurrentStepHistory = [];
+  window.vjaRenderApplicationStep?.(null);
 
   if (resetUi) {
     latest = null;
@@ -99,7 +103,6 @@ async function vjaTakeSessionFromOpener(slot) {
     slot.tab.openerTabId
   )) return null;
 
-  // Move rather than copy the context so the old tab cannot later restore a stale duplicate.
   await chrome.storage.session.set({ [slot.key]: session });
   await chrome.storage.session.remove(sourceKey);
   return session;
@@ -128,6 +131,7 @@ async function vjaRestoreApplicationSession() {
   latest = session.latest;
   latestPage = session.latestPage;
   latestTrackedId = session.latestTrackedId || null;
+  window.vjaCurrentStepHistory = Array.isArray(session.stepHistory) ? session.stepHistory : [];
   vjaRenderRestoredAnalysis(session);
 
   const restoredLabel = restoredViaHandoff
@@ -137,6 +141,7 @@ async function vjaRestoreApplicationSession() {
   try {
     await refreshFieldPlan();
     window.vjaRenderSubmissionReadiness?.();
+    window.vjaCaptureApplicationStep?.();
     const review = Number(latestPlan?.reviewCount || 0);
     const blocked = Number(latestPlan?.blockedCount || 0);
     $("fillNote").textContent = review || blocked
