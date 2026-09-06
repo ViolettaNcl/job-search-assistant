@@ -26,6 +26,14 @@ assert.equal(result.confirmed, false);
 assert.equal(result.signal, "negative-or-instructional");
 
 result = receipt.detect({
+  url: "https://jobs.example.com/apply",
+  title: "Application instructions",
+  text: "After you submit, you will see ‘Thank you for applying’. Then you may close this page."
+});
+assert.equal(result.confirmed, false, "instructional examples of confirmation copy must not count as a receipt");
+assert.equal(result.signal, "negative-or-instructional");
+
+result = receipt.detect({
   url: "https://jobs.example.com/application/success",
   title: "Application",
   text: "Continue to the next step."
