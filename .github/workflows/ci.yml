@@ -17,3 +17,6 @@ jobs:
         run: |
           node --check browser-extension/content.js
           node --check browser-extension/popup.js
+          node --check browser-extension/cv-upload.js
+          node --check browser-extension/cv-vault-popup.js
+          node --check browser-extension/options.js
