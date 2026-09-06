@@ -59,6 +59,10 @@ Accepts page-extracted vacancy text and returns:
 - common screening answers
 - warnings to verify before submission
 
+### `POST /api/vacancies/{id}/apply-tailored`
+
+Submits a strong HH.ru vacancy through HH's applicant-authorized API using the selected HH resume and the same vacancy-specific natural-language drafting engine used by the browser extension. The service blocks blacklisted companies, duplicate applications and vacancies below the one-click threshold.
+
 ## Safety / quality gates
 
 - `85–100`: Apply now
@@ -77,14 +81,13 @@ The extension intentionally does **not** fill:
 - unverified LinkedIn profile
 - arbitrary unknown yes/no questions
 
-It never clicks the final Submit button.
+For external job sites it never clicks the final Submit button. HH.ru is the explicit exception: after user confirmation, HH OAuth and resume selection, the dedicated HH button can submit via the official applicant API.
 
 ## Next implementation batch
 
-1. Use `ApplicationDraftService` for HH API submissions so auto-applied HH letters use the same natural tailoring engine.
-2. Add application-question memory with explicit `safe reusable` vs `candidate must answer` classifications.
-3. Add ATS-specific selectors for HH, Greenhouse, Lever and Ashby.
-4. Add CV upload helper for the two known PDF variants.
-5. Add one-click `Import to CRM` from the extension and `Mark Applied` after external submission.
-6. Add optional LLM provider interface for deeper company-specific wording, with deterministic truthful fallback when no API key is configured.
-7. Add daily application queue showing the top 10–20 strong matches and duplicate protection.
+1. Add application-question memory with explicit `safe reusable` vs `candidate must answer` classifications.
+2. Add ATS-specific selectors for Greenhouse, Lever and Ashby.
+3. Add CV upload helper for the two known PDF variants.
+4. Add one-click `Import to CRM` from the extension and `Mark Applied` after external submission.
+5. Add optional LLM provider interface for deeper company-specific wording, with deterministic truthful fallback when no API key is configured.
+6. Add daily application queue showing the top 10–20 strong matches and duplicate protection.
