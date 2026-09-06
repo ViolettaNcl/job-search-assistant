@@ -26,7 +26,7 @@ jobs:
       - name: Publish self-contained Windows backend
         shell: pwsh
         run: |
-          dotnet restore src/JobSearchAssistant/JobSearchAssistant.csproj
+          dotnet restore src/JobSearchAssistant/JobSearchAssistant.csproj -r win-x64
           dotnet publish src/JobSearchAssistant/JobSearchAssistant.csproj `
             -c Release `
             -r win-x64 `
