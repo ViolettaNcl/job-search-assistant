@@ -1,4 +1,5 @@
 window.vjaLastUploadedCvName = null;
+window.vjaLastAttributedApplicationKey = null;
 
 async function vjaGetRecommendedStoredCv() {
   if (!latest?.draft) return { key: null, data: null, language: null };
@@ -38,13 +39,36 @@ async function vjaUploadRecommendedCv() {
     const result = await sendToPage({ type: "uploadCv", fileData: data });
     if (!result?.success) throw new Error(result?.error || "The CV could not be inserted into this page.");
     window.vjaLastUploadedCvName = result.filename;
+    window.vjaLastAttributedApplicationKey = null;
     $("cvVaultStatus").textContent = `Uploaded: ${result.filename}`;
     $("fillNote").textContent = `${result.filename} was inserted into the resume/CV upload field. Check that the site displays the correct attachment before submitting.`;
   } catch (error) {
     window.vjaLastUploadedCvName = null;
+    window.vjaLastAttributedApplicationKey = null;
     showError(error?.message || String(error));
   } finally {
     $("uploadCv").disabled = false;
+  }
+}
+
+async function vjaRecordActualCvAttribution() {
+  const resumeName = window.vjaLastUploadedCvName;
+  const vacancyId = latestTrackedId;
+  if (!resumeName || !vacancyId) return;
+
+  const key = `${vacancyId}:${resumeName}`;
+  if (window.vjaLastAttributedApplicationKey === key) return;
+
+  try {
+    const api = await getApiBase();
+    const response = await fetch(`${api}/api/vacancies/${vacancyId}/cv-attribution?resumeLabel=${encodeURIComponent(resumeName)}`, {
+      method: "POST"
+    });
+    if (!response.ok) return;
+    window.vjaLastAttributedApplicationKey = key;
+    $("fillNote").textContent = `Application recorded as Applied. CV analytics attributed to ${resumeName}.`;
+  } catch {
+    // Application tracking must remain successful even if optional analytics attribution cannot be recorded.
   }
 }
 
@@ -55,7 +79,16 @@ const cvNameNode = $("cvName");
 if (cvNameNode) {
   new MutationObserver(() => {
     window.vjaLastUploadedCvName = null;
+    window.vjaLastAttributedApplicationKey = null;
     vjaRefreshCvVaultStatus();
   }).observe(cvNameNode, { childList: true, characterData: true, subtree: true });
 }
+
+const markAppliedNode = $("markApplied");
+if (markAppliedNode) {
+  new MutationObserver(() => {
+    if (markAppliedNode.textContent.includes("Applied")) vjaRecordActualCvAttribution();
+  }).observe(markAppliedNode, { childList: true, characterData: true, subtree: true });
+}
+
 vjaRefreshCvVaultStatus();
