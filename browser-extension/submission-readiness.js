@@ -13,6 +13,10 @@
     return text.length > max ? `${text.slice(0, max - 1)}…` : text;
   }
 
+  function requiredKey(field) {
+    return clean(field?.requiredKey || field?.token || field?.label, "");
+  }
+
   function build(scan, plan, cv = {}) {
     const fields = Array.isArray(scan?.fields) ? scan.fields : [];
     const resolutions = Array.isArray(plan?.fields) ? plan.fields : [];
@@ -36,14 +40,34 @@
               : item.reason || (item.action === "blocked" ? "Manual answer required." : "Review this answer."),
             180),
           currentValuePresent: Boolean(String(source.currentValue || "").trim()),
-          type: String(source.type || "")
+          type: String(source.type || ""),
+          requiredKey: requiredKey(source)
         };
       });
+
+    const representedRequiredKeys = new Set(items.map(item => item.requiredKey).filter(Boolean));
+    const missingRequiredKeys = new Set();
+    for (const source of fields) {
+      if (source?.required !== true || source?.requiredSatisfied === true) continue;
+      const key = requiredKey(source);
+      if (!key || representedRequiredKeys.has(key) || missingRequiredKeys.has(key)) continue;
+      missingRequiredKeys.add(key);
+      items.push({
+        token: source.token || "",
+        action: "required",
+        label: truncate(source.label || "Required field", 110),
+        reason: "This visible field is marked required and currently has no detectable answer. Complete it before final submission.",
+        currentValuePresent: Boolean(String(source.currentValue || "").trim()),
+        type: String(source.type || ""),
+        requiredKey: key
+      });
+    }
 
     const blockedCount = items.filter(item => item.action === "blocked").length;
     const failedCount = items.filter(item => item.action === "failed").length;
     const reviewCount = items.filter(item => item.action === "review").length;
-    const attentionCount = reviewCount + failedCount;
+    const requiredCount = items.filter(item => item.action === "required").length;
+    const attentionCount = reviewCount + failedCount + requiredCount;
     const state = blockedCount > 0 ? "blocked" : attentionCount > 0 ? "review" : "clear";
     const uploadFields = Number(scan?.uploadFields || 0);
     const uploadedName = clean(cv?.uploadedName, "");
@@ -73,16 +97,21 @@
       title = `${blockedCount} manual-only field${blockedCount === 1 ? "" : "s"} require attention`;
       const extra = attentionCount;
       detail = extra
-        ? `There ${extra === 1 ? "is" : "are"} also ${extra} field${extra === 1 ? "" : "s"} to review or verify.`
+        ? `There ${extra === 1 ? "is" : "are"} also ${extra} field${extra === 1 ? "" : "s"} requiring review, completion or fill verification.`
         : "The assistant intentionally cannot validate or answer these fields for you.";
     } else if (state === "review") {
-      title = `${attentionCount} field${attentionCount === 1 ? "" : "s"} still need review`;
-      detail = failedCount
-        ? `${failedCount} safe autofill attempt${failedCount === 1 ? "" : "s"} could not be verified. Confirm those fields manually before final submission.`
-        : "Review these employer-specific or interactive controls before final submission.";
+      title = `${attentionCount} field${attentionCount === 1 ? "" : "s"} still need attention`;
+      if (requiredCount) {
+        const other = reviewCount + failedCount;
+        detail = `${requiredCount} required field${requiredCount === 1 ? " is" : "s are"} still blank${other ? `; ${other} other field${other === 1 ? " also needs" : "s also need"} review or verification` : ""}.`;
+      } else if (failedCount) {
+        detail = `${failedCount} safe autofill attempt${failedCount === 1 ? "" : "s"} could not be verified. Confirm those fields manually before final submission.`;
+      } else {
+        detail = "Review these employer-specific or interactive controls before final submission.";
+      }
     } else {
       title = "Assistant checklist clear";
-      detail = "No unresolved fields were detected by the assistant. Review the entire employer form before final Submit/Apply.";
+      detail = "No unresolved or detectably blank required fields were found by the assistant. Review the entire employer form before final Submit/Apply.";
     }
 
     return {
@@ -92,6 +121,7 @@
       reviewCount,
       failedCount,
       blockedCount,
+      requiredCount,
       items,
       cvCheckpoint
     };
