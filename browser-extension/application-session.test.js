@@ -61,11 +61,41 @@ assert.equal(
 );
 assert.equal(sessions.canHandoffFromOpener(session, childApplyUrl, "bad", 42, now + 5_000), false);
 
+const sharedHostPage = {
+  url: "https://jobs.smartrecruiters.com/Acme/123-junior-developer",
+  title: "Junior Developer",
+  company: "Acme",
+  ats: "smartrecruiters"
+};
+const sharedHostSession = sessions.create({ latest, latestPage: sharedHostPage }, now);
+assert.equal(
+  sessions.canHandoffFromOpener(sharedHostSession, "https://jobs.smartrecruiters.com/Acme/123-junior-developer/apply", 50, 50, now + 5_000),
+  false,
+  "shared-host ATS must not cross tabs without an explicit tenant identity"
+);
+
+const teamtailorPage = {
+  url: "https://acme.teamtailor.com/jobs/123-junior-developer",
+  title: "Junior Developer",
+  company: "Acme",
+  ats: "teamtailor"
+};
+const teamtailorSession = sessions.create({ latest, latestPage: teamtailorPage }, now);
+assert.equal(
+  sessions.canHandoffFromOpener(teamtailorSession, "https://acme.teamtailor.com/jobs/123-junior-developer/apply", 60, 60, now + 5_000),
+  true
+);
+assert.equal(
+  sessions.canHandoffFromOpener(teamtailorSession, "https://other.teamtailor.com/jobs/123/apply", 60, 60, now + 5_000),
+  false
+);
+
 assert.equal(sessions.isApplicationLike("https://jobs.smartrecruiters.com/acme/123/apply"), true);
 assert.equal(sessions.isApplicationLike("https://jobs.smartrecruiters.com/acme/123"), false);
 assert.equal(sessions.hostFamily("https://foo.jobs.smartrecruiters.com/apply"), "smartrecruiters.com");
 assert.equal(sessions.tenantKey("https://acme.wd5.myworkdayjobs.com/apply"), "workday:acme");
 assert.equal(sessions.tenantKey("https://other.wd3.myworkdayjobs.com/apply"), "workday:other");
+assert.equal(sessions.tenantKey("https://acme.teamtailor.com/jobs/123/apply"), "teamtailor.com:acme");
 assert.equal(sessions.normalizedUrl("https://example.com/job/123/#details"), "https://example.com/job/123");
 
 assert.equal(sessions.create({ latest: null, latestPage: page }, now), null);
