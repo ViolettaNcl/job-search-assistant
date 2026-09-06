@@ -1,5 +1,6 @@
 let vjaSubmissionReceiptResult = null;
 let vjaSubmissionReceiptRetry = 0;
+let vjaContinuationJob = null;
 
 function vjaEnsureSubmissionReceiptUi() {
   let card = $("submissionReceiptCard");
@@ -30,32 +31,55 @@ function vjaEnsureSubmissionReceiptUi() {
   record.className = "primary full compactFull";
   record.textContent = "Record application";
 
+  const continueButton = document.createElement("button");
+  continueButton.id = "continueApplicationSession";
+  continueButton.className = "secondary full compactFull hidden";
+  continueButton.textContent = "Continue to next strong job";
+
   const safety = document.createElement("p");
   safety.id = "submissionReceiptSafety";
   safety.className = "readinessDisclaimer";
-  safety.textContent = "The assistant never treats the signal alone as permission to change the CRM. Recording happens only when you press this button.";
+  safety.textContent = "The assistant never treats the signal alone as permission to change the CRM. Recording and navigation each require an explicit click.";
 
-  card.append(eyebrow, title, detail, record, safety);
+  card.append(eyebrow, title, detail, record, continueButton, safety);
   anchor.insertAdjacentElement("afterend", card);
   record.addEventListener("click", vjaRecordSubmissionReceipt);
+  continueButton.addEventListener("click", vjaContinueApplicationSession);
   return card;
 }
 
 function vjaHideSubmissionReceiptUi() {
   $("submissionReceiptCard")?.classList.add("hidden");
   vjaSubmissionReceiptResult = null;
+  vjaContinuationJob = null;
+  $("continueApplicationSession")?.classList.add("hidden");
+}
+
+function vjaRenderContinuation(nextJob) {
+  vjaContinuationJob = nextJob || null;
+  const button = $("continueApplicationSession");
+  if (!button || !window.vjaApplicationContinuation) return null;
+  const state = window.vjaApplicationContinuation.build({ recorded: true, nextJob });
+  button.classList.toggle("hidden", !state.visible);
+  button.disabled = !state.enabled;
+  button.textContent = state.label;
+  button.title = state.detail;
+  return state;
 }
 
 function vjaRenderSubmissionReceipt(result) {
   const card = vjaEnsureSubmissionReceiptUi();
   if (!card) return;
   vjaSubmissionReceiptResult = result;
+  vjaContinuationJob = null;
   card.classList.remove("hidden");
   card.className = "readinessCard readiness-clear";
 
   const title = $("submissionReceiptTitle");
   const detail = $("submissionReceiptDetail");
   const button = $("recordSubmissionReceipt");
+  const continueButton = $("continueApplicationSession");
+  if (continueButton) continueButton.classList.add("hidden");
   if (title) title.textContent = "Employer confirmation detected";
   if (detail) {
     const labels = {
@@ -96,6 +120,35 @@ async function vjaCheckSubmissionReceipt({ retry = true } = {}) {
   }
 }
 
+async function vjaContinueApplicationSession() {
+  clearError();
+  const button = $("continueApplicationSession");
+  const state = window.vjaApplicationContinuation?.build({ recorded: true, nextJob: vjaContinuationJob });
+  if (!state?.enabled || !state.url) {
+    return showError("No safe 75+ unapplied vacancy is ready to open right now.");
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Opening next job…";
+  }
+
+  try {
+    await chrome.tabs.create({ url: state.url, active: true });
+    if (button) button.textContent = "Next job opened ✓";
+    if ($("submissionReceiptDetail")) {
+      $("submissionReceiptDetail").textContent = `${state.detail}. Opened in a new tab; this confirmation page remains available.`;
+    }
+    if ($("queueLoopStatus")) $("queueLoopStatus").textContent = "Next ranked strong job opened in a new tab.";
+  } catch (error) {
+    if (button) {
+      button.disabled = false;
+      button.textContent = state.label;
+    }
+    showError(error?.message || String(error));
+  }
+}
+
 async function vjaRecordSubmissionReceipt() {
   const button = $("recordSubmissionReceipt");
   if (!latest) return showError("The application context is not available yet. Reopen the extension on this confirmation page.");
@@ -127,15 +180,25 @@ async function vjaRecordSubmissionReceipt() {
     const card = vjaEnsureSubmissionReceiptUi();
     if (card) card.className = "readinessCard readiness-clear";
     if ($("submissionReceiptTitle")) $("submissionReceiptTitle").textContent = "Application recorded ✓";
-    if ($("submissionReceiptDetail")) $("submissionReceiptDetail").textContent = "The CRM is updated. The next ranked unapplied vacancy can now move to the top of the daily queue.";
     if (button) {
       button.disabled = true;
       button.textContent = "Recorded ✓";
     }
 
     await window.vjaClearApplicationSession?.();
-    await window.vjaLoadNextStrongJob?.({ quiet: true });
-    if ($("queueLoopStatus")) $("queueLoopStatus").textContent = "Application recorded. Ranked queue refreshed for the next strong job.";
+    const next = await window.vjaLoadNextStrongJob?.({ quiet: true });
+    const continuation = vjaRenderContinuation(next);
+
+    if ($("submissionReceiptDetail")) {
+      $("submissionReceiptDetail").textContent = continuation?.enabled
+        ? `The CRM is updated. ${continuation.detail}`
+        : "The CRM is updated. No other 75+ unapplied vacancy is ready right now.";
+    }
+    if ($("queueLoopStatus")) {
+      $("queueLoopStatus").textContent = continuation?.enabled
+        ? "Application recorded. The next ranked strong job is ready to open."
+        : "Application recorded. Ranked queue refreshed; no next 75+ job is ready.";
+    }
   } catch (error) {
     showError(error?.message || String(error));
     if (button && document.body.contains(button)) {
@@ -152,3 +215,4 @@ setTimeout(() => {
 
 window.vjaCheckSubmissionReceipt = vjaCheckSubmissionReceipt;
 window.vjaRecordSubmissionReceipt = vjaRecordSubmissionReceipt;
+window.vjaContinueApplicationSession = vjaContinueApplicationSession;
