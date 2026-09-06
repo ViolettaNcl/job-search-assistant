@@ -38,6 +38,7 @@ jobs:
           node --check browser-extension/final-review-gate.js
           node --check browser-extension/candidate-local-profile.js
           node --check browser-extension/setup-readiness.js
+          node --check browser-extension/application-continuation.js
           node --check browser-extension/popup.js
           node --check browser-extension/local-contact-profile-popup.js
           node --check browser-extension/cv-upload.js
@@ -74,6 +75,7 @@ jobs:
           node --check browser-extension/followup-desk.test.js
           node --check browser-extension/candidate-local-profile.test.js
           node --check browser-extension/setup-readiness.test.js
+          node --check browser-extension/application-continuation.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls
@@ -114,6 +116,8 @@ jobs:
         run: node browser-extension/candidate-local-profile.test.js
       - name: Test Setup & Readiness states
         run: node browser-extension/setup-readiness.test.js
+      - name: Test post-submission application continuation
+        run: node browser-extension/application-continuation.test.js
       - name: Validate dashboard inline JavaScript
         run: |
           python3 - <<'PY'
