@@ -88,6 +88,13 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
         if (Matches(label, "relocat", "переезд", "готовы.*переех"))
             return Review(field, "relocation", "Relocation is a job-specific commitment and should be confirmed before submission.", false);
 
+        if (IsInteractiveReviewControl(field))
+            return Review(
+                field,
+                $"interactive:{label}",
+                "This ATS uses a custom interactive control. Review and choose the truthful option manually; the assistant will not guess or script this control.",
+                false);
+
         if (Matches(label, "phone", "mobile", "телефон", "номер телефона"))
             return FromVerifiedOrMemoryOrReview(field, _candidate.Phone, memory, "phone", "Phone number has not been verified in the candidate profile yet.");
 
@@ -165,6 +172,10 @@ public sealed class ApplicationQuestionService(IOptions<CandidateProfileOptions>
 
         return Review(field, normalizedKey, "Employer-specific or unfamiliar question; review once before answering.", false);
     }
+
+    private static bool IsInteractiveReviewControl(ExtensionFieldInput field)
+        => field.Type.Equals("combobox", StringComparison.OrdinalIgnoreCase)
+           || field.Type.Equals("radiogroup", StringComparison.OrdinalIgnoreCase);
 
     private static ExtensionFieldResolution FromVerifiedOrMemoryOrReview(
         ExtensionFieldInput field,
