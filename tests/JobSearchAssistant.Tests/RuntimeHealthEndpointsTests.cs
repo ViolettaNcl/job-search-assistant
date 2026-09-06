@@ -56,4 +56,42 @@ public sealed class RuntimeHealthEndpointsTests
         Assert.IsTrue(result.DatabaseReachable);
         Assert.IsFalse(result.AppStateReady);
     }
+
+    [TestMethod]
+    public async Task LocalSqliteReadiness_IsPersistentAndReadyAfterBootstrap()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"vja-health-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite($"Data Source={databasePath}")
+                .Options;
+
+            await using var db = new AppDbContext(options);
+            var bootstrap = await DatabaseBootstrapper.InitializeAsync(
+                db,
+                DatabaseStorageMode.LocalSqlite,
+                NullLogger.Instance,
+                CancellationToken.None);
+
+            var result = await RuntimeHealthEndpoints.CheckReadinessAsync(
+                db,
+                DatabaseStorageMode.LocalSqlite,
+                bootstrap,
+                CancellationToken.None);
+
+            Assert.AreEqual("sqlite-ensure-created", bootstrap.Mode);
+            Assert.IsTrue(result.Ready);
+            Assert.IsTrue(result.DatabaseReachable);
+            Assert.IsTrue(result.AppStateReady);
+            Assert.IsTrue(LocalSqliteDatabase.IsPersistent(DatabaseStorageMode.LocalSqlite));
+            Assert.AreEqual("sqlite", LocalSqliteDatabase.Label(DatabaseStorageMode.LocalSqlite));
+        }
+        finally
+        {
+            if (File.Exists(databasePath)) File.Delete(databasePath);
+            if (File.Exists(databasePath + "-shm")) File.Delete(databasePath + "-shm");
+            if (File.Exists(databasePath + "-wal")) File.Delete(databasePath + "-wal");
+        }
+    }
 }

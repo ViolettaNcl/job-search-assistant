@@ -40,4 +40,50 @@ public sealed class DatabaseBootstrapperTests
         Assert.AreEqual(0, result.AppliedMigrations);
         Assert.IsTrue(await db.AppStates.AnyAsync(x => x.Id == 1));
     }
+
+    [TestMethod]
+    public async Task LocalSqliteBootstrap_PersistsApplicationStateAcrossContexts()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"vja-{Guid.NewGuid():N}.db");
+        var connection = $"Data Source={databasePath}";
+
+        try
+        {
+            var firstOptions = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite(connection)
+                .Options;
+
+            await using (var first = new AppDbContext(firstOptions))
+            {
+                var result = await DatabaseBootstrapper.InitializeAsync(
+                    first,
+                    DatabaseStorageMode.LocalSqlite,
+                    NullLogger.Instance,
+                    CancellationToken.None);
+
+                Assert.AreEqual("sqlite-ensure-created", result.Mode);
+                Assert.IsTrue(await first.AppStates.AnyAsync(x => x.Id == 1));
+                var state = await first.AppStates.SingleAsync(x => x.Id == 1);
+                state.HhResumeId = "persistent-test-resume";
+                await first.SaveChangesAsync();
+            }
+
+            var secondOptions = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite(connection)
+                .Options;
+
+            await using (var second = new AppDbContext(secondOptions))
+            {
+                Assert.IsTrue(await second.Database.CanConnectAsync());
+                var state = await second.AppStates.AsNoTracking().SingleAsync(x => x.Id == 1);
+                Assert.AreEqual("persistent-test-resume", state.HhResumeId);
+            }
+        }
+        finally
+        {
+            if (File.Exists(databasePath)) File.Delete(databasePath);
+            if (File.Exists(databasePath + "-shm")) File.Delete(databasePath + "-shm");
+            if (File.Exists(databasePath + "-wal")) File.Delete(databasePath + "-wal");
+        }
+    }
 }

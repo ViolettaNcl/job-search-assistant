@@ -9,6 +9,14 @@ VIOLETTA APPLY ASSISTANT — WINDOWS QUICK START
    The launcher starts the local backend at:
    http://127.0.0.1:8080
 
+   No database installation is required. By default the assistant stores its
+   persistent local database here:
+   %LOCALAPPDATA%\ViolettaApplyAssistant\jobassistant.db
+
+   Application history, queue state, follow-ups and analytics survive backend
+   and computer restarts. The database lives outside the extracted bundle, so
+   replacing the bundle with a newer version does not remove local history.
+
 3. FIRST INSTALL ONLY — install the Chrome extension locally:
    - Open chrome://extensions
    - Enable Developer mode
@@ -41,9 +49,16 @@ VIOLETTA APPLY ASSISTANT — WINDOWS QUICK START
    - Submit the employer form yourself on external ATS sites
    - Record the verified submission in the assistant
 
+OPTIONAL DATABASE SETTINGS
+--------------------------
+- The default local SQLite database requires no setup.
+- Advanced users can override the SQLite connection using ConnectionStrings__Sqlite.
+- PostgreSQL remains supported for a server/shared deployment through ConnectionStrings__Postgres.
+  When PostgreSQL is configured it takes precedence over local SQLite.
+
 IMPORTANT
 ---------
 - Never share user-settings.cmd.
 - Never paste passwords, SMS codes, CAPTCHA answers or 2FA codes into configuration files.
-- The bundled default database is in-memory unless you configure PostgreSQL, so local history resets when the backend stops. Use persistent PostgreSQL if application history must survive restarts.
-- CV Vault PDFs are stored in Chrome local extension storage, not in this backend bundle.
+- Back up %LOCALAPPDATA%\ViolettaApplyAssistant\jobassistant.db if you want an extra copy of local CRM/application history.
+- CV Vault PDFs are stored in Chrome local extension storage, not in the backend database.

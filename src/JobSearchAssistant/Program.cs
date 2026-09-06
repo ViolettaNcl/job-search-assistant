@@ -14,15 +14,18 @@ builder.Services.Configure<RemotiveOptions>(builder.Configuration.GetSection("Re
 builder.Services.Configure<AdzunaOptions>(builder.Configuration.GetSection("Adzuna"));
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection("Security"));
 
-var connection = builder.Configuration.GetConnectionString("Postgres");
-var persistentDatabase = !string.IsNullOrWhiteSpace(connection);
-if (persistentDatabase)
+var postgresConnection = builder.Configuration.GetConnectionString("Postgres");
+DatabaseStorageMode storageMode;
+if (!string.IsNullOrWhiteSpace(postgresConnection))
 {
-    builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connection));
+    storageMode = DatabaseStorageMode.Postgres;
+    builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(postgresConnection));
 }
 else
 {
-    builder.Services.AddDbContext<AppDbContext>(o => o.UseInMemoryDatabase("jobassistant"));
+    storageMode = DatabaseStorageMode.LocalSqlite;
+    var sqliteConnection = LocalSqliteDatabase.ResolveConnectionString(builder.Configuration);
+    builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(sqliteConnection));
 }
 builder.Services.AddHttpClient("hh");
 builder.Services.AddHttpClient("telegram");
@@ -55,20 +58,20 @@ DatabaseBootstrapResult databaseBootstrap;
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    databaseBootstrap = await DatabaseBootstrapper.InitializeAsync(db, persistentDatabase, app.Logger);
+    databaseBootstrap = await DatabaseBootstrapper.InitializeAsync(db, storageMode, app.Logger);
 }
 
 app.MapGet("/health", () => Results.Ok(new
 {
     status = "ok",
     utc = DateTimeOffset.UtcNow,
-    database = persistentDatabase ? "postgres" : "in-memory",
-    persistent = persistentDatabase,
+    database = LocalSqliteDatabase.Label(storageMode),
+    persistent = LocalSqliteDatabase.IsPersistent(storageMode),
     schemaMode = databaseBootstrap.Mode,
     latestMigration = databaseBootstrap.LatestMigration,
     appliedMigrations = databaseBootstrap.AppliedMigrations
 }));
-app.MapRuntimeHealth(persistentDatabase, databaseBootstrap);
+app.MapRuntimeHealth(storageMode, databaseBootstrap);
 
 app.MapGet("/api/candidate", (IOptions<CandidateProfileOptions> options, CandidateProfileReadinessService readiness) =>
 {

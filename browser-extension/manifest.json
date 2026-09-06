@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "2.1.0",
-  "description": "Prepare and review applications safely, verify setup readiness, record verified submissions, and run from the packaged Windows bundle.",
+  "version": "2.2.0",
+  "description": "Prepare and review applications safely with setup readiness, verified submissions, follow-ups, and persistent local Windows history.",
   "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
   "background": {
