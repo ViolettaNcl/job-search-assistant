@@ -36,8 +36,10 @@ jobs:
           node --check browser-extension/review-navigator.js
           node --check browser-extension/candidate-confirmation.js
           node --check browser-extension/final-review-gate.js
+          node --check browser-extension/candidate-local-profile.js
           node --check browser-extension/setup-readiness.js
           node --check browser-extension/popup.js
+          node --check browser-extension/local-contact-profile-popup.js
           node --check browser-extension/cv-upload.js
           node --check browser-extension/cv-vault-popup.js
           node --check browser-extension/review-summary.js
@@ -70,6 +72,7 @@ jobs:
           node --check browser-extension/submission-receipt.test.js
           node --check browser-extension/submission-receipt-session.test.js
           node --check browser-extension/followup-desk.test.js
+          node --check browser-extension/candidate-local-profile.test.js
           node --check browser-extension/setup-readiness.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
@@ -107,6 +110,8 @@ jobs:
         run: node browser-extension/submission-receipt-session.test.js
       - name: Test Follow-up Desk ranking and request safety
         run: node browser-extension/followup-desk.test.js
+      - name: Test local candidate contact profile
+        run: node browser-extension/candidate-local-profile.test.js
       - name: Test Setup & Readiness states
         run: node browser-extension/setup-readiness.test.js
       - name: Validate dashboard inline JavaScript
