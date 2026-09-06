@@ -10,18 +10,40 @@ public sealed record DatabaseBootstrapResult(
 
 public static class DatabaseBootstrapper
 {
-    public static async Task<DatabaseBootstrapResult> InitializeAsync(
+    public static Task<DatabaseBootstrapResult> InitializeAsync(
         AppDbContext db,
         bool persistentDatabase,
         ILogger logger,
         CancellationToken ct = default)
+        => InitializeAsync(
+            db,
+            persistentDatabase ? DatabaseStorageMode.Postgres : DatabaseStorageMode.InMemory,
+            logger,
+            ct);
+
+    public static async Task<DatabaseBootstrapResult> InitializeAsync(
+        AppDbContext db,
+        DatabaseStorageMode storageMode,
+        ILogger logger,
+        CancellationToken ct = default)
     {
-        if (!persistentDatabase)
+        if (storageMode == DatabaseStorageMode.InMemory)
         {
             await db.Database.EnsureCreatedAsync(ct);
             await EnsureAppStateAsync(db, ct);
             logger.LogInformation("Database initialized in non-persistent in-memory mode.");
             return new DatabaseBootstrapResult("in-memory", null, 0);
+        }
+
+        if (storageMode == DatabaseStorageMode.LocalSqlite)
+        {
+            await db.Database.EnsureCreatedAsync(ct);
+            await EnsureAppStateAsync(db, ct);
+            if (!await db.Database.CanConnectAsync(ct))
+                throw new InvalidOperationException("Local SQLite database was created but cannot be reopened.");
+
+            logger.LogInformation("Persistent local SQLite schema ready.");
+            return new DatabaseBootstrapResult("sqlite-ensure-created", null, 0);
         }
 
         var knownMigrations = db.Database.GetMigrations().ToArray();
