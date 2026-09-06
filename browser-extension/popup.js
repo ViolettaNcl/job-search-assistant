@@ -3,6 +3,7 @@ let latest = null;
 let latestPage = null;
 let latestScan = null;
 let latestPlan = null;
+let latestTrackedId = null;
 
 async function getApiBase() {
   const stored = await chrome.storage.sync.get({ apiBase: "http://localhost:8080" });
@@ -39,7 +40,7 @@ function clearError() {
 }
 
 function setBusy(busy) {
-  for (const id of ["analyze", "fillForm", "copyLetter", "applyHh", "findCv", "rememberAnswers", "clearMemory"]) {
+  for (const id of ["analyze", "fillForm", "copyLetter", "applyHh", "findCv", "rememberAnswers", "clearMemory", "trackJob", "markApplied"]) {
     if ($(id)) $(id).disabled = busy;
   }
   $("analyze").textContent = busy ? "Working…" : "Analyze this vacancy";
@@ -113,6 +114,7 @@ async function analyze() {
   clearError();
   setBusy(true);
   try {
+    latestTrackedId = null;
     latestPage = await sendToPage({ type: "extractPage" });
     if (latestPage?.error) throw new Error(latestPage.error);
     const api = await getApiBase();
@@ -135,8 +137,12 @@ async function analyze() {
 
     await refreshFieldPlan();
 
-    const canDirectApply = isHhVacancy(latestPage?.url) && latest.match.score >= 75;
+    const hh = isHhVacancy(latestPage?.url);
+    const canDirectApply = hh && latest.match.score >= 75;
     $("applyHh").classList.toggle("hidden", !canDirectApply);
+    $("externalActions").classList.toggle("hidden", hh);
+    $("trackJob").textContent = "Save to tracker";
+    $("markApplied").textContent = "Mark applied";
     $("fillNote").textContent = latestPlan.reviewCount || latestPlan.blockedCount
       ? `${latestPlan.autofillCount} fields can be filled safely. ${latestPlan.reviewCount} need review and ${latestPlan.blockedCount} are intentionally blocked from automation.`
       : `${latestPlan.autofillCount} fields can be filled safely. Review the final form before submitting.`;
@@ -228,6 +234,60 @@ async function findCvUpload() {
   }
 }
 
+async function ensureTracked() {
+  if (latestTrackedId) return latestTrackedId;
+  if (!latestPage?.url) throw new Error("Analyze a vacancy first.");
+  const api = await getApiBase();
+  const hh = isHhVacancy(latestPage.url);
+  const response = await fetch(hh ? `${api}/api/import/hh` : `${api}/api/import/manual`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(hh
+      ? { url: latestPage.url }
+      : { url: latestPage.url, title: latestPage.title || null, company: latestPage.company || null })
+  });
+  if (!response.ok) throw new Error(`Could not save this vacancy to the tracker (${response.status}).`);
+  const payload = await response.json();
+  latestTrackedId = payload.id;
+  return latestTrackedId;
+}
+
+async function trackJob() {
+  clearError();
+  if (!latest) return showError("Analyze the vacancy first.");
+  setBusy(true);
+  try {
+    await ensureTracked();
+    $("trackJob").textContent = "Saved ✓";
+    $("fillNote").textContent = "Vacancy saved in Job Search Assistant. Duplicate URLs are protected by the existing import logic.";
+  } catch (error) {
+    showError(error?.message || String(error));
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function markApplied() {
+  clearError();
+  if (!latest) return showError("Analyze the vacancy first.");
+  const confirmed = window.confirm("Mark this external vacancy as applied in Job Search Assistant? Do this after you have submitted the application on the employer site.");
+  if (!confirmed) return;
+  setBusy(true);
+  try {
+    const id = await ensureTracked();
+    const api = await getApiBase();
+    const response = await fetch(`${api}/api/vacancies/${id}/mark-applied`, { method: "POST" });
+    if (!response.ok) throw new Error(`Could not mark the vacancy as applied (${response.status}).`);
+    $("trackJob").textContent = "Saved ✓";
+    $("markApplied").textContent = "Applied ✓";
+    $("fillNote").textContent = "Application recorded in the CRM as Applied.";
+  } catch (error) {
+    showError(error?.message || String(error));
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function applyOnHh() {
   clearError();
   if (!latestPage?.url || !isHhVacancy(latestPage.url)) return showError("Open an HH.ru vacancy first.");
@@ -246,6 +306,7 @@ async function applyOnHh() {
     });
     if (!importedResponse.ok) throw new Error("Could not import this HH vacancy into Job Assistant.");
     const imported = await importedResponse.json();
+    latestTrackedId = imported.id;
 
     const applyResponse = await fetch(`${api}/api/vacancies/${imported.id}/apply-tailored`, { method: "POST" });
     const payload = await applyResponse.json().catch(() => ({}));
@@ -273,6 +334,8 @@ async function applyOnHh() {
   $("rememberAnswers").addEventListener("click", rememberAnswers);
   $("clearMemory").addEventListener("click", clearMemory);
   $("findCv").addEventListener("click", findCvUpload);
+  $("trackJob").addEventListener("click", trackJob);
+  $("markApplied").addEventListener("click", markApplied);
   $("applyHh").addEventListener("click", applyOnHh);
 
   try {
