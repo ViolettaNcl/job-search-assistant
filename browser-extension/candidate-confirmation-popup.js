@@ -1,4 +1,4 @@
-window.vjaCandidateConfirmationState = null;
+window.vjaCandidateConfirmationState = window.vjaCandidateConfirmationState || null;
 window.vjaReviewNavigatorSelection = window.vjaReviewNavigatorSelection || null;
 
 function vjaEnsureCandidateConfirmationUi() {
@@ -23,19 +23,6 @@ function vjaEnsureCandidateConfirmationUi() {
   anchor.insertAdjacentElement("afterend", note);
   anchor.insertAdjacentElement("afterend", button);
   return { button, note };
-}
-
-function vjaSanitizedCandidateConfirmationState() {
-  return window.vjaCandidateConfirmation?.sanitizeState?.(window.vjaCandidateConfirmationState) || { salt: "", records: [] };
-}
-
-async function vjaReadCandidateConfirmationStateFromSession() {
-  if (!chrome.storage?.session || !window.vjaApplicationSession) return null;
-  const tab = await activeTab();
-  const key = window.vjaApplicationSession.slotKey(tab.id);
-  if (!key) return null;
-  const stored = await chrome.storage.session.get(key);
-  return stored?.[key]?.candidateConfirmations || null;
 }
 
 function vjaUpdateCandidateConfirmationUi(item = window.vjaReviewNavigatorSelection) {
@@ -74,18 +61,6 @@ function vjaRefreshConfirmationCounts() {
   if ($("blockedCount")) $("blockedCount").textContent = Number(readiness.blockedCount || 0);
 }
 
-// Extend the existing application-session payload without storing field labels or answers.
-if (window.vjaApplicationSession?.create && !window.vjaApplicationSession.__candidateConfirmationWrapped) {
-  const originalCreateSession = window.vjaApplicationSession.create.bind(window.vjaApplicationSession);
-  window.vjaApplicationSession.create = function (input, now) {
-    const session = originalCreateSession(input, now);
-    if (!session) return session;
-    session.candidateConfirmations = vjaSanitizedCandidateConfirmationState();
-    return session;
-  };
-  window.vjaApplicationSession.__candidateConfirmationWrapped = true;
-}
-
 // Every field rescan is annotated against the current salted fingerprints. A changed
 // answer no longer matches, so confirmation is invalidated without storing the value.
 if (typeof window.refreshFieldPlan === "function" && !window.refreshFieldPlan.__candidateConfirmationWrapped) {
@@ -99,27 +74,6 @@ if (typeof window.refreshFieldPlan === "function" && !window.refreshFieldPlan.__
   };
   wrappedRefreshFieldPlan.__candidateConfirmationWrapped = true;
   window.refreshFieldPlan = wrappedRefreshFieldPlan;
-}
-
-// Restore confirmation fingerprints after the existing ATS session has completed any
-// same-tab or opener-linked handoff. Then re-scan once so the checklist reflects them.
-if (typeof window.vjaRestoreApplicationSession === "function" && !window.vjaRestoreApplicationSession.__candidateConfirmationWrapped) {
-  const originalRestoreApplicationSession = window.vjaRestoreApplicationSession;
-  const wrappedRestoreApplicationSession = async function (...args) {
-    const restored = await originalRestoreApplicationSession(...args);
-    if (!restored) return restored;
-    window.vjaCandidateConfirmationState = window.vjaCandidateConfirmation.sanitizeState(
-      await vjaReadCandidateConfirmationStateFromSession()
-    );
-    try {
-      await window.refreshFieldPlan();
-      window.vjaRenderSubmissionReadiness?.();
-      vjaRefreshConfirmationCounts();
-    } catch { }
-    return restored;
-  };
-  wrappedRestoreApplicationSession.__candidateConfirmationWrapped = true;
-  window.vjaRestoreApplicationSession = wrappedRestoreApplicationSession;
 }
 
 async function vjaConfirmCurrentReviewField() {
@@ -191,4 +145,5 @@ $("clearSession")?.addEventListener("click", () => {
 
 window.vjaUpdateCandidateConfirmationUi = vjaUpdateCandidateConfirmationUi;
 window.vjaConfirmCurrentReviewField = vjaConfirmCurrentReviewField;
+window.vjaAnnotateCurrentScanWithConfirmations = vjaAnnotateCurrentScanWithConfirmations;
 vjaUpdateCandidateConfirmationUi(null);
