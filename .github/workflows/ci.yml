@@ -40,6 +40,7 @@ jobs:
           node --check browser-extension/field-verification.test.js
           node --check browser-extension/fill-reconciliation.test.js
           node --check browser-extension/required-field-state.test.js
+          node --check browser-extension/required-field-content.test.js
           node --check browser-extension/submission-readiness.test.js
           node --check browser-extension/application-session.test.js
           node --check browser-extension/daily-queue.test.js
@@ -54,6 +55,8 @@ jobs:
         run: node browser-extension/fill-reconciliation.test.js
       - name: Test required-field completeness semantics
         run: node browser-extension/required-field-state.test.js
+      - name: Test required-field browser enrichment
+        run: node browser-extension/required-field-content.test.js
       - name: Test submission readiness
         run: node browser-extension/submission-readiness.test.js
       - name: Test multi-step ATS sessions
