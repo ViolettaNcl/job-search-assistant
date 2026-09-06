@@ -2,7 +2,7 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **0.6** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, autofills safe ATS fields, stores applications in the CRM, inserts the recommended CV from a local browser vault, and shows a conservative submission-readiness checklist before the candidate submits externally.
+Version **0.7** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, autofills safe ATS fields, verifies that those fills actually persist, stores applications in the CRM, inserts the recommended CV from a local browser vault, and shows a conservative submission-readiness checklist before the candidate submits externally.
 
 ## External job sites
 
@@ -14,11 +14,12 @@ Version **0.6** is a review-first application autopilot for Russia and Europe. I
    - fields safe to autofill;
    - fields that need review;
    - fields intentionally blocked from automation.
-6. Click **Fill safe fields**.
+6. Click **Fill safe fields**. The extension waits briefly and verifies that the visible ATS control kept the intended value.
 7. Answer any review/manual-only fields yourself, then click **Recheck submission checklist**.
-8. Click **Upload recommended CV** when a stored CV is available.
-9. Review the whole employer form and attachment, then press the website's final Submit/Apply button yourself.
-10. Click **Mark applied** after submission so the application is recorded in the Job Search Assistant CRM.
+8. If the checklist reports an autofill verification failure, confirm or re-enter that field manually and recheck it.
+9. Click **Upload recommended CV** when a stored CV is available.
+10. Review the whole employer form and attachment, then press the website's final Submit/Apply button yourself.
+11. Click **Mark applied** after submission so the application is recorded in the Job Search Assistant CRM.
 
 **Save to tracker** can store the vacancy before you apply. Rich browser import keeps the job description, country/location, fit score and eligibility instead of saving only a shallow link. Duplicate source URLs reuse the existing CRM record.
 
@@ -56,17 +57,33 @@ These controls are deliberately **review-first**. The extension includes them in
 
 Legal, verification/CAPTCHA, security, identity-document, demographic and medical questions remain blocked regardless of whether the employer renders them as native fields or custom controls.
 
+## Verified safe autofill
+
+Version 0.7 no longer treats a programmatic input event as proof that the field was filled successfully.
+
+For fields classified as safe to fill, the extension:
+
+1. writes the intended value using the existing native-input/select handling;
+2. dispatches the normal input/change/blur events;
+3. waits briefly for the ATS/React UI to settle;
+4. reads the current visible field value again;
+5. compares the persisted value against the intended value using deterministic normalization.
+
+The verifier understands common boolean variants such as `Yes` / `true` / `Да` and can compare both the underlying `<select>` value and its visible option text. If the ATS rejects or rewrites a supposedly safe fill, that field is remembered locally for the current page as an **Autofill failed / Verify fill** checkpoint. The backend does not receive or learn a new personal answer from this mechanism.
+
+This deliberately favors a false warning over silently submitting a field that did not stick.
+
 ## Submission-readiness checklist
 
-Version 0.6 turns field counts into a concrete pre-submit checkpoint.
+Version 0.6 introduced a concrete pre-submit checkpoint; version 0.7 also includes failed safe-autofill verification in that checklist.
 
 The checklist distinguishes:
 
-- **Checklist clear** — no unresolved fields were detected by the extension;
-- **Review needed** — employer-specific or custom interactive fields still require candidate verification;
+- **Checklist clear** — no unresolved fields or detected autofill failures remain;
+- **Review needed** — employer-specific/custom controls or a failed safe-autofill attempt still require candidate verification;
 - **Manual action** — blocked fields such as legal, security, CAPTCHA, medical or demographic questions must be handled manually.
 
-When a review field already contains a value, the checklist marks it as **Verify** rather than assuming the answer is correct. The **Recheck submission checklist** button rescans the current form after the candidate has made manual changes.
+When a review field already contains a value, the checklist marks it as **Verify** rather than assuming the answer is correct. A safe-fill failure with a current value is marked **Verify fill**. The **Recheck submission checklist** button rescans the current form after the candidate has made manual changes.
 
 The checklist also carries a CV checkpoint. If the extension itself inserted a CV from the local vault, it shows the exact filename recorded by the extension and still instructs the candidate to verify that the employer page displays the same attachment. If an upload field is detected but no insertion was recorded, the checklist warns that the recommended CV still needs verification.
 
@@ -166,7 +183,7 @@ After updating the extension code, click **Reload** on the extension card in `ch
 
 The content script does not transmit vacancy pages in the background. Page text and form metadata are sent to the configured Job Search Assistant backend only after the user clicks **Analyze this vacancy** or requests a form action.
 
-Reusable answers and CV Vault files remain in this Chrome profile's local extension storage. A stored CV is exposed to the currently open page only when the user explicitly clicks **Upload recommended CV**.
+Reusable answers, CV Vault files and the page-local failed-fill markers remain in this Chrome profile/page context. A stored CV is exposed to the currently open page only when the user explicitly clicks **Upload recommended CV**. Failed-fill tracking does not store the intended personal value in DOM attributes.
 
 ## Next iteration
 
