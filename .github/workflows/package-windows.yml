@@ -1,0 +1,67 @@
+name: package-windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'browser-extension/**'
+      - 'src/JobSearchAssistant/**'
+      - 'scripts/**'
+      - '.github/workflows/package-windows.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish self-contained Windows backend
+        shell: pwsh
+        run: |
+          dotnet restore src/JobSearchAssistant/JobSearchAssistant.csproj
+          dotnet publish src/JobSearchAssistant/JobSearchAssistant.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            --no-restore `
+            -o dist/Violetta-Apply-Assistant/backend
+
+      - name: Assemble extension and launcher
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/Violetta-Apply-Assistant/extension | Out-Null
+          Copy-Item browser-extension/* dist/Violetta-Apply-Assistant/extension -Recurse -Force
+          Copy-Item scripts/start-assistant-windows.cmd dist/Violetta-Apply-Assistant/start-assistant.cmd -Force
+          Copy-Item scripts/user-settings.example.cmd dist/Violetta-Apply-Assistant/user-settings.example.cmd -Force
+          Copy-Item scripts/START_HERE.txt dist/Violetta-Apply-Assistant/START_HERE.txt -Force
+
+          if (-not (Test-Path 'dist/Violetta-Apply-Assistant/backend/JobSearchAssistant.exe')) {
+            throw 'Published Windows backend executable is missing.'
+          }
+          if (-not (Test-Path 'dist/Violetta-Apply-Assistant/extension/manifest.json')) {
+            throw 'Packaged Chrome extension manifest is missing.'
+          }
+
+      - name: Create downloadable ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path dist/Violetta-Apply-Assistant/* `
+            -DestinationPath dist/Violetta-Apply-Assistant-Windows.zip `
+            -CompressionLevel Optimal `
+            -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: violetta-apply-assistant-windows
+          path: dist/Violetta-Apply-Assistant-Windows.zip
+          if-no-files-found: error
+          retention-days: 30
