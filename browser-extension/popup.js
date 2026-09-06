@@ -31,6 +31,7 @@ function setBusy(busy) {
   $("analyze").disabled = busy;
   $("fillForm").disabled = busy;
   $("copyLetter").disabled = busy;
+  $("applyHh").disabled = busy;
   $("analyze").textContent = busy ? "Working…" : "Analyze this vacancy";
 }
 
@@ -51,6 +52,15 @@ function chips(container, values) {
     const el = document.createElement("span");
     el.textContent = value;
     container.appendChild(el);
+  }
+}
+
+function isHhVacancy(url) {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)hh\.ru$/i.test(parsed.hostname) && /\/vacancy\/\d+/i.test(parsed.pathname);
+  } catch {
+    return false;
   }
 }
 
@@ -76,6 +86,9 @@ async function analyze() {
     chips($("matched"), latest.match.matched);
     chips($("missing"), latest.match.missing);
     $("result").classList.remove("hidden");
+
+    const canDirectApply = isHhVacancy(latestPage?.url) && latest.match.score >= 75;
+    $("applyHh").classList.toggle("hidden", !canDirectApply);
     setDot(true);
   } catch (error) {
     setDot(false);
@@ -118,12 +131,49 @@ async function fillForm() {
   }
 }
 
+async function applyOnHh() {
+  clearError();
+  if (!latestPage?.url || !isHhVacancy(latestPage.url)) return showError("Open an HH.ru vacancy first.");
+  if (!latest || latest.match.score < 75) return showError("This vacancy is below the one-click apply threshold. Review it manually.");
+
+  const confirmed = window.confirm(`Submit an application to this HH vacancy now?\n\nFit: ${latest.match.score}/100\n${latestPage.title || "Vacancy"}\n\nThis uses the selected HH resume and a vacancy-specific cover letter.`);
+  if (!confirmed) return;
+
+  setBusy(true);
+  try {
+    const api = await getApiBase();
+    const importedResponse = await fetch(`${api}/api/import/hh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: latestPage.url })
+    });
+    if (!importedResponse.ok) throw new Error("Could not import this HH vacancy into Job Assistant.");
+    const imported = await importedResponse.json();
+
+    const applyResponse = await fetch(`${api}/api/vacancies/${imported.id}/apply-tailored`, { method: "POST" });
+    const payload = await applyResponse.json().catch(() => ({}));
+    if (!applyResponse.ok) {
+      const message = payload.errorText || payload.errorCode || `HH application failed (${applyResponse.status}).`;
+      throw new Error(message);
+    }
+
+    $("applyHh").textContent = "Applied on HH ✓";
+    $("applyHh").disabled = true;
+    $("fillNote").textContent = "Application submitted through HH's official applicant API and recorded in Job Assistant.";
+  } catch (error) {
+    showError(error?.message || String(error));
+  } finally {
+    setBusy(false);
+  }
+}
+
 (async function init() {
   $("apiBase").value = await getApiBase();
   $("saveApi").addEventListener("click", saveApiBase);
   $("analyze").addEventListener("click", analyze);
   $("copyLetter").addEventListener("click", copyLetter);
   $("fillForm").addEventListener("click", fillForm);
+  $("applyHh").addEventListener("click", applyOnHh);
 
   try {
     const api = await getApiBase();
