@@ -22,16 +22,23 @@ function vjaUploadLabel(input) {
 
 function vjaFindResumeInput() {
   const inputs = [...document.querySelectorAll('input[type="file"]')]
-    .filter(input => !input.disabled && input.offsetParent !== null);
+    .filter(input => !input.disabled);
   if (!inputs.length) return null;
+
   const resumeWords = /\b(resume|cv|curriculum|application file)\b|резюме|резюм|currículo|lebenslauf/i;
-  return inputs.find(input => resumeWords.test(vjaUploadLabel(input))) || inputs[0];
+  const explicitResume = inputs.find(input => resumeWords.test(vjaUploadLabel(input)));
+  if (explicitResume) return explicitResume;
+
+  if (inputs.length === 1) return inputs[0];
+
+  const visible = inputs.find(input => input.offsetParent !== null);
+  return visible || null;
 }
 
 function vjaUploadCv(fileData) {
   if (!fileData?.base64 || !fileData?.name) return { success: false, error: "Stored CV data is missing." };
   const input = vjaFindResumeInput();
-  if (!input) return { success: false, error: "No visible file-upload field was found on this page." };
+  if (!input) return { success: false, error: "No unambiguous résumé/CV upload field was found on this page." };
 
   const bytes = vjaBase64ToBytes(fileData.base64);
   const file = new File([bytes], fileData.name, { type: fileData.type || "application/pdf", lastModified: Date.now() });
@@ -45,7 +52,13 @@ function vjaUploadCv(fileData) {
   input.style.outlineOffset = "3px";
   input.scrollIntoView({ behavior: "smooth", block: "center" });
 
-  return { success: true, filename: file.name, size: file.size, fieldLabel: vjaUploadLabel(input).slice(0, 180) };
+  return {
+    success: true,
+    filename: file.name,
+    size: file.size,
+    hiddenField: input.offsetParent === null,
+    fieldLabel: vjaUploadLabel(input).slice(0, 180)
+  };
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
