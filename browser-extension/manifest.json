@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "1.2.0",
-  "description": "Run a ranked apply-next loop, defer queue items, preserve ATS context across safe same-tab and opener-linked flows, verify safe autofill and check submission readiness.",
+  "version": "1.3.0",
+  "description": "Run a ranked apply-next loop, preserve ATS context, track privacy-safe application stages, verify safe autofill and check submission readiness.",
   "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
   "background": {
