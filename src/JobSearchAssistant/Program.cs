@@ -50,18 +50,23 @@ var app = builder.Build();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+DatabaseBootstrapResult databaseBootstrap;
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.EnsureCreatedAsync();
-    if (!await db.AppStates.AnyAsync(x => x.Id == 1))
-    {
-        db.AppStates.Add(new AppState { Id = 1 });
-        await db.SaveChangesAsync();
-    }
+    databaseBootstrap = await DatabaseBootstrapper.InitializeAsync(db, persistentDatabase, app.Logger);
 }
 
-app.MapGet("/health", () => Results.Ok(new { status = "ok", utc = DateTimeOffset.UtcNow, database = persistentDatabase ? "postgres" : "in-memory", persistent = persistentDatabase }));
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "ok",
+    utc = DateTimeOffset.UtcNow,
+    database = persistentDatabase ? "postgres" : "in-memory",
+    persistent = persistentDatabase,
+    schemaMode = databaseBootstrap.Mode,
+    latestMigration = databaseBootstrap.LatestMigration,
+    appliedMigrations = databaseBootstrap.AppliedMigrations
+}));
 
 app.MapGet("/api/candidate", (IOptions<CandidateProfileOptions> options) =>
 {
