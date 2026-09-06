@@ -10,24 +10,6 @@ function vjaFinalActionVisible(el) {
   return el.offsetParent !== null && style.visibility !== "hidden" && style.display !== "none";
 }
 
-function vjaFinalActionScore(el) {
-  const text = vjaFinalActionText(el).toLowerCase();
-  if (!text) return -100;
-  if (/\b(next|continue|back|previous|save|draft|cancel|preview|review)\b|далее|назад|сохранить|отмена/i.test(text)) return -100;
-
-  let score = 0;
-  if (/submit application|complete application|send application|finish application/i.test(text)) score += 12;
-  else if (/\bsubmit\b/i.test(text)) score += 9;
-  else if (/\bapply now\b|\bapply\b/i.test(text)) score += 7;
-  else if (/подать (заявку|отклик)|отправить (заявку|отклик)|откликнуться/i.test(text)) score += 10;
-  else return -100;
-
-  if (el.matches?.('button[type="submit"], input[type="submit"]')) score += 3;
-  if (el.closest?.("form")) score += 2;
-  if (/application|candidate|apply/i.test(location.pathname + location.search)) score += 1;
-  return score;
-}
-
 let vjaFinalSubmitHighlight = null;
 let vjaFinalSubmitOutline = "";
 let vjaFinalSubmitOutlineOffset = "";
@@ -45,24 +27,26 @@ function vjaClearFinalSubmitHighlight() {
 function vjaLocateFinalSubmit() {
   vjaClearFinalSubmitHighlight();
   const selector = 'button, input[type="submit"], input[type="button"], [role="button"]';
+  const applicationRoute = /application|candidate|apply/i.test(location.pathname + location.search);
   const candidates = [...document.querySelectorAll(selector)]
     .filter(vjaFinalActionVisible)
-    .map(el => ({ el, label: vjaFinalActionText(el).slice(0, 160), score: vjaFinalActionScore(el) }))
-    .filter(x => x.score >= 7)
-    .sort((a, b) => b.score - a.score);
+    .map(el => {
+      const label = vjaFinalActionText(el).slice(0, 160);
+      return {
+        el,
+        label,
+        metadata: {
+          submitType: Boolean(el.matches?.('button[type="submit"], input[type="submit"]')),
+          inForm: Boolean(el.closest?.("form")),
+          applicationRoute
+        }
+      };
+    });
 
-  if (!candidates.length) return { found: false, ambiguous: false, count: 0 };
-  const best = candidates[0];
-  const ties = candidates.filter(x => x.score === best.score);
-  if (ties.length > 1) {
-    return {
-      found: false,
-      ambiguous: true,
-      count: ties.length,
-      labels: ties.slice(0, 4).map(x => x.label)
-    };
-  }
+  const choice = window.vjaFinalSubmitControl?.choose?.(candidates) || { found: false, ambiguous: false, count: 0 };
+  if (!choice.found) return choice;
 
+  const best = choice.candidate;
   vjaFinalSubmitHighlight = best.el;
   vjaFinalSubmitOutline = best.el.style.outline || "";
   vjaFinalSubmitOutlineOffset = best.el.style.outlineOffset || "";
