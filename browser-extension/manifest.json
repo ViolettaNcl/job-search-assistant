@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "2.4.0",
-  "description": "Prepare and review applications safely with reusable contacts, verified submissions, one-click continuation to the next strong job, follow-ups, and persistent Windows history.",
+  "version": "2.4.1",
+  "description": "Prepare and review applications safely with reusable contacts, verified submissions, SQLite-compatible ranked queue continuation, follow-ups, and persistent Windows history.",
   "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
   "background": {
