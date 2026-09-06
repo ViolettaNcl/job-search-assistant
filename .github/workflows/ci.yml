@@ -27,6 +27,7 @@ jobs:
           node --check browser-extension/submission-receipt.js
           node --check browser-extension/submission-receipt-content.js
           node --check browser-extension/followup-desk.js
+          node --check browser-extension/pipeline-desk.js
           node --check browser-extension/submission-readiness.js
           node --check browser-extension/application-session.js
           node --check browser-extension/application-step-intelligence.js
@@ -45,6 +46,8 @@ jobs:
           node --check browser-extension/step-intelligence-popup.js
           node --check browser-extension/daily-loop-popup.js
           node --check browser-extension/followup-desk-popup.js
+          node --check browser-extension/pipeline-desk-popup.js
+          node --check browser-extension/pipeline-refresh-popup.js
           node --check browser-extension/prepare-application-popup.js
           node --check browser-extension/review-navigator-popup.js
           node --check browser-extension/candidate-confirmation-popup.js
@@ -69,6 +72,7 @@ jobs:
           node --check browser-extension/submission-receipt.test.js
           node --check browser-extension/submission-receipt-session.test.js
           node --check browser-extension/followup-desk.test.js
+          node --check browser-extension/pipeline-desk.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls
@@ -105,6 +109,8 @@ jobs:
         run: node browser-extension/submission-receipt-session.test.js
       - name: Test Follow-up Desk ranking and request safety
         run: node browser-extension/followup-desk.test.js
+      - name: Test Pipeline Desk transitions and request safety
+        run: node browser-extension/pipeline-desk.test.js
       - name: Validate dashboard inline JavaScript
         run: |
           python3 - <<'PY'
