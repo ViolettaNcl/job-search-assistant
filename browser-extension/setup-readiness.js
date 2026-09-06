@@ -11,6 +11,9 @@
   function build(input = {}) {
     const backendOk = bool(input.backend?.reachable) && input.backend?.ready !== false;
     const candidateOk = bool(input.candidate?.coreReady);
+    const phoneReady = bool(input.contacts?.phone);
+    const linkedinReady = bool(input.contacts?.linkedin);
+    const contactsReady = phoneReady && linkedinReady;
     const enCv = bool(input.cv?.english);
     const ruCv = bool(input.cv?.russian);
     const bothCvs = enCv && ruCv;
@@ -18,6 +21,10 @@
     const queueOk = queueCount > 0;
     const hhAuthorized = bool(input.hh?.authorized);
     const hhResumeSelected = bool(input.hh?.resumeSelected);
+
+    const missingContacts = [];
+    if (!phoneReady) missingContacts.push("phone");
+    if (!linkedinReady) missingContacts.push("LinkedIn");
 
     const items = [
       item(
@@ -35,6 +42,16 @@
         "required",
         candidateOk ? "Verified core candidate facts are available." : "Required candidate facts are incomplete or could not be verified.",
         "candidate"
+      ),
+      item(
+        "contacts",
+        "Reusable contact details",
+        contactsReady,
+        "recommended",
+        contactsReady
+          ? "Phone and LinkedIn are available from the verified backend profile or this browser's local contact profile."
+          : `Add ${missingContacts.join(" and ")} once so common contact fields do not need repeated manual entry.`,
+        "contacts"
       ),
       item(
         "english-cv",
@@ -86,7 +103,7 @@
       state = "blocked";
       title = "Setup blocked";
       detail = "Fix the required setup items before relying on the application assistant.";
-    } else if (!bothCvs || !queueOk) {
+    } else if (!contactsReady || !bothCvs || !queueOk) {
       state = "attention";
       title = "Usable, but setup needs attention";
       detail = "Applications can still be prepared, but finishing the recommended setup will reduce manual work.";
@@ -102,6 +119,7 @@
       items,
       capabilities: {
         externalAts: backendOk && candidateOk,
+        contactAutofill: contactsReady,
         cvAutoload: bothCvs,
         dailyQueue: backendOk && queueOk,
         hhDirect: backendOk && candidateOk && hhAuthorized && hhResumeSelected

@@ -13,8 +13,10 @@
     .card { margin-top: 18px; padding: 18px; background: white; border: 1px solid #e1e4e9; border-radius: 14px; }
     .card h2 { margin: 0 0 6px; font-size: 17px; }
     .row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; margin-top: 14px; }
+    .fieldGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+    .fieldGrid label { display: grid; gap: 6px; font-size: 12px; color: #6a717d; font-weight: 700; }
     .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
-    input[type=file], input[type=url], input[type=text] { width: 100%; padding: 10px; border: 1px solid #d6dae1; border-radius: 9px; background: #fafbfc; font: inherit; }
+    input[type=file], input[type=url], input[type=text], input[type=tel] { width: 100%; padding: 10px; border: 1px solid #d6dae1; border-radius: 9px; background: #fafbfc; font: inherit; }
     button { border: 1px solid #d4d8df; border-radius: 9px; background: white; color: #17191f; padding: 9px 12px; font: inherit; font-weight: 700; cursor: pointer; }
     button.primary { background: #17191f; color: white; border-color: #17191f; }
     button.danger { color: #9f1239; }
@@ -39,7 +41,7 @@
     .capability.on { background: #e8f7ed; color: #146c39; }
     .privacy { margin-top: 24px; padding: 14px 16px; border-radius: 12px; background: #eef3ff; color: #33466d; font-size: 13px; line-height: 1.5; }
     code { background: #f0f1f3; padding: 2px 5px; border-radius: 5px; }
-    @media (max-width: 560px) { .row { grid-template-columns: 1fr; } }
+    @media (max-width: 560px) { .row, .fieldGrid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -67,6 +69,27 @@
     </div>
     <div id="capabilities" class="capabilities"></div>
     <ul id="readinessList" class="readinessList"></ul>
+  </section>
+
+  <h1 style="margin-top:32px;font-size:24px">Local contact profile</h1>
+  <p>Save your phone and LinkedIn once in this Chrome profile. They become reusable application-memory facts when the backend candidate profile does not already contain a verified value.</p>
+
+  <section class="card">
+    <h2>Reusable contact details</h2>
+    <p>Verified backend values always take precedence. Local values are never committed to GitHub and can be cleared without affecting other remembered application answers.</p>
+    <div class="fieldGrid">
+      <label for="localPhone">Phone number
+        <input id="localPhone" type="tel" autocomplete="tel" placeholder="+357 …" />
+      </label>
+      <label for="localLinkedIn">LinkedIn profile
+        <input id="localLinkedIn" type="url" autocomplete="url" placeholder="https://www.linkedin.com/in/…" />
+      </label>
+    </div>
+    <div class="actions">
+      <button id="saveContacts" class="primary">Save local contacts</button>
+      <button id="clearContacts" class="danger">Clear local contacts</button>
+    </div>
+    <div id="contactStatus" class="status">No local contact details checked yet.</div>
   </section>
 
   <h1 style="margin-top:32px;font-size:24px">CV Vault</h1>
@@ -101,9 +124,10 @@
   </section>
 
   <div class="privacy">
-    <strong>Privacy:</strong> CV files are kept in <code>chrome.storage.local</code> for this extension. They are not uploaded to the Job Search Assistant backend. Setup checks read only backend health/configuration and whether the two local CV slots exist. HH authorization is performed by HH.ru through the backend OAuth flow.
+    <strong>Privacy:</strong> CV files are kept in <code>chrome.storage.local</code> and are not uploaded to the Job Search Assistant backend. Local phone/LinkedIn values are also persisted in <code>chrome.storage.local</code> as application memory; during form preparation those reusable values are included in the field-resolution request sent to your configured backend, but they are not committed to GitHub. Setup checks read backend health/configuration plus the presence of local CV/contact slots. HH authorization is performed by HH.ru through the backend OAuth flow.
   </div>
 
+  <script src="candidate-local-profile.js"></script>
   <script src="setup-readiness.js"></script>
   <script src="options.js"></script>
 </main>
