@@ -21,12 +21,14 @@ jobs:
           node --check browser-extension/field-verification.js
           node --check browser-extension/fill-reconciliation.js
           node --check browser-extension/content.js
+          node --check browser-extension/review-navigator-content.js
           node --check browser-extension/submission-readiness.js
           node --check browser-extension/application-session.js
           node --check browser-extension/application-step-intelligence.js
           node --check browser-extension/daily-queue.js
           node --check browser-extension/queue-defer.js
           node --check browser-extension/prepare-application.js
+          node --check browser-extension/review-navigator.js
           node --check browser-extension/popup.js
           node --check browser-extension/cv-upload.js
           node --check browser-extension/cv-vault-popup.js
@@ -36,6 +38,7 @@ jobs:
           node --check browser-extension/step-intelligence-popup.js
           node --check browser-extension/daily-loop-popup.js
           node --check browser-extension/prepare-application-popup.js
+          node --check browser-extension/review-navigator-popup.js
           node --check browser-extension/options.js
           node --check browser-extension/ats-structured.test.js
           node --check browser-extension/ats-controls.test.js
@@ -47,6 +50,7 @@ jobs:
           node --check browser-extension/daily-queue.test.js
           node --check browser-extension/queue-defer.test.js
           node --check browser-extension/prepare-application.test.js
+          node --check browser-extension/review-navigator.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls
@@ -67,6 +71,8 @@ jobs:
         run: node browser-extension/queue-defer.test.js
       - name: Test one-click preparation result model
         run: node browser-extension/prepare-application.test.js
+      - name: Test review-field navigation order
+        run: node browser-extension/review-navigator.test.js
       - name: Validate dashboard inline JavaScript
         run: |
           python3 - <<'PY'
