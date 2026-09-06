@@ -9,14 +9,36 @@ const page = {
   company: "Acme",
   ats: "workday"
 };
+const stepHistory = [{
+  at: now,
+  jobKey: "abc",
+  route: "https://acme.wd5.myworkdayjobs.com/apply/1",
+  ats: "workday",
+  fingerprint: "fp1",
+  signatures: ["email:x", "text:y"],
+  fieldCount: 2,
+  autofillCount: 1,
+  reviewCount: 1,
+  blockedCount: 0,
+  failedCount: 0,
+  stage: 1,
+  currentValue: "must-not-survive"
+}];
 
-const session = sessions.create({ latest, latestPage: page, latestTrackedId: "job-1", coverLetter: "Edited letter" }, now);
+const session = sessions.create({ latest, latestPage: page, latestTrackedId: "job-1", coverLetter: "Edited letter", stepHistory }, now);
 assert.ok(session);
 assert.equal(session.version, 1);
 assert.equal(session.coverLetter, "Edited letter");
 assert.equal(session.latestTrackedId, "job-1");
+assert.equal(session.stepHistory.length, 1);
+assert.equal(session.stepHistory[0].stage, 1);
+assert.equal(session.stepHistory[0].currentValue, undefined);
+assert.equal(JSON.stringify(session.stepHistory).includes("must-not-survive"), false);
 assert.equal(sessions.slotKey(42), "vjaApplicationSession:42");
 assert.equal(sessions.slotKey("bad"), "");
+
+const oversized = Array.from({ length: 20 }, (_, index) => ({ stage: index + 1, signatures: [`x${index}`] }));
+assert.equal(sessions.sanitizeStepHistory(oversized).length, sessions.MAX_STEP_HISTORY);
 
 assert.equal(sessions.canRestore(session, page.url, now + 1_000), true);
 assert.equal(
