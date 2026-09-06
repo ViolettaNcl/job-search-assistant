@@ -36,7 +36,8 @@ public sealed class ApplicationAttributionService(AppDbContext db)
     internal static string SanitizeResumeLabel(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return "";
-        var file = Path.GetFileName(value.Trim());
+        var normalized = value.Trim().Replace('\\', '/');
+        var file = normalized[(normalized.LastIndexOf('/') + 1)..];
         if (!file.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) return "";
         var safe = new string(file.Where(c => char.IsLetterOrDigit(c) || c is '.' or '_' or '-' or ' ').ToArray()).Trim();
         return safe.Length > 160 ? safe[..160] : safe;
