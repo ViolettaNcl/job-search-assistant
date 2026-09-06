@@ -33,7 +33,7 @@ public sealed class ApplicationAttributionService(AppDbContext db)
         return true;
     }
 
-    internal static string SanitizeResumeLabel(string? value)
+    public static string SanitizeResumeLabel(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return "";
         var normalized = value.Trim().Replace('\\', '/');
