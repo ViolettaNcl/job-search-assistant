@@ -50,8 +50,8 @@ async function vjaPrepareCurrentApplication() {
     latestTrackedId = null;
     window.vjaCurrentStepHistory = [];
 
-    const analyzed = await analyze();
-    if (!analyzed || !latest || !latestPage?.url) {
+    await analyze();
+    if (!latest || !latestPage?.url) {
       throw new Error("The vacancy could not be analyzed. Check the backend connection and try again.");
     }
 
