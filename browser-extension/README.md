@@ -2,7 +2,7 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **0.5** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, autofills safe ATS fields, stores applications in the CRM, and can insert the recommended CV from a local browser vault.
+Version **0.6** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, autofills safe ATS fields, stores applications in the CRM, inserts the recommended CV from a local browser vault, and shows a conservative submission-readiness checklist before the candidate submits externally.
 
 ## External job sites
 
@@ -15,9 +15,10 @@ Version **0.5** is a review-first application autopilot for Russia and Europe. I
    - fields that need review;
    - fields intentionally blocked from automation.
 6. Click **Fill safe fields**.
-7. Click **Upload recommended CV** when a stored CV is available.
-8. Review anything left for you and press the website's final Submit/Apply button yourself.
-9. Click **Mark applied** after submission so the application is recorded in the Job Search Assistant CRM.
+7. Answer any review/manual-only fields yourself, then click **Recheck submission checklist**.
+8. Click **Upload recommended CV** when a stored CV is available.
+9. Review the whole employer form and attachment, then press the website's final Submit/Apply button yourself.
+10. Click **Mark applied** after submission so the application is recorded in the Job Search Assistant CRM.
 
 **Save to tracker** can store the vacancy before you apply. Rich browser import keeps the job description, country/location, fit score and eligibility instead of saving only a shallow link. Duplicate source URLs reuse the existing CRM record.
 
@@ -43,7 +44,7 @@ This makes vacancy extraction less dependent on an ATS keeping the same React cl
 
 ## Custom ATS controls
 
-Version 0.5 combines the hardened Greenhouse/Lever/Ashby field scanner with recognition for modern non-native controls common on Workday, Personio, SmartRecruiters and similar sites:
+Version 0.5 introduced recognition for modern non-native controls common on Workday, Personio, SmartRecruiters and similar sites while preserving the hardened Greenhouse/Lever/Ashby field scanner:
 
 - ARIA `combobox` controls;
 - styled buttons that open listboxes;
@@ -54,6 +55,22 @@ Version 0.5 combines the hardened Greenhouse/Lever/Ashby field scanner with reco
 These controls are deliberately **review-first**. The extension includes them in the field analysis so they are no longer invisible, but it does not script clicks into custom dropdowns or radio widgets. Even a truthful known answer such as EU work authorization is left for manual selection when the ATS uses a custom interactive control. Native HTML selects/radios can still use the existing safe resolver when the answer is unambiguous.
 
 Legal, verification/CAPTCHA, security, identity-document, demographic and medical questions remain blocked regardless of whether the employer renders them as native fields or custom controls.
+
+## Submission-readiness checklist
+
+Version 0.6 turns field counts into a concrete pre-submit checkpoint.
+
+The checklist distinguishes:
+
+- **Checklist clear** — no unresolved fields were detected by the extension;
+- **Review needed** — employer-specific or custom interactive fields still require candidate verification;
+- **Manual action** — blocked fields such as legal, security, CAPTCHA, medical or demographic questions must be handled manually.
+
+When a review field already contains a value, the checklist marks it as **Verify** rather than assuming the answer is correct. The **Recheck submission checklist** button rescans the current form after the candidate has made manual changes.
+
+The checklist also carries a CV checkpoint. If the extension itself inserted a CV from the local vault, it shows the exact filename recorded by the extension and still instructs the candidate to verify that the employer page displays the same attachment. If an upload field is detected but no insertion was recorded, the checklist warns that the recommended CV still needs verification.
+
+A clear checklist is deliberately not described as proof that the employer form is safe to submit. It covers only controls the extension can detect. The final external Submit/Apply action remains candidate-controlled.
 
 ## Application Memory
 
@@ -154,6 +171,6 @@ Reusable answers and CV Vault files remain in this Chrome profile's local extens
 ## Next iteration
 
 - validate real application forms across Workday, SmartRecruiters, Teamtailor, Recruitee, Workable and Personio
-- consider narrowly scoped custom-control automation only where a platform adapter can prove the option mapping is deterministic and safe
+- add platform-specific adapters only where field/value mapping can be proven deterministic and safe
 - optional company-specific writing provider with deterministic truthful fallback
 - continue using outcome analytics to decide which sources, role families and CV variants deserve more applications
