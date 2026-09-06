@@ -41,7 +41,7 @@
     const parsed = safeUrl(value);
     if (!parsed) return false;
     const text = `${parsed.pathname} ${parsed.search}`.toLowerCase();
-    return /(?:^|[\/_?=&.-])(apply|application|applications|candidate|questionnaire|screening|jobapplication|job-application|applynow|apply-now)(?:$|[\/_?=&.-])/.test(text);
+    return /(?:^|[\s\/_?=&.-])(apply|application|applications|candidate|questionnaire|screening|jobapplication|job-application|applynow|apply-now)(?:$|[\s\/_?=&.-])/.test(text);
   }
 
   function create(input, now = Date.now()) {
