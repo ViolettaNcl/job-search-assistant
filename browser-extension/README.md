@@ -2,153 +2,123 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **1.2** is a review-first application autopilot for Russia and Europe. It uses the backend's ranked vacancy queue to make the daily workflow continuous: open the next strong job, analyze it, tailor the application, safely fill what can be verified, preserve context across compatible ATS steps and safe opener-linked tabs, record the application, then advance to the next strong unapplied vacancy.
+Version **1.3** is a review-first application autopilot for Russia and Europe. It combines the ranked daily application queue, temporary deferrals, truthful vacancy-specific drafts, verified safe autofill, CV selection, multi-step ATS context, safe opener-linked tab handoff and a submission checklist that now detects visible required fields that are still blank.
 
 ## Daily apply loop
 
 The popup shows the strongest **75+** unapplied job from the backend queue.
 
-The normal loop is:
+Typical workflow:
 
 1. Click **Open next strong job**.
-2. The vacancy opens in a new tab, leaving an unfinished application tab intact.
-3. Analyze the vacancy and complete the review-first application workflow.
-4. Submit externally yourself, or use the supported HH official API flow when available.
-5. Click **Mark applied** for an external application.
-6. The queue card refreshes automatically and advances to the next strong unapplied job.
+2. Analyze the vacancy.
+3. Review the fit, tailored draft and recommended CV.
+4. Fill only fields the assistant classifies as safe.
+5. Resolve review/manual/required checkpoints yourself.
+6. Verify the CV attachment.
+7. Press the employer's final Submit/Apply button yourself.
+8. Click **Mark applied** for external applications.
+9. The popup advances to the next ranked strong job.
 
-The popup calls `GET /api/application-queue?limit=20&minScore=75` and respects the backend's fit, freshness and eligibility ranking. The browser-side selector only removes invalid URLs, likely-ineligible entries, jobs below 75 and the vacancy already open/analyzed in the current workflow.
-
-**Full queue** opens the broader ranked shortlist. Opening a vacancy is always an explicit user action; the extension does not launch vacancies in the background and does not automatically submit external ATS forms.
+The browser does not create its own competing ranking model. It uses `GET /api/application-queue?limit=20&minScore=75` and excludes only invalid URLs, likely-ineligible jobs, sub-75 jobs and the vacancy already active in the current workflow.
 
 ## Temporary queue deferral
 
-**Defer 4h** postpones a strong vacancy without pretending it was applied, rejected or permanently skipped.
+**Defer 4h** temporarily moves a strong vacancy out of the queue without pretending it was applied, rejected or permanently skipped.
 
-A deferral:
+The backend records `QueueDeferredUntil=<UTC timestamp>` in the existing application-event history. While the timestamp is active, the job stays out of the queue. After expiry it can reappear automatically. Ordinary manually saved/bookmarked vacancies remain excluded.
 
-- writes the vacancy as `Saved` through the existing status API;
-- records an auditable `ApplicationEvent` note in the form `QueueDeferredUntil=<UTC timestamp>`;
-- hides that vacancy from the ranked queue while the timestamp is in the future;
-- automatically allows the vacancy back into the queue after the deferral expires;
-- does not mark the vacancy Applied, Rejected or Skipped;
-- does not cause an ordinary manually saved/bookmarked vacancy to reappear automatically.
+## ATS context and tab handoff
 
-No extra database column or migration is required. If the backend rejects a deferral, the current queue item stays available and the extension reports the failure instead of silently advancing.
+Application context is kept in ephemeral `chrome.storage.session` and expires after eight hours. It includes vacancy metadata, fit result, current cover-letter edit, recommended CV label and tracker ID when available. It does not contain CV bytes, passwords, CAPTCHA/2FA answers, legal declarations or sensitive profile answers.
 
-## Multi-step ATS sessions
+Same-tab ATS continuation restores the session only on a compatible application route. Version 1.2 also added conservative cross-tab/new-window handoff using Chrome's real `openerTabId`.
 
-The active application context is stored in ephemeral `chrome.storage.session`. It keeps:
+Cross-tab handoff requires:
 
-- analyzed vacancy/job metadata;
-- fit and recommendation result;
-- generated application draft and the candidate's current cover-letter edit;
-- recommended CV label;
-- existing tracker vacancy ID when one has already been created.
+- the child tab's opener to be exactly the session-owning tab;
+- an application-looking destination route;
+- a matching deterministic employer/tenant identity;
+- an unexpired session.
 
-It does **not** copy CV PDF bytes, reusable Application Memory, passwords, CAPTCHA/2FA answers, legal declarations or sensitive personal fields into the session record.
+When valid, the session is **moved**, not copied, to avoid a stale duplicate in the opener tab.
 
-### Same-tab continuation
+Employer identity is derived conservatively for Workday, Teamtailor, Recruitee and Personio subdomains plus shared-host URL structures for SmartRecruiters, Lever, Ashby, Greenhouse and Workable. A different employer on the same shared ATS host cannot claim the application context.
 
-When an ATS moves from the vacancy page into later application steps in the same tab, the popup can restore the existing session if the current URL is a valid continuation.
+## Required-field completeness — v1.3
 
-For shared ATS origins, version 1.2 also closes a previous ambiguity: same-origin alone is no longer sufficient when multiple employers share one host. The session must preserve the same derived employer/tenant identity.
+Version 1.3 closes a submission-readiness gap: a form must not appear clear merely because the resolver did not understand a visible required control.
 
-### Safe cross-tab / new-window handoff
+The content-side completeness layer enriches each scanned field with required-state metadata. It recognizes:
 
-Version 1.2 supports a conservative new-tab handoff for ATS flows where the employer's Apply action opens another tab/window.
+- native HTML `required` controls;
+- `aria-required="true"` controls;
+- native required radio groups, counted once rather than once per option;
+- required checkboxes and file inputs;
+- ARIA radiogroups/custom controls when their required state is exposed;
+- conservative visible label markers such as `required`, `обязательное`, `υποχρεωτικό`, `obligatoire`, or a standalone `*` marker.
 
-Automatic handoff requires all of the following:
+A blank required control becomes a distinct **Required** checkpoint in the submission checklist.
 
-1. the current tab has a real Chrome `openerTabId`;
-2. that opener tab is exactly the tab holding the stored application session;
-3. the destination URL looks like an application step;
-4. the source and destination resolve to the same explicit ATS tenant/employer identity;
-5. the session is still inside its eight-hour lifetime.
+Required checkpoints are deduplicated against existing safety states. For example, if a required work-authorization question is already classified as **Review**, or a required email field has a verified autofill failure, the checklist does not display a second duplicate Required warning.
 
-When those checks pass, the session is **moved** from the opener tab's storage slot into the new tab's slot rather than copied. This prevents the original tab from later restoring a stale duplicate.
+Once the required control has a detectable answer, it disappears from the required count on the next scan/recheck.
 
-Tenant identity is derived conservatively from either an employer-specific ATS hostname or from documented shared-host URL structure. Supported identities include:
+The completeness pass deliberately does **not** treat every blank field as required. Optional fields remain optional.
 
-- Workday employer subdomains such as `acme.wd5.myworkdayjobs.com`;
-- Teamtailor employer subdomains;
-- Recruitee employer subdomains;
-- Personio employer subdomains;
-- SmartRecruiters paths such as `jobs.smartrecruiters.com/<company>/...`;
-- Lever paths such as `jobs.lever.co/<company>/...`;
-- Ashby paths such as `jobs.ashbyhq.com/<company>/...`;
-- Greenhouse paths such as `job-boards.greenhouse.io/<company>/...` or `boards.greenhouse.io/<company>/...`;
-- Workable paths such as `apply.workable.com/<company>/...`.
-
-A different employer on the same shared ATS host does not restore the session. A tab with no opener relationship also does not automatically claim another tab's application context.
-
-This is intentionally stricter than scanning every open tab for a vaguely similar URL.
-
-## External job sites
-
-1. Open a vacancy in Chrome, either directly or through the daily loop.
-2. Click **Violetta Apply Assistant**.
-3. Click **Analyze this vacancy**.
-4. The backend scores the job and creates a truthful role-specific application draft.
-5. The extension scans the application form and reports safe, review and blocked fields.
-6. Click **Fill safe fields**. The extension waits for the ATS UI to settle, verifies each attempted fill and automatically refreshes the checklist.
-7. If the ATS moves to a compatible same-tab step or a safely linked new tab, reopen the extension and the application context is restored.
-8. Correct any review/manual-only/failed-fill items yourself. **Recheck submission checklist** remains available after manual edits.
-9. Click **Upload recommended CV** when a stored CV is available and verify the employer page shows the expected attachment.
-10. Review the entire employer form, then press the website's final Submit/Apply button yourself.
-11. Click **Mark applied** after submission so the application is recorded in the CRM and the daily queue can advance.
-
-**Save to tracker** can store a vacancy before applying. Rich browser import keeps the job description, country/location, fit score and eligibility instead of saving only a shallow link. Duplicate source URLs reuse the existing CRM record.
-
-## ATS-aware extraction and controls
-
-The extension prefers Schema.org `JobPosting` JSON-LD before fragile visual selectors. It extracts title, company, description, location/country, remote status and experience hints when available, with ATS-specific and generic DOM fallbacks.
-
-Host recognition includes HH.ru, Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Teamtailor, Recruitee, Workable and Personio. Malformed JSON-LD is ignored safely and falls back to DOM extraction.
-
-Modern ARIA comboboxes, listbox-opening buttons and radiogroups are recognized so custom ATS questions are not invisible. These controls remain review-first: the extension does not script ambiguous choices.
-
-Legal, verification/CAPTCHA, security, identity-document, demographic and medical questions remain blocked regardless of whether they are native or custom controls.
-
-## Verified safe autofill
-
-For a field classified as safe, the extension:
-
-1. writes the intended value;
-2. dispatches normal input/change/blur events;
-3. waits for the ATS/React UI to settle;
-4. reads the field back;
-5. compares the persisted value against the intended value.
-
-If a supposedly safe fill does not persist, the field becomes an **Autofill failed / Verify fill** checkpoint instead of silent success. Native radio/checkbox alternatives and common boolean variants are handled deterministically.
-
-## Submission readiness
+## Submission-readiness states
 
 The checklist distinguishes:
 
-- **Checklist clear** — no unresolved detected fields or autofill failures remain;
-- **Review needed** — employer-specific/custom controls or failed safe-autofill attempts need candidate verification;
-- **Manual action** — blocked legal, security, CAPTCHA, medical or demographic questions must be handled manually.
+- **Checklist clear** — no unresolved, failed-fill or detectably blank required controls were found;
+- **Review needed** — employer-specific questions, failed safe fills or blank required controls still need attention;
+- **Manual action** — blocked legal, security, CAPTCHA, medical, demographic or other protected questions require candidate action.
 
-A clear checklist is not proof that the entire employer form is complete. The final external Submit/Apply action remains candidate-controlled.
+The visible **Needs review** count includes required blanks and failed fills so the compact summary cannot disagree with the detailed checklist.
+
+After safe autofill or a manual recheck, the extension rescans the form and recalculates required-state information. A previous Required checkpoint therefore clears only after the current form state actually contains an answer.
+
+A clear checklist is still not proof that the employer site is complete. It covers only controls the extension can detect. Always inspect the full page, attachments and employer validation messages before final submission.
+
+## ATS extraction and custom controls
+
+The extension prefers Schema.org `JobPosting` JSON-LD before fragile visual selectors. It extracts title, company, description, location/country, remote status and experience hints when available, with ATS-specific and generic DOM fallbacks.
+
+Host recognition includes HH.ru, Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Teamtailor, Recruitee, Workable and Personio.
+
+ARIA comboboxes, listbox-opening buttons and radiogroups are detected so modern ATS questions are visible to the checklist. Ambiguous custom controls remain review-first; the extension does not guess selections.
+
+Legal, verification/CAPTCHA, security, identity-document, demographic and medical questions stay blocked from automatic answering.
+
+## Verified safe autofill
+
+For fields classified as safe, the extension:
+
+1. writes the intended truthful value;
+2. dispatches normal input/change/blur events;
+3. waits for the ATS UI to settle;
+4. reads the field back;
+5. deterministically compares the persisted value with the intended value.
+
+If the value did not persist, the field becomes **Autofill failed / Verify fill** rather than silent success.
 
 ## Application Memory
 
-**Remember confirmed answers** stores reusable answers in Chrome storage only after Violetta entered/confirmed them herself and explicitly asks the extension to remember them.
+**Remember confirmed answers** stores reusable answers only after Violetta enters/confirms them and explicitly asks the extension to remember them.
 
-Application Memory deliberately does **not** learn or reuse salary expectations, exact availability/start date, relocation commitments, commercial-experience years, criminal/legal declarations, passport/national-ID data, date of birth/age, medical/disability information, demographic answers or security-clearance declarations.
+It deliberately does not automatically learn or reuse salary expectations, exact availability dates, relocation commitments, commercial-experience years, criminal/legal declarations, passport/national-ID data, date of birth/age, medical/disability information, demographic answers or security-clearance declarations.
 
 ## CV Vault
 
-The local **CV Vault** keeps the English and Russian PDF variants in the Chrome extension profile. PDF bytes remain in `chrome.storage.local`; they are not uploaded to the Job Search Assistant backend.
+The local CV Vault stores English and Russian PDFs in `chrome.storage.local`; PDF bytes are not uploaded to the backend.
 
-**Upload recommended CV** selects the Russian or English vault entry from the application draft and inserts it into the most likely résumé/CV input after explicit user action. Always verify the employer page shows the expected filename before final submission.
+**Upload recommended CV** inserts the selected local file only after explicit user action. Always verify the employer page shows the expected filename.
 
 ## HH.ru direct submission
 
-For an HH vacancy scoring **75/100 or higher**, the extension can show **Apply on HH via official API**. After explicit confirmation it imports the vacancy, reuses the selected HH resume, generates the vacancy-specific Russian draft, submits through HH's applicant-authorized API and records the application in the CRM.
+For an HH vacancy scoring **75/100 or higher**, the extension can use HH's official applicant API after explicit confirmation. HH OAuth and an HH resume must be configured first.
 
-HH OAuth and an HH resume must be configured first. The extension does not bypass CAPTCHA/2FA or imitate hidden browser clicks.
+The extension does not bypass CAPTCHA/2FA or imitate hidden browser clicks.
 
 ## Install locally
 
@@ -159,10 +129,9 @@ HH OAuth and an HH resume must be configured first. The extension does not bypas
 5. Select the `browser-extension` folder.
 6. Pin **Violetta Apply Assistant**.
 7. Open **CV Vault setup** and store the English/Russian PDFs.
+8. After extension updates, click **Reload** on the extension card.
 
-After updating extension code, click **Reload** on the extension card.
-
-## Backend APIs used
+## Main backend APIs used
 
 - `GET /health`
 - `GET /api/candidate`
@@ -171,21 +140,24 @@ After updating extension code, click **Reload** on the extension card.
 - `POST /api/extension/resolve-fields`
 - `POST /api/import/hh`
 - `POST /api/import/browser`
-- `POST /api/vacancies/{id}/status` — including temporary queue deferrals
+- `POST /api/vacancies/{id}/status`
 - `POST /api/vacancies/{id}/apply-tailored`
 - `POST /api/vacancies/{id}/mark-applied`
 - `GET /api/vacancies/{id}/application-draft`
 
 ## Privacy and safety model
 
-Vacancy pages are not transmitted in the background. Page text/form metadata are sent to the configured backend only after the user requests analysis or a form action.
+Vacancy/form information is sent to the configured backend only after the user requests analysis or a form action. The extension does not background-scan unrelated browser tabs.
 
-Reusable answers and CV Vault files remain in the local Chrome profile. Multi-step application context uses ephemeral `chrome.storage.session` and expires automatically. Cross-tab handoff does not enumerate or inspect unrelated tabs; it follows only the browser-provided opener relationship and deterministic ATS tenant identity. Queue deferrals store only a vacancy status plus expiry note in the existing CRM event history.
+Reusable answers and CV files stay in the local Chrome profile. Multi-step context is ephemeral. Cross-tab handoff follows only the browser-provided opener relation plus deterministic ATS employer identity. Required-field detection inspects visible form metadata and current values locally; it does not invent answers or weaken protected-field rules.
+
+## Validation
+
+The release test suite covers backend tests plus deterministic extension tests for structured ATS extraction, custom controls, safe-fill persistence, corrected-fill reconciliation, required-field semantics, browser-scope required enrichment, submission readiness, multi-step/opener-linked ATS sessions, daily queue selection and queue deferrals.
 
 ## Next iteration
 
-- validate real application forms and cross-tab behavior across Workday, SmartRecruiters, Teamtailor, Recruitee, Workable, Greenhouse, Lever, Ashby and Personio;
-- add platform-specific adapters only where field/value mapping can be proven deterministic and safe;
-- add a more flexible defer menu only if real usage shows 4 hours is too rigid;
-- optional company-specific writing provider with deterministic truthful fallback;
-- continue using outcome analytics to decide which sources, role families and CV variants deserve more applications.
+- validate v1.3 on real Workday, SmartRecruiters, Greenhouse, Lever, Ashby, Teamtailor, Recruitee, Workable and Personio application forms;
+- add platform-specific adapters only where field/value behavior is deterministic and safe;
+- improve detection of employer-side validation messages without pretending those messages are always visible before submit;
+- use outcome analytics to decide which role families, sources and CV variants deserve more applications.
