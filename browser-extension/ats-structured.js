@@ -47,6 +47,7 @@
       .replace(/&quot;/gi, '"')
       .replace(/&#39;/gi, "'")
       .replace(/[ \t]+/g, " ")
+      .replace(/\s+([,.;:!?])/g, "$1")
       .replace(/\n\s+/g, "\n")
       .trim();
   }
