@@ -6,6 +6,7 @@
   const DEFAULT_TTL_MS = 8 * 60 * 60 * 1000;
   const SESSION_VERSION = 1;
   const MAX_STEP_HISTORY = 12;
+  const MAX_CONFIRMATIONS = 80;
   const SHARED_ATS_FAMILIES = new Set([
     "smartrecruiters.com",
     "greenhouse.io",
@@ -114,6 +115,21 @@
     }));
   }
 
+  function sanitizeCandidateConfirmations(value) {
+    const salt = /^[a-f0-9]{32,64}$/i.test(String(value?.salt || "")) ? String(value.salt).toLowerCase() : "";
+    const records = Array.isArray(value?.records)
+      ? value.records
+          .filter(item => /^[a-f0-9]{64}$/i.test(String(item?.fieldHash || "")) && /^[a-f0-9]{64}$/i.test(String(item?.valueHash || "")))
+          .slice(-MAX_CONFIRMATIONS)
+          .map(item => ({
+            fieldHash: String(item.fieldHash).toLowerCase(),
+            valueHash: String(item.valueHash).toLowerCase(),
+            at: Number(item?.at || 0)
+          }))
+      : [];
+    return { salt, records };
+  }
+
   function create(input, now = Date.now()) {
     if (!input?.latest || !input?.latestPage?.url) return null;
     return {
@@ -124,7 +140,8 @@
       latest: input.latest,
       latestTrackedId: input.latestTrackedId || null,
       coverLetter: String(input.coverLetter || input.latest?.draft?.coverLetter || ""),
-      stepHistory: sanitizeStepHistory(input.stepHistory)
+      stepHistory: sanitizeStepHistory(input.stepHistory),
+      candidateConfirmations: sanitizeCandidateConfirmations(input.candidateConfirmations)
     };
   }
 
@@ -186,11 +203,13 @@
     DEFAULT_TTL_MS,
     SESSION_VERSION,
     MAX_STEP_HISTORY,
+    MAX_CONFIRMATIONS,
     normalizedUrl,
     hostFamily,
     tenantKey,
     isApplicationLike,
     sanitizeStepHistory,
+    sanitizeCandidateConfirmations,
     create,
     isExpired,
     canRestore,
