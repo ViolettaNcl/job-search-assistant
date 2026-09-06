@@ -17,6 +17,7 @@ button:disabled { opacity: .55; cursor: default; }
 .primary { background: #16181d; color: white; }
 .secondary { background: white; color: #16181d; border: 1px solid #d5d8df; }
 .full { width: 100%; margin-bottom: 12px; }
+.compactFull { margin-top: -2px; font-size: 11px; padding: 7px 10px; }
 .scoreRow { display: flex; justify-content: space-between; align-items: flex-end; padding: 12px; background: white; border: 1px solid #e3e5e9; border-radius: 10px; }
 .scoreRow strong { display: block; font-size: 24px; }
 .right { text-align: right; }
