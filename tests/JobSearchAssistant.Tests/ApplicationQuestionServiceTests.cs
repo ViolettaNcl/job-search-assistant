@@ -20,6 +20,17 @@ public sealed class ApplicationQuestionServiceTests
     }
 
     [TestMethod]
+    public void CustomWorkAuthorizationCombobox_IsReviewFirst()
+    {
+        var result = Resolve("Poland", new ExtensionFieldInput("f1", "Are you authorized to work in Poland?", "combobox", "", ["Yes", "No"]));
+        var field = result.Fields.Single();
+        Assert.AreEqual("review", field.Action);
+        Assert.AreEqual("workAuthorization", field.MemoryKey);
+        Assert.IsNull(field.Value);
+        StringAssert.Contains(field.Reason, "custom interactive");
+    }
+
+    [TestMethod]
     public void RussianSponsorship_IsNo()
     {
         var result = Resolve("Russia", new ExtensionFieldInput("f1", "Will you require visa sponsorship to work in Russia?", "select", "", ["Yes", "No"]));
@@ -50,6 +61,13 @@ public sealed class ApplicationQuestionServiceTests
     public void SensitiveQuestion_IsBlocked()
     {
         var result = Resolve("Cyprus", new ExtensionFieldInput("f1", "Do you have a disability?", "select", "", ["Yes", "No"]));
+        Assert.AreEqual("blocked", result.Fields.Single().Action);
+    }
+
+    [TestMethod]
+    public void SensitiveCustomRadioGroup_RemainsBlocked()
+    {
+        var result = Resolve("Cyprus", new ExtensionFieldInput("f1", "Do you have a disability?", "radiogroup", "", ["Yes", "No"]));
         Assert.AreEqual("blocked", result.Fields.Single().Action);
     }
 
@@ -108,7 +126,7 @@ public sealed class ApplicationQuestionServiceTests
         var field = result.Fields.Single();
         Assert.AreEqual("review", field.Action);
         Assert.AreEqual("location", field.MemoryKey);
-        StringAssert.Contains(field.Reason, "Autocomplete");
+        StringAssert.Contains(field.Reason, "custom interactive");
     }
 
     [TestMethod]
