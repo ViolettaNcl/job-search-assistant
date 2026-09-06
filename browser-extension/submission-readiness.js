@@ -19,22 +19,32 @@
     const scanned = new Map(fields.map(field => [field.token, field]));
 
     const items = resolutions
-      .filter(item => item?.action === "review" || item?.action === "blocked")
+      .filter(item => {
+        const source = scanned.get(item?.token) || {};
+        return item?.action === "review" || item?.action === "blocked" || (item?.action === "fill" && source.fillFailed === true);
+      })
       .map(item => {
         const source = scanned.get(item.token) || {};
+        const failedFill = item.action === "fill" && source.fillFailed === true;
         return {
           token: item.token || "",
-          action: item.action,
+          action: failedFill ? "failed" : item.action,
           label: truncate(source.label || item.memoryKey || "Unidentified field", 110),
-          reason: truncate(item.reason || (item.action === "blocked" ? "Manual answer required." : "Review this answer."), 180),
+          reason: truncate(
+            failedFill
+              ? "Safe autofill did not persist or could not be verified after the ATS page settled. Confirm or re-enter this field manually."
+              : item.reason || (item.action === "blocked" ? "Manual answer required." : "Review this answer."),
+            180),
           currentValuePresent: Boolean(String(source.currentValue || "").trim()),
           type: String(source.type || "")
         };
       });
 
     const blockedCount = items.filter(item => item.action === "blocked").length;
+    const failedCount = items.filter(item => item.action === "failed").length;
     const reviewCount = items.filter(item => item.action === "review").length;
-    const state = blockedCount > 0 ? "blocked" : reviewCount > 0 ? "review" : "clear";
+    const attentionCount = reviewCount + failedCount;
+    const state = blockedCount > 0 ? "blocked" : attentionCount > 0 ? "review" : "clear";
     const uploadFields = Number(scan?.uploadFields || 0);
     const uploadedName = clean(cv?.uploadedName, "");
     const recommendedName = clean(cv?.recommendedName, "");
@@ -61,12 +71,15 @@
     let detail;
     if (state === "blocked") {
       title = `${blockedCount} manual-only field${blockedCount === 1 ? "" : "s"} require attention`;
-      detail = reviewCount
-        ? `There ${reviewCount === 1 ? "is" : "are"} also ${reviewCount} field${reviewCount === 1 ? "" : "s"} to review.`
+      const extra = attentionCount;
+      detail = extra
+        ? `There ${extra === 1 ? "is" : "are"} also ${extra} field${extra === 1 ? "" : "s"} to review or verify.`
         : "The assistant intentionally cannot validate or answer these fields for you.";
     } else if (state === "review") {
-      title = `${reviewCount} field${reviewCount === 1 ? "" : "s"} still need review`;
-      detail = "Review these employer-specific or interactive controls before final submission.";
+      title = `${attentionCount} field${attentionCount === 1 ? "" : "s"} still need review`;
+      detail = failedCount
+        ? `${failedCount} safe autofill attempt${failedCount === 1 ? "" : "s"} could not be verified. Confirm those fields manually before final submission.`
+        : "Review these employer-specific or interactive controls before final submission.";
     } else {
       title = "Assistant checklist clear";
       detail = "No unresolved fields were detected by the assistant. Review the entire employer form before final Submit/Apply.";
@@ -77,6 +90,7 @@
       title,
       detail,
       reviewCount,
+      failedCount,
       blockedCount,
       items,
       cvCheckpoint
