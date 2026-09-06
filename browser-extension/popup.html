@@ -53,8 +53,14 @@
         <div>
           <span class="small">Recommended CV</span>
           <strong id="cvName">—</strong>
+          <span id="cvVaultStatus" class="small">CV Vault not checked</span>
         </div>
+        <button id="uploadCv" class="primary">Upload recommended CV</button>
+      </div>
+
+      <div class="grid">
         <button id="findCv" class="secondary">Find upload field</button>
+        <button id="setupCv" class="secondary">CV Vault setup</button>
       </div>
 
       <label class="small" for="coverLetter">Tailored cover letter</label>
@@ -84,5 +90,6 @@
     <p id="error" class="error hidden"></p>
   </main>
   <script src="popup.js"></script>
+  <script src="cv-vault-popup.js"></script>
 </body>
 </html>

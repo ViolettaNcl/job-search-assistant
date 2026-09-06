@@ -15,5 +15,9 @@ jobs:
       - run: dotnet test tests/JobSearchAssistant.Tests/JobSearchAssistant.Tests.csproj -c Release
       - name: Validate extension JavaScript
         run: |
+          node --check browser-extension/background.js
           node --check browser-extension/content.js
           node --check browser-extension/popup.js
+          node --check browser-extension/cv-upload.js
+          node --check browser-extension/cv-vault-popup.js
+          node --check browser-extension/options.js
