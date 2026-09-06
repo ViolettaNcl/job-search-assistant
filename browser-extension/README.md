@@ -2,7 +2,7 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **1.1** is a review-first application autopilot for Russia and Europe. It uses the backend's ranked vacancy queue to make the daily workflow continuous: open the next strong job, analyze it, tailor the application, safely fill what can be verified, preserve context across compatible ATS steps, record the application, then advance to the next strong unapplied vacancy.
+Version **1.2** is a review-first application autopilot for Russia and Europe. It uses the backend's ranked vacancy queue to make the daily workflow continuous: open the next strong job, analyze it, tailor the application, safely fill what can be verified, preserve context across compatible ATS steps and safe opener-linked tabs, record the application, then advance to the next strong unapplied vacancy.
 
 ## Daily apply loop
 
@@ -23,7 +23,7 @@ The popup calls `GET /api/application-queue?limit=20&minScore=75` and respects t
 
 ## Temporary queue deferral
 
-Version 1.1 adds **Defer 4h** for a strong vacancy that should stay in the pipeline but should not block the current application session.
+**Defer 4h** postpones a strong vacancy without pretending it was applied, rejected or permanently skipped.
 
 A deferral:
 
@@ -34,31 +34,11 @@ A deferral:
 - does not mark the vacancy Applied, Rejected or Skipped;
 - does not cause an ordinary manually saved/bookmarked vacancy to reappear automatically.
 
-No extra database column or migration is required. The behavior uses the existing vacancy status and application-event history.
-
-The popup sends the deferral only after an explicit **Defer 4h** click. If the backend rejects the status update, the current queue item remains available and the extension reports the failure instead of silently advancing.
-
-## External job sites
-
-1. Open a vacancy in Chrome, either directly or through the daily loop.
-2. Click **Violetta Apply Assistant**.
-3. Click **Analyze this vacancy**.
-4. The backend scores the job and creates a truthful role-specific application draft.
-5. The extension scans the application form and reports safe, review and blocked fields.
-6. Click **Fill safe fields**. The extension waits for the ATS UI to settle, verifies each attempted fill and automatically refreshes the checklist.
-7. If the ATS moves to another compatible application step in the same browser tab, reopen the extension: the vacancy, fit score, edited cover letter, CV recommendation and tracker context are restored automatically.
-8. Correct any review/manual-only/failed-fill items yourself. **Recheck submission checklist** remains available after manual edits.
-9. Click **Upload recommended CV** when a stored CV is available and verify the employer page shows the expected attachment.
-10. Review the entire employer form, then press the website's final Submit/Apply button yourself.
-11. Click **Mark applied** after submission so the application is recorded in the CRM and the daily queue can advance.
-
-**Save to tracker** can store a vacancy before applying. Rich browser import keeps the job description, country/location, fit score and eligibility instead of saving only a shallow link. Duplicate source URLs reuse the existing CRM record.
+No extra database column or migration is required. If the backend rejects a deferral, the current queue item stays available and the extension reports the failure instead of silently advancing.
 
 ## Multi-step ATS sessions
 
-The active application context is kept in `chrome.storage.session`, keyed to the current browser tab. This prevents Workday/SmartRecruiters/Personio-style flows from losing the original vacancy context after the job-description page disappears.
-
-The session stores:
+The active application context is stored in ephemeral `chrome.storage.session`. It keeps:
 
 - analyzed vacancy/job metadata;
 - fit and recommendation result;
@@ -68,11 +48,57 @@ The session stores:
 
 It does **not** copy CV PDF bytes, reusable Application Memory, passwords, CAPTCHA/2FA answers, legal declarations or sensitive personal fields into the session record.
 
-A session can restore on the same analyzed vacancy, on an application-looking URL on the same origin, or for selected ATS families when a cross-subdomain transition preserves the same employer/tenant identity. Workday restoration is tenant-bound so one employer's context cannot bleed into another employer's Workday site.
+### Same-tab continuation
 
-A different job-detail page is not treated as a continuation. Sessions expire after eight hours and are removed after the application is recorded as Applied. **Forget** discards a session manually.
+When an ATS moves from the vacancy page into later application steps in the same tab, the popup can restore the existing session if the current URL is a valid continuation.
 
-The current implementation is intentionally same-tab. Cross-tab/new-window ATS handoff is not guessed automatically.
+For shared ATS origins, version 1.2 also closes a previous ambiguity: same-origin alone is no longer sufficient when multiple employers share one host. The session must preserve the same derived employer/tenant identity.
+
+### Safe cross-tab / new-window handoff
+
+Version 1.2 supports a conservative new-tab handoff for ATS flows where the employer's Apply action opens another tab/window.
+
+Automatic handoff requires all of the following:
+
+1. the current tab has a real Chrome `openerTabId`;
+2. that opener tab is exactly the tab holding the stored application session;
+3. the destination URL looks like an application step;
+4. the source and destination resolve to the same explicit ATS tenant/employer identity;
+5. the session is still inside its eight-hour lifetime.
+
+When those checks pass, the session is **moved** from the opener tab's storage slot into the new tab's slot rather than copied. This prevents the original tab from later restoring a stale duplicate.
+
+Tenant identity is derived conservatively from either an employer-specific ATS hostname or from documented shared-host URL structure. Supported identities include:
+
+- Workday employer subdomains such as `acme.wd5.myworkdayjobs.com`;
+- Teamtailor employer subdomains;
+- Recruitee employer subdomains;
+- Personio employer subdomains;
+- SmartRecruiters paths such as `jobs.smartrecruiters.com/<company>/...`;
+- Lever paths such as `jobs.lever.co/<company>/...`;
+- Ashby paths such as `jobs.ashbyhq.com/<company>/...`;
+- Greenhouse paths such as `job-boards.greenhouse.io/<company>/...` or `boards.greenhouse.io/<company>/...`;
+- Workable paths such as `apply.workable.com/<company>/...`.
+
+A different employer on the same shared ATS host does not restore the session. A tab with no opener relationship also does not automatically claim another tab's application context.
+
+This is intentionally stricter than scanning every open tab for a vaguely similar URL.
+
+## External job sites
+
+1. Open a vacancy in Chrome, either directly or through the daily loop.
+2. Click **Violetta Apply Assistant**.
+3. Click **Analyze this vacancy**.
+4. The backend scores the job and creates a truthful role-specific application draft.
+5. The extension scans the application form and reports safe, review and blocked fields.
+6. Click **Fill safe fields**. The extension waits for the ATS UI to settle, verifies each attempted fill and automatically refreshes the checklist.
+7. If the ATS moves to a compatible same-tab step or a safely linked new tab, reopen the extension and the application context is restored.
+8. Correct any review/manual-only/failed-fill items yourself. **Recheck submission checklist** remains available after manual edits.
+9. Click **Upload recommended CV** when a stored CV is available and verify the employer page shows the expected attachment.
+10. Review the entire employer form, then press the website's final Submit/Apply button yourself.
+11. Click **Mark applied** after submission so the application is recorded in the CRM and the daily queue can advance.
+
+**Save to tracker** can store a vacancy before applying. Rich browser import keeps the job description, country/location, fit score and eligibility instead of saving only a shallow link. Duplicate source URLs reuse the existing CRM record.
 
 ## ATS-aware extraction and controls
 
@@ -154,12 +180,11 @@ After updating extension code, click **Reload** on the extension card.
 
 Vacancy pages are not transmitted in the background. Page text/form metadata are sent to the configured backend only after the user requests analysis or a form action.
 
-Reusable answers and CV Vault files remain in the local Chrome profile. Multi-step application context uses ephemeral `chrome.storage.session` and expires automatically. Queue deferrals store only a vacancy status plus expiry note in the existing CRM event history.
+Reusable answers and CV Vault files remain in the local Chrome profile. Multi-step application context uses ephemeral `chrome.storage.session` and expires automatically. Cross-tab handoff does not enumerate or inspect unrelated tabs; it follows only the browser-provided opener relationship and deterministic ATS tenant identity. Queue deferrals store only a vacancy status plus expiry note in the existing CRM event history.
 
 ## Next iteration
 
-- validate real application forms across Workday, SmartRecruiters, Teamtailor, Recruitee, Workable and Personio;
-- add safe cross-tab/new-window session handoff where deterministic ATS job identity can be preserved;
+- validate real application forms and cross-tab behavior across Workday, SmartRecruiters, Teamtailor, Recruitee, Workable, Greenhouse, Lever, Ashby and Personio;
 - add platform-specific adapters only where field/value mapping can be proven deterministic and safe;
 - add a more flexible defer menu only if real usage shows 4 hours is too rigid;
 - optional company-specific writing provider with deterministic truthful fallback;

@@ -81,22 +81,58 @@ function vjaRenderRestoredAnalysis(session) {
   $("markApplied").textContent = "Mark applied";
 }
 
+async function vjaTakeSessionFromOpener(slot) {
+  const openerTabId = Number(slot?.tab?.openerTabId);
+  if (!Number.isFinite(openerTabId) || openerTabId < 0) return null;
+
+  const sourceKey = window.vjaApplicationSession.slotKey(openerTabId);
+  if (!sourceKey || sourceKey === slot.key) return null;
+
+  const stored = await chrome.storage.session.get(sourceKey);
+  const session = stored?.[sourceKey];
+  if (!session) return null;
+
+  if (!window.vjaApplicationSession.canHandoffFromOpener(
+    session,
+    slot.tab.url || "",
+    openerTabId,
+    slot.tab.openerTabId
+  )) return null;
+
+  // Move rather than copy the context so the old tab cannot later restore a stale duplicate.
+  await chrome.storage.session.set({ [slot.key]: session });
+  await chrome.storage.session.remove(sourceKey);
+  return session;
+}
+
 async function vjaRestoreApplicationSession() {
   const slot = await vjaSessionSlot();
   if (!slot) return false;
-  const stored = await chrome.storage.session.get(slot.key);
-  const session = stored?.[slot.key];
-  if (!session) return false;
 
-  if (!window.vjaApplicationSession.canRestore(session, slot.tab.url || "")) {
+  let restoredViaHandoff = false;
+  const stored = await chrome.storage.session.get(slot.key);
+  let session = stored?.[slot.key];
+
+  if (session && !window.vjaApplicationSession.canRestore(session, slot.tab.url || "")) {
     await chrome.storage.session.remove(slot.key);
-    return false;
+    session = null;
   }
+
+  if (!session) {
+    session = await vjaTakeSessionFromOpener(slot);
+    restoredViaHandoff = Boolean(session);
+  }
+
+  if (!session) return false;
 
   latest = session.latest;
   latestPage = session.latestPage;
   latestTrackedId = session.latestTrackedId || null;
   vjaRenderRestoredAnalysis(session);
+
+  const restoredLabel = restoredViaHandoff
+    ? `Handoff restored ${latestPage.company || latestPage.title || "application"} from the opener tab.`
+    : `Restored ${latestPage.company || latestPage.title || "application"} in this tab.`;
 
   try {
     await refreshFieldPlan();
@@ -106,11 +142,11 @@ async function vjaRestoreApplicationSession() {
     $("fillNote").textContent = review || blocked
       ? `Restored this application session on the current ATS step. ${review} fields need review and ${blocked} are manual-only.`
       : "Restored this application session on the current ATS step. No unresolved fields were detected by the assistant; review the full form before submitting.";
-    vjaShowSessionStatus(`Restored ${latestPage.company || latestPage.title || "application"} in this tab.`);
+    vjaShowSessionStatus(restoredLabel);
     setDot(true);
   } catch (error) {
     $("fillNote").textContent = `Application context restored, but this ATS step could not be scanned yet: ${error?.message || String(error)}`;
-    vjaShowSessionStatus(`Restored ${latestPage.company || latestPage.title || "application"} in this tab.`);
+    vjaShowSessionStatus(restoredLabel);
   }
   return true;
 }

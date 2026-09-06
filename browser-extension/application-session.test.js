@@ -44,11 +44,76 @@ assert.equal(
   false
 );
 
+const childApplyUrl = "https://acme.wd5.myworkdayjobs.com/en-US/Careers/apply/job/R123/application";
+assert.equal(sessions.canHandoffFromOpener(session, childApplyUrl, 42, 42, now + 5_000), true);
+assert.equal(sessions.canHandoffFromOpener(session, childApplyUrl, 42, 43, now + 5_000), false);
+assert.equal(
+  sessions.canHandoffFromOpener(session, "https://other.wd3.myworkdayjobs.com/en-US/Jobs/apply/job/R123", 42, 42, now + 5_000),
+  false
+);
+assert.equal(
+  sessions.canHandoffFromOpener(session, "https://acme.wd5.myworkdayjobs.com/en-US/Careers/job/Berlin/Other-Role_R999", 42, 42, now + 5_000),
+  false
+);
+assert.equal(
+  sessions.canHandoffFromOpener(session, childApplyUrl, 42, 42, now + sessions.DEFAULT_TTL_MS + 1),
+  false
+);
+assert.equal(sessions.canHandoffFromOpener(session, childApplyUrl, "bad", 42, now + 5_000), false);
+
+const sharedHostPage = {
+  url: "https://jobs.smartrecruiters.com/Acme/123-junior-developer",
+  title: "Junior Developer",
+  company: "Acme",
+  ats: "smartrecruiters"
+};
+const sharedHostSession = sessions.create({ latest, latestPage: sharedHostPage }, now);
+assert.equal(
+  sessions.canRestore(sharedHostSession, "https://jobs.smartrecruiters.com/Acme/123-junior-developer/apply", now + 5_000),
+  true
+);
+assert.equal(
+  sessions.canRestore(sharedHostSession, "https://jobs.smartrecruiters.com/Other/999-other-role/apply", now + 5_000),
+  false,
+  "same shared origin must not restore across employers"
+);
+assert.equal(
+  sessions.canHandoffFromOpener(sharedHostSession, "https://jobs.smartrecruiters.com/Acme/123-junior-developer/apply", 50, 50, now + 5_000),
+  true
+);
+assert.equal(
+  sessions.canHandoffFromOpener(sharedHostSession, "https://jobs.smartrecruiters.com/Other/999-other-role/apply", 50, 50, now + 5_000),
+  false
+);
+
+const teamtailorPage = {
+  url: "https://acme.teamtailor.com/jobs/123-junior-developer",
+  title: "Junior Developer",
+  company: "Acme",
+  ats: "teamtailor"
+};
+const teamtailorSession = sessions.create({ latest, latestPage: teamtailorPage }, now);
+assert.equal(
+  sessions.canHandoffFromOpener(teamtailorSession, "https://acme.teamtailor.com/jobs/123-junior-developer/apply", 60, 60, now + 5_000),
+  true
+);
+assert.equal(
+  sessions.canHandoffFromOpener(teamtailorSession, "https://other.teamtailor.com/jobs/123/apply", 60, 60, now + 5_000),
+  false
+);
+
 assert.equal(sessions.isApplicationLike("https://jobs.smartrecruiters.com/acme/123/apply"), true);
 assert.equal(sessions.isApplicationLike("https://jobs.smartrecruiters.com/acme/123"), false);
 assert.equal(sessions.hostFamily("https://foo.jobs.smartrecruiters.com/apply"), "smartrecruiters.com");
 assert.equal(sessions.tenantKey("https://acme.wd5.myworkdayjobs.com/apply"), "workday:acme");
 assert.equal(sessions.tenantKey("https://other.wd3.myworkdayjobs.com/apply"), "workday:other");
+assert.equal(sessions.tenantKey("https://acme.teamtailor.com/jobs/123/apply"), "teamtailor.com:acme");
+assert.equal(sessions.tenantKey("https://jobs.smartrecruiters.com/Acme/123/apply"), "smartrecruiters.com:path:acme");
+assert.equal(sessions.tenantKey("https://jobs.lever.co/Acme/abc/apply"), "lever.co:path:acme");
+assert.equal(sessions.tenantKey("https://jobs.ashbyhq.com/Acme/abc/application"), "ashbyhq.com:path:acme");
+assert.equal(sessions.tenantKey("https://job-boards.greenhouse.io/Acme/jobs/123"), "greenhouse.io:path:acme");
+assert.equal(sessions.tenantKey("https://apply.workable.com/Acme/j/ABC/apply"), "workable.com:path:acme");
+assert.equal(sessions.tenantKey("https://apply.workable.com/apply"), "");
 assert.equal(sessions.normalizedUrl("https://example.com/job/123/#details"), "https://example.com/job/123");
 
 assert.equal(sessions.create({ latest: null, latestPage: page }, now), null);
