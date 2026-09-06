@@ -2,7 +2,7 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **0.3** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, autofills safe ATS fields, stores applications in the CRM, and can insert the recommended CV from a local browser vault.
+Version **0.4** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, autofills safe ATS fields, stores applications in the CRM, and can insert the recommended CV from a local browser vault.
 
 ## External job sites
 
@@ -23,15 +23,23 @@ Version **0.3** is a review-first application autopilot for Russia and Europe. I
 
 ## ATS-aware extraction
 
-The content script has dedicated page-detection adapters for:
+Version 0.4 prefers standards-based structured vacancy data before relying on fragile visual selectors. When a page publishes Schema.org `JobPosting` JSON-LD, the extension extracts title, company, description, location/country, remote status and experience hints from that structured record. ATS-specific CSS selectors and the generic DOM scanner remain fallbacks when structured data is absent or incomplete.
+
+Host recognition currently identifies:
 
 - HH.ru
 - Greenhouse
 - Lever
 - Ashby
+- Workday
+- SmartRecruiters
+- Teamtailor
+- Recruitee
+- Workable
+- Personio
 - generic career/application pages
 
-The adapters improve extraction of job title, company, description and location while keeping a generic fallback for other sites.
+This makes vacancy extraction less dependent on an ATS keeping the same React classes or visual markup. The parser is deterministic and covered by Node tests in GitHub Actions; malformed JSON-LD is ignored safely and falls back to DOM extraction.
 
 ## Application Memory
 
@@ -61,7 +69,7 @@ The **Clear saved answers** button deletes reusable browser-side memory without 
 
 ## CV Vault
 
-Version 0.3 adds a local **CV Vault**.
+The local **CV Vault** keeps the two PDF variants in the browser extension profile.
 
 Open **CV Vault setup** from the extension and choose the two PDF variants once:
 
@@ -131,8 +139,7 @@ Reusable answers and CV Vault files remain in this Chrome profile's local extens
 
 ## Next iteration
 
-- validate/fine-tune Greenhouse, Lever and Ashby adapters against real application pages
-- configurable verified phone/LinkedIn profile fields after user confirmation
-- follow-up reminders for valuable applications with no response
+- validate real application forms across Workday, SmartRecruiters, Teamtailor, Recruitee, Workable and Personio
+- strengthen custom/composite field handling without guessing legal or salary answers
 - optional company-specific writing provider with deterministic truthful fallback
-- application outcome analytics by source, role and CV variant
+- continue using outcome analytics to decide which sources, role families and CV variants deserve more applications
