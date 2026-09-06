@@ -45,35 +45,12 @@ function vjaUpdateCandidateConfirmationUi(item = window.vjaReviewNavigatorSelect
   note.dataset.state = item.action || "review";
 }
 
-async function vjaAnnotateCurrentScanWithConfirmations() {
-  if (!latestScan || !window.vjaCandidateConfirmation) return;
-  latestScan.fields = await window.vjaCandidateConfirmation.annotate(
-    latestScan.fields || [],
-    window.vjaCandidateConfirmationState
-  );
-}
-
 function vjaRefreshConfirmationCounts() {
   if (typeof vjaCurrentReadiness !== "function") return;
   const readiness = vjaCurrentReadiness();
   if (!readiness) return;
   if ($("reviewCount")) $("reviewCount").textContent = Number(readiness.reviewCount || 0) + Number(readiness.failedCount || 0);
   if ($("blockedCount")) $("blockedCount").textContent = Number(readiness.blockedCount || 0);
-}
-
-// Every field rescan is annotated against the current salted fingerprints. A changed
-// answer no longer matches, so confirmation is invalidated without storing the value.
-if (typeof window.refreshFieldPlan === "function" && !window.refreshFieldPlan.__candidateConfirmationWrapped) {
-  const originalRefreshFieldPlan = window.refreshFieldPlan;
-  const wrappedRefreshFieldPlan = async function (...args) {
-    const plan = await originalRefreshFieldPlan(...args);
-    await vjaAnnotateCurrentScanWithConfirmations();
-    window.vjaRenderSubmissionReadiness?.();
-    vjaRefreshConfirmationCounts();
-    return plan;
-  };
-  wrappedRefreshFieldPlan.__candidateConfirmationWrapped = true;
-  window.refreshFieldPlan = wrappedRefreshFieldPlan;
 }
 
 async function vjaConfirmCurrentReviewField() {
@@ -87,7 +64,7 @@ async function vjaConfirmCurrentReviewField() {
   }
 
   try {
-    await window.refreshFieldPlan();
+    await refreshFieldPlan();
     const field = (latestScan?.fields || []).find(x => x.token === item.token);
     if (!field) throw new Error("That ATS field moved or was replaced. Use Next field needing me again.");
     if (field.candidateConfirmed) {
@@ -129,14 +106,6 @@ async function vjaConfirmCurrentReviewField() {
 const vjaCandidateConfirmationUi = vjaEnsureCandidateConfirmationUi();
 vjaCandidateConfirmationUi.button?.addEventListener("click", vjaConfirmCurrentReviewField);
 
-for (const id of ["analyze", "prepareApplication"]) {
-  $(id)?.addEventListener("click", () => {
-    window.vjaCandidateConfirmationState = null;
-    window.vjaReviewNavigatorSelection = null;
-    vjaUpdateCandidateConfirmationUi(null);
-  }, true);
-}
-
 $("clearSession")?.addEventListener("click", () => {
   window.vjaCandidateConfirmationState = null;
   window.vjaReviewNavigatorSelection = null;
@@ -145,5 +114,4 @@ $("clearSession")?.addEventListener("click", () => {
 
 window.vjaUpdateCandidateConfirmationUi = vjaUpdateCandidateConfirmationUi;
 window.vjaConfirmCurrentReviewField = vjaConfirmCurrentReviewField;
-window.vjaAnnotateCurrentScanWithConfirmations = vjaAnnotateCurrentScanWithConfirmations;
 vjaUpdateCandidateConfirmationUi(null);
