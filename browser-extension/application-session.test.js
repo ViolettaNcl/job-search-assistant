@@ -24,8 +24,12 @@ assert.equal(
   true
 );
 assert.equal(
-  sessions.canRestore(session, "https://other.wd3.myworkdayjobs.com/en-US/Jobs/apply/job/R123", now + 5_000),
+  sessions.canRestore(session, "https://acme.wd3.myworkdayjobs.com/en-US/Jobs/apply/job/R123", now + 5_000),
   true
+);
+assert.equal(
+  sessions.canRestore(session, "https://other.wd3.myworkdayjobs.com/en-US/Jobs/apply/job/R123", now + 5_000),
+  false
 );
 assert.equal(
   sessions.canRestore(session, "https://acme.wd5.myworkdayjobs.com/en-US/Careers/job/Berlin/Other-Role_R999", now + 5_000),
@@ -43,6 +47,8 @@ assert.equal(
 assert.equal(sessions.isApplicationLike("https://jobs.smartrecruiters.com/acme/123/apply"), true);
 assert.equal(sessions.isApplicationLike("https://jobs.smartrecruiters.com/acme/123"), false);
 assert.equal(sessions.hostFamily("https://foo.jobs.smartrecruiters.com/apply"), "smartrecruiters.com");
+assert.equal(sessions.tenantKey("https://acme.wd5.myworkdayjobs.com/apply"), "workday:acme");
+assert.equal(sessions.tenantKey("https://other.wd3.myworkdayjobs.com/apply"), "workday:other");
 assert.equal(sessions.normalizedUrl("https://example.com/job/123/#details"), "https://example.com/job/123");
 
 assert.equal(sessions.create({ latest: null, latestPage: page }, now), null);
