@@ -23,6 +23,7 @@ jobs:
           node --check browser-extension/content.js
           node --check browser-extension/submission-readiness.js
           node --check browser-extension/application-session.js
+          node --check browser-extension/application-step-intelligence.js
           node --check browser-extension/daily-queue.js
           node --check browser-extension/queue-defer.js
           node --check browser-extension/popup.js
@@ -31,6 +32,7 @@ jobs:
           node --check browser-extension/review-summary.js
           node --check browser-extension/post-fill-auto-recheck.js
           node --check browser-extension/multistep-session-popup.js
+          node --check browser-extension/step-intelligence-popup.js
           node --check browser-extension/daily-loop-popup.js
           node --check browser-extension/options.js
           node --check browser-extension/ats-structured.test.js
@@ -39,6 +41,7 @@ jobs:
           node --check browser-extension/fill-reconciliation.test.js
           node --check browser-extension/submission-readiness.test.js
           node --check browser-extension/application-session.test.js
+          node --check browser-extension/application-step-intelligence.test.js
           node --check browser-extension/daily-queue.test.js
           node --check browser-extension/queue-defer.test.js
       - name: Test ATS structured extraction
@@ -53,6 +56,8 @@ jobs:
         run: node browser-extension/submission-readiness.test.js
       - name: Test multi-step ATS sessions
         run: node browser-extension/application-session.test.js
+      - name: Test ATS application stage intelligence
+        run: node browser-extension/application-step-intelligence.test.js
       - name: Test daily apply queue selection
         run: node browser-extension/daily-queue.test.js
       - name: Test queue deferral request format
