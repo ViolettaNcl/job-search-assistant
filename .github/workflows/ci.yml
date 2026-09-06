@@ -23,12 +23,14 @@ jobs:
           node --check browser-extension/content.js
           node --check browser-extension/submission-readiness.js
           node --check browser-extension/application-session.js
+          node --check browser-extension/daily-queue.js
           node --check browser-extension/popup.js
           node --check browser-extension/cv-upload.js
           node --check browser-extension/cv-vault-popup.js
           node --check browser-extension/review-summary.js
           node --check browser-extension/post-fill-auto-recheck.js
           node --check browser-extension/multistep-session-popup.js
+          node --check browser-extension/daily-loop-popup.js
           node --check browser-extension/options.js
           node --check browser-extension/ats-structured.test.js
           node --check browser-extension/ats-controls.test.js
@@ -36,6 +38,7 @@ jobs:
           node --check browser-extension/fill-reconciliation.test.js
           node --check browser-extension/submission-readiness.test.js
           node --check browser-extension/application-session.test.js
+          node --check browser-extension/daily-queue.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls
@@ -48,6 +51,8 @@ jobs:
         run: node browser-extension/submission-readiness.test.js
       - name: Test multi-step ATS sessions
         run: node browser-extension/application-session.test.js
+      - name: Test daily apply queue selection
+        run: node browser-extension/daily-queue.test.js
       - name: Validate dashboard inline JavaScript
         run: |
           python3 - <<'PY'
