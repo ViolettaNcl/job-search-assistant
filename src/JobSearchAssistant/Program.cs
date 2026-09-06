@@ -37,6 +37,8 @@ builder.Services.AddScoped<RemotiveClient>();
 builder.Services.AddScoped<AdzunaClient>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<TailoredHhApplyService>();
+builder.Services.AddScoped<BrowserVacancyImportService>();
+builder.Services.AddScoped<ApplicationQueueService>();
 builder.Services.AddScoped<StatsService>();
 builder.Services.AddHostedService<VacancyCollectorWorker>();
 builder.Services.AddHostedService<TelegramBotWorker>();
@@ -133,6 +135,9 @@ app.MapGet("/api/dashboard", async (AppDbContext db, StatsService stats, Cancell
     });
 });
 
+app.MapGet("/api/application-queue", async (int? limit, int? minScore, ApplicationQueueService queue, CancellationToken ct)
+    => Results.Ok(await queue.GetAsync(limit ?? 20, minScore ?? 65, ct)));
+
 app.MapGet("/api/vacancies", async (AppDbContext db, string? status, int? minScore, string? market, string? type, CancellationToken ct) =>
 {
     var q = db.Vacancies.Include(x => x.Company).AsQueryable();
@@ -200,6 +205,29 @@ app.MapPost("/api/import/hh", async (ManualImport request, JobService jobs, Canc
     var vacancy = await jobs.ImportHhUrlAsync(request.Url, ct);
     return vacancy is null ? Results.NotFound() : Results.Ok(new { vacancy.Id, vacancy.Title, vacancy.MatchScore, vacancy.MatchLevel });
 });
+
+app.MapPost("/api/import/browser", async (BrowserVacancyImportRequest request, BrowserVacancyImportService imports, CancellationToken ct) =>
+{
+    try
+    {
+        var vacancy = await imports.ImportAsync(request, ct);
+        return Results.Ok(new
+        {
+            vacancy.Id,
+            vacancy.Title,
+            vacancy.Source,
+            vacancy.MatchScore,
+            vacancy.MatchLevel,
+            vacancy.EligibilityStatus,
+            vacancy.EligibilityReason
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = "invalid_url", message = ex.Message });
+    }
+});
+
 app.MapPost("/api/import/manual", async (ManualVacancyImport request, JobService jobs, CancellationToken ct) =>
 {
     var vacancy = await jobs.ImportManualAsync(request.Url, request.Title, request.Company, ct);
