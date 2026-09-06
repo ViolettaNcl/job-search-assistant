@@ -2,7 +2,7 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **0.2** is a review-first application autopilot for Russia and Europe. It reads the vacancy only after the user clicks Analyze, asks the backend what can be answered safely, reuses confirmed answers, and keeps job-specific or sensitive questions out of automation.
+Version **0.3** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, autofills safe ATS fields, stores applications in the CRM, and can insert the recommended CV from a local browser vault.
 
 ## External job sites
 
@@ -10,19 +10,20 @@ Version **0.2** is a review-first application autopilot for Russia and Europe. I
 2. Click **Violetta Apply Assistant**.
 3. Click **Analyze this vacancy**.
 4. The backend scores the job and creates a truthful role-specific application draft.
-5. The extension scans the visible application form and reports:
+5. The extension scans the application form and reports:
    - fields safe to autofill;
    - fields that need review;
    - fields intentionally blocked from automation.
 6. Click **Fill safe fields**.
-7. Review anything left for you and press the website's final Submit/Apply button yourself.
-8. Click **Mark applied** after submission so the application is recorded in the Job Search Assistant CRM.
+7. Click **Upload recommended CV** when a stored CV is available.
+8. Review anything left for you and press the website's final Submit/Apply button yourself.
+9. Click **Mark applied** after submission so the application is recorded in the Job Search Assistant CRM.
 
-**Save to tracker** can store the vacancy before you apply. Duplicate source URLs reuse the existing CRM record instead of creating repeated applications.
+**Save to tracker** can store the vacancy before you apply. Rich browser import keeps the job description, country/location, fit score and eligibility instead of saving only a shallow link. Duplicate source URLs reuse the existing CRM record.
 
 ## ATS-aware extraction
 
-The content script now has dedicated page-detection adapters for:
+The content script has dedicated page-detection adapters for:
 
 - HH.ru
 - Greenhouse
@@ -34,7 +35,7 @@ The adapters improve extraction of job title, company, description and location 
 
 ## Application Memory
 
-**Remember confirmed answers** stores reusable answers locally in Chrome storage only after Violetta has entered them herself.
+**Remember confirmed answers** stores reusable answers in Chrome storage only after Violetta has entered/confirmed them herself and explicitly asks the extension to remember them.
 
 Initial examples include:
 
@@ -58,14 +59,20 @@ Application Memory deliberately does **not** learn or reuse:
 
 The **Clear saved answers** button deletes reusable browser-side memory without changing the verified candidate profile.
 
-## CV helper
+## CV Vault
 
-The extension displays the CV variant recommended by the tailoring engine, for example:
+Version 0.3 adds a local **CV Vault**.
 
-- `Violetta_Nicolaou_CV_RU_v2.pdf`
-- `Violetta_Nicolaou_CV_EN_v2.pdf`
+Open **CV Vault setup** from the extension and choose the two PDF variants once:
 
-**Find upload field** highlights the first visible file-upload control on the page. Chrome security rules do not allow an extension to silently choose a local file, so Violetta still selects the recommended PDF herself.
+- English CV for European/international applications
+- Russian CV for Russia/HH.ru and Russian-language applications
+
+The PDF bytes are stored in `chrome.storage.local` in the extension profile. They are not uploaded to the Job Search Assistant backend.
+
+After analysis, **Upload recommended CV** selects the Russian or English vault entry based on the application draft and inserts it into the most likely résumé/CV file input. The uploader supports ATS pages where the real file input is visually hidden behind a styled upload button, while avoiding ambiguous multi-file forms when it cannot identify a résumé field confidently.
+
+Always check that the employer site shows the correct filename before final submission.
 
 ## HH.ru direct submission
 
@@ -83,6 +90,14 @@ After explicit confirmation it:
 
 HH OAuth and an HH resume must be configured first. The extension does not bypass CAPTCHA/2FA or imitate hidden browser clicks for HH submission.
 
+## Daily queue
+
+The backend also exposes a ranked application queue at:
+
+`/queue.html`
+
+It prioritizes unapplied jobs using fit, freshness and eligibility while excluding likely-ineligible opportunities. This is intended to become the daily “what should I apply to first?” screen.
+
 ## Install locally
 
 1. Run the Job Search Assistant backend at `http://localhost:8080`.
@@ -91,6 +106,7 @@ HH OAuth and an HH resume must be configured first. The extension does not bypas
 4. Choose **Load unpacked**.
 5. Select the `browser-extension` folder.
 6. Pin **Violetta Apply Assistant** to the Chrome toolbar.
+7. Open **CV Vault setup** and store the English/Russian PDF copies.
 
 After updating the extension code, click **Reload** on the extension card in `chrome://extensions`.
 
@@ -101,21 +117,22 @@ After updating the extension code, click **Reload** on the extension card in `ch
 - `POST /api/extension/analyze`
 - `POST /api/extension/resolve-fields`
 - `POST /api/import/hh`
-- `POST /api/import/manual`
+- `POST /api/import/browser`
 - `POST /api/vacancies/{id}/apply-tailored`
 - `POST /api/vacancies/{id}/mark-applied`
 - `GET /api/vacancies/{id}/application-draft`
+- `GET /api/application-queue`
 
 ## Privacy model
 
 The content script does not transmit vacancy pages in the background. Page text and form metadata are sent to the configured Job Search Assistant backend only after the user clicks **Analyze this vacancy** or requests a form action.
 
-Reusable answers saved with Application Memory remain in this Chrome profile's local extension storage.
+Reusable answers and CV Vault files remain in this Chrome profile's local extension storage. A stored CV is exposed to the currently open page only when the user explicitly clicks **Upload recommended CV**.
 
 ## Next iteration
 
-- richer Greenhouse/Lever/Ashby field adapters based on real application forms
-- optional LLM provider interface for deeper company-specific wording
-- daily top-application queue
-- configurable phone/LinkedIn in the verified candidate profile after the user confirms them
-- follow-up reminders for high-value applications with no response
+- validate/fine-tune Greenhouse, Lever and Ashby adapters against real application pages
+- configurable verified phone/LinkedIn profile fields after user confirmation
+- follow-up reminders for valuable applications with no response
+- optional company-specific writing provider with deterministic truthful fallback
+- application outcome analytics by source, role and CV variant
