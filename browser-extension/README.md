@@ -2,7 +2,7 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **0.8** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, verifies safe ATS autofill, automatically refreshes the submission checklist after form actions, stores applications in the CRM, and can insert the recommended CV from a local browser vault.
+Version **0.9** is a review-first application autopilot for Russia and Europe. It analyzes vacancies only after the user asks, creates truthful role-specific application material, reuses explicitly confirmed answers, verifies safe ATS autofill, automatically refreshes the submission checklist, keeps the application context across compatible multi-step ATS pages, stores applications in the CRM, and can insert the recommended CV from a local browser vault.
 
 ## External job sites
 
@@ -12,12 +12,37 @@ Version **0.8** is a review-first application autopilot for Russia and Europe. I
 4. The backend scores the job and creates a truthful role-specific application draft.
 5. The extension scans the application form and reports safe, review and blocked fields.
 6. Click **Fill safe fields**. The extension waits for the ATS UI to settle, verifies each attempted fill, and automatically refreshes the checklist.
-7. Correct any review/manual-only/failed-fill items yourself. **Recheck submission checklist** remains available after manual edits.
-8. Click **Upload recommended CV** when a stored CV is available and verify the employer page shows the expected attachment.
-9. Review the whole employer form, then press the website's final Submit/Apply button yourself.
-10. Click **Mark applied** after submission so the application is recorded in the CRM.
+7. If the ATS moves to another compatible application step in the same browser tab, reopen the extension: the vacancy, fit score, edited cover letter, CV recommendation and tracker context are restored automatically.
+8. Correct any review/manual-only/failed-fill items yourself. **Recheck submission checklist** remains available after manual edits.
+9. Click **Upload recommended CV** when a stored CV is available and verify the employer page shows the expected attachment.
+10. Review the whole employer form, then press the website's final Submit/Apply button yourself.
+11. Click **Mark applied** after submission so the application is recorded in the CRM.
 
 **Save to tracker** can store the vacancy before you apply. Rich browser import keeps the job description, country/location, fit score and eligibility instead of saving only a shallow link. Duplicate source URLs reuse the existing CRM record.
+
+## Multi-step ATS sessions
+
+Version 0.9 keeps the active application context in `chrome.storage.session`, keyed to the current browser tab. This solves a common problem on Workday/SmartRecruiters/Personio-style flows where the job description disappears after the candidate moves from the vacancy page into step 2/3/4 of the application.
+
+The session stores only the application context needed to continue the current workflow:
+
+- analyzed vacancy/job metadata;
+- fit/recommendation result;
+- generated application draft and the candidate's current cover-letter edit;
+- recommended CV label;
+- existing tracker vacancy ID when one has already been created.
+
+It does **not** copy CV PDF bytes, reusable Application Memory, passwords, CAPTCHA/2FA answers, legal declarations or sensitive personal fields into the session record.
+
+A session can restore when:
+
+- the current page is the same analyzed vacancy; or
+- the same tab moves to a URL that looks like an application step on the same origin; or
+- the same tab moves between subdomains of the same recognized ATS family, such as `*.myworkdayjobs.com`, and the destination looks like an application step.
+
+A different job-detail page on the same site is deliberately **not** treated as a continuation. Sessions expire after eight hours and are removed after the application is recorded as Applied. The popup shows when a multi-step session is active/restored and provides **Forget** to discard it manually.
+
+The first v0.9 implementation is intentionally same-tab. Cross-tab/new-window ATS handoff is a separate reliability problem and is not guessed automatically.
 
 ## ATS-aware extraction
 
@@ -47,7 +72,7 @@ Native radio/checkbox alternatives are handled so a non-matching option in the s
 
 ## Automatic post-fill reconciliation
 
-Version 0.8 removes the extra manual step after **Fill safe fields**. When that action completes, the popup automatically rescans the employer form, rebuilds the field plan and rerenders submission readiness with the latest verified state.
+After **Fill safe fields**, the popup automatically rescans the employer form, rebuilds the field plan and rerenders submission readiness with the latest verified state.
 
 A previously failed-fill warning can also be reconciled after the candidate manually corrects the field. The warning is cleared in the popup only when the current field value deterministically matches the truthful planned value. A different or blank value does not clear it, and employer-specific `review` fields are never promoted to safe merely because they contain text.
 
@@ -118,11 +143,12 @@ After updating extension code, click **Reload** on the extension card.
 
 Vacancy pages are not transmitted in the background. Page text/form metadata are sent to the configured backend only after the user requests analysis or a form action.
 
-Reusable answers and CV Vault files remain in the local Chrome profile. Failed-fill tracking does not store intended personal values in DOM attributes. Post-fill reconciliation compares the current field value with the already-generated truthful plan only to decide whether a local warning still applies.
+Reusable answers and CV Vault files remain in the local Chrome profile. Failed-fill tracking does not store intended personal values in DOM attributes. The multi-step context uses ephemeral `chrome.storage.session` rather than persistent local storage and expires automatically.
 
 ## Next iteration
 
-- validate real application forms across Workday, SmartRecruiters, Teamtailor, Recruitee, Workable and Personio;
+- validate real multi-step application forms across Workday, SmartRecruiters, Teamtailor, Recruitee, Workable and Personio;
+- add safe cross-tab/new-window session handoff where a deterministic ATS job identity can be preserved;
 - add platform-specific adapters only where field/value mapping can be proven deterministic and safe;
 - optional company-specific writing provider with deterministic truthful fallback;
 - continue using outcome analytics to decide which sources, role families and CV variants deserve more applications.
