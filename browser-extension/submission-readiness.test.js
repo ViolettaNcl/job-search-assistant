@@ -24,6 +24,16 @@ const answeredReview = readiness.build(
 assert.equal(answeredReview.items[0].currentValuePresent, true);
 assert.equal(answeredReview.state, "review");
 
+const confirmedReview = readiness.build(
+  { fields: [field("a", "Location", "Berlin", "combobox", { candidateConfirmed: true })], uploadFields: 0 },
+  { fields: [{ token: "a", action: "review", reason: "Verify ATS location." }] }
+);
+assert.equal(confirmedReview.state, "clear");
+assert.equal(confirmedReview.reviewCount, 0);
+assert.equal(confirmedReview.items.length, 0);
+assert.equal(confirmedReview.confirmedCount, 1);
+assert.match(confirmedReview.detail, /candidate-reviewed checkpoint/i);
+
 const failedFill = readiness.build(
   { fields: [field("f", "Email", "", "email", { fillFailed: true })], uploadFields: 0 },
   { fields: [{ token: "f", action: "fill", value: "violetta@example.com", memoryKey: "email", reason: "Verified email." }] }
@@ -41,6 +51,14 @@ const failedFillWithCurrentValue = readiness.build(
 assert.equal(failedFillWithCurrentValue.items[0].currentValuePresent, true);
 assert.equal(failedFillWithCurrentValue.failedCount, 1);
 
+const confirmedFailedFill = readiness.build(
+  { fields: [field("f", "Email", "violetta@example.com", "email", { fillFailed: true, candidateConfirmed: true })], uploadFields: 0 },
+  { fields: [{ token: "f", action: "fill", value: "violetta@example.com" }] }
+);
+assert.equal(confirmedFailedFill.state, "clear");
+assert.equal(confirmedFailedFill.failedCount, 0);
+assert.equal(confirmedFailedFill.confirmedCount, 1);
+
 const blocked = readiness.build(
   { fields: [field("a", "Salary"), field("b", "Date of birth", "1990-01-01", "date")], uploadFields: 1 },
   { fields: [
@@ -54,6 +72,14 @@ assert.equal(blocked.blockedCount, 1);
 assert.equal(blocked.reviewCount, 1);
 assert.equal(blocked.failedCount, 0);
 assert.equal(blocked.cvCheckpoint.status, "check");
+
+const confirmedBlocked = readiness.build(
+  { fields: [field("b", "Date of birth", "1990-01-01", "date", { candidateConfirmed: true })], uploadFields: 0 },
+  { fields: [{ token: "b", action: "blocked", reason: "Sensitive field." }] }
+);
+assert.equal(confirmedBlocked.state, "clear");
+assert.equal(confirmedBlocked.blockedCount, 0);
+assert.equal(confirmedBlocked.confirmedCount, 1);
 
 const inserted = readiness.build(
   { fields: [], uploadFields: 1 },
