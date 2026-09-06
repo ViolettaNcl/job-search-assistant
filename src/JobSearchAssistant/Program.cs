@@ -2,6 +2,7 @@ using JobSearchAssistant.Data;
 using JobSearchAssistant.Domain;
 using JobSearchAssistant.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,10 +30,12 @@ builder.Services.AddHttpClient("remotive");
 builder.Services.AddHttpClient("adzuna");
 builder.Services.AddSingleton<SecretCipher>();
 builder.Services.AddSingleton<MatchScoringService>();
+builder.Services.AddSingleton<ApplicationDraftService>();
 builder.Services.AddScoped<HhClient>();
 builder.Services.AddScoped<RemotiveClient>();
 builder.Services.AddScoped<AdzunaClient>();
 builder.Services.AddScoped<JobService>();
+builder.Services.AddScoped<TailoredHhApplyService>();
 builder.Services.AddScoped<StatsService>();
 builder.Services.AddHostedService<VacancyCollectorWorker>();
 builder.Services.AddHostedService<TelegramBotWorker>();
@@ -53,6 +56,34 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", utc = DateTimeOffset.UtcNow, database = persistentDatabase ? "postgres" : "in-memory", persistent = persistentDatabase }));
+
+app.MapGet("/api/candidate", (IOptions<CandidateProfileOptions> options) =>
+{
+    var c = options.Value;
+    return Results.Ok(new
+    {
+        c.Name,
+        c.RussianName,
+        c.GreekName,
+        c.Email,
+        c.CurrentCountry,
+        c.CurrentCity,
+        c.GitHubUrl,
+        c.CvUrl,
+        c.EnglishCvFileName,
+        c.RussianCvFileName,
+        c.Education,
+        c.MainProjectUrl,
+        c.MainProjectSummary,
+        c.RussiaWorkAuthorized,
+        c.EuWorkAuthorized,
+        c.Citizenships,
+        c.FluentLanguages,
+        c.CoreSkills,
+        c.PreferredRoles,
+        c.EmploymentTypes
+    });
+});
 
 app.MapGet("/api/dashboard", async (AppDbContext db, StatsService stats, CancellationToken ct) =>
 {
@@ -123,7 +154,41 @@ app.MapGet("/api/vacancies", async (AppDbContext db, string? status, int? minSco
     return Results.Ok(items.ToList());
 });
 
-app.MapPost("/api/collect", async (JobService jobs, Microsoft.Extensions.Options.IOptions<SearchOptions> options, CancellationToken ct)
+app.MapGet("/api/vacancies/{id:guid}/application-draft", async (Guid id, AppDbContext db, ApplicationDraftService drafts, CancellationToken ct) =>
+{
+    var vacancy = await db.Vacancies.Include(x => x.Company).SingleOrDefaultAsync(x => x.Id == id, ct);
+    return vacancy is null ? Results.NotFound() : Results.Ok(drafts.Build(vacancy));
+});
+
+app.MapPost("/api/extension/analyze", (ExtensionAnalyzeRequest request, MatchScoringService scoring, ApplicationDraftService drafts) =>
+{
+    var result = scoring.Score(
+        request.Title ?? "",
+        request.Description ?? "",
+        request.Remote,
+        request.Experience ?? "",
+        request.Location ?? request.Country ?? "",
+        request.RemoteScope ?? "");
+
+    var draft = drafts.Build(
+        request.Title ?? "Unknown role",
+        request.Company ?? "the company",
+        request.Description ?? "",
+        request.Country ?? "",
+        request.Source ?? "browser",
+        result.Score,
+        result.Matched,
+        result.Missing);
+
+    return Results.Ok(new
+    {
+        match = result,
+        recommendation = result.Score >= 85 ? "Apply now" : result.Score >= 75 ? "Apply" : result.Score >= 65 ? "Review" : "Skip",
+        draft
+    });
+});
+
+app.MapPost("/api/collect", async (JobService jobs, IOptions<SearchOptions> options, CancellationToken ct)
     => Results.Ok(await jobs.CollectAsync(options.Value, ct)));
 
 app.MapPost("/api/import/hh", async (ManualImport request, JobService jobs, CancellationToken ct) =>
@@ -147,6 +212,12 @@ app.MapPost("/api/vacancies/{id:guid}/status", async (Guid id, StatusRequest req
 app.MapPost("/api/vacancies/{id:guid}/apply", async (Guid id, JobService jobs, CancellationToken ct) =>
 {
     var result = await jobs.ApplyAsync(id, ct);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
+app.MapPost("/api/vacancies/{id:guid}/apply-tailored", async (Guid id, TailoredHhApplyService apply, CancellationToken ct) =>
+{
+    var result = await apply.ApplyAsync(id, ct);
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
 });
 
@@ -198,3 +269,13 @@ public sealed record StatusRequest(string Status, string? Note);
 public sealed record BoolRequest(bool Value);
 public sealed record ResumeRequest(string ResumeId);
 public sealed record AutoApplyRequest(bool Enabled, int MinimumScore, int DailyLimit);
+public sealed record ExtensionAnalyzeRequest(
+    string? Title,
+    string? Company,
+    string? Description,
+    string? Country,
+    string? Location,
+    string? RemoteScope,
+    string? Experience,
+    string? Source,
+    bool Remote = true);

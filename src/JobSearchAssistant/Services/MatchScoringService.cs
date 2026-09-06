@@ -25,18 +25,15 @@ public sealed class MatchScoringService(IOptions<CandidateProfileOptions> candid
         ["Docker"] = 5,
         ["Git"] = 4,
         ["Unit Testing"] = 5,
+        ["Automated Testing"] = 5,
         ["MSTest"] = 4,
+        ["xUnit"] = 4,
         ["JavaScript"] = 4,
+        ["TypeScript"] = 4,
+        ["React"] = 4,
         ["SignalR"] = 3,
         ["JWT"] = 3
     };
-
-    private static readonly string[] CandidateSkills =
-    [
-        "C#", ".NET", "ASP.NET Core", "Entity Framework Core", "EF Core", "SQL Server", "SQL",
-        "REST API", "REST", "LINQ", "Docker", "Git", "Unit Testing", "MSTest", "JavaScript",
-        "SignalR", "JWT", "WPF", "XAML", "GitHub Actions"
-    ];
 
     private static readonly string[] GapSkills =
     ["RabbitMQ", "Kafka", "Kubernetes", "Redis", "Azure", "AWS", "gRPC", "Elasticsearch"];
@@ -59,7 +56,7 @@ public sealed class MatchScoringService(IOptions<CandidateProfileOptions> candid
 
         foreach (var gap in GapSkills)
         {
-            if (Contains(haystack, gap) && !CandidateSkills.Contains(gap, StringComparer.OrdinalIgnoreCase))
+            if (Contains(haystack, gap) && !_candidate.CoreSkills.Contains(gap, StringComparer.OrdinalIgnoreCase))
             {
                 missing.Add(gap);
                 score -= 3;
@@ -71,6 +68,9 @@ public sealed class MatchScoringService(IOptions<CandidateProfileOptions> candid
             score += 10;
         if (lowerTitle.Contains("intern") || lowerTitle.Contains("trainee") || lowerTitle.Contains("стажер") || lowerTitle.Contains("стажёр") || lowerTitle.Contains("стажиров"))
             score += 14;
+        if (lowerTitle.Contains("associate software") || lowerTitle.Contains("начинающ")) score += 8;
+        if (lowerTitle.Contains("qa") || lowerTitle.Contains("tester") || lowerTitle.Contains("тестиров")) score += 4;
+        if (lowerTitle.Contains("implementation") || lowerTitle.Contains("application support") || lowerTitle.Contains("technical support")) score += 3;
         if (lowerTitle.Contains("contractor") || lowerTitle.Contains("b2b") || lowerTitle.Contains("freelance") || lowerTitle.Contains("фриланс"))
             score += 4;
         if (remote) score += 7;
@@ -93,36 +93,41 @@ public sealed class MatchScoringService(IOptions<CandidateProfileOptions> candid
         score = Math.Clamp(score, 0, 100);
         var level = score >= 85 ? "Strong Match" : score >= 65 ? "Apply" : score >= 50 ? "Stretch" : "Skip";
         var why = matched.Count == 0
-            ? "Мало прямых совпадений с основным C#/.NET стеком."
-            : $"Совпадают: {string.Join(", ", matched.Take(7))}." +
-              (missing.Count > 0 ? $" Дополнительно требуют: {string.Join(", ", missing)}." : "");
+            ? "Few direct matches with Violetta's current technical stack."
+            : $"Matched: {string.Join(", ", matched.Take(7))}." +
+              (missing.Count > 0 ? $" Gaps to verify: {string.Join(", ", missing)}." : "");
 
         return new MatchResult(score, level, matched.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), missing.ToArray(), why, eligibility.Status, eligibility.Reason);
     }
 
     private (string Status, string Reason) EvaluateEligibility(string text, bool remote, string location, string remoteScope)
     {
+        if (!remote) return ("Likely ineligible", "Current search profile is remote-only.");
+
         var l = $"{text} {location} {remoteScope}".ToLowerInvariant();
         var worldwide = l.Contains("worldwide") || l.Contains("anywhere") || l.Contains("global remote") || l.Contains("work from anywhere");
         var contractor = l.Contains("international contractor") || l.Contains("independent contractor") || l.Contains("contractor worldwide") || l.Contains("b2b") || l.Contains("freelance");
         var russia = l.Contains("russia") || l.Contains("росси");
-        var emea = l.Contains("emea") || l.Contains("europe") || l.Contains("european time") || l.Contains("utc+") || l.Contains("utc-");
+        var eu = l.Contains("eu only") || l.Contains("european union") || l.Contains("eu citizen") || l.Contains("right to work in the eu") || l.Contains("must be based in the eu");
+        var europe = eu || l.Contains("emea") || l.Contains("europe") || l.Contains("european time") || l.Contains("cyprus") || l.Contains("greece") || l.Contains("poland") || l.Contains("czech") || l.Contains("romania") || l.Contains("bulgaria") || l.Contains("portugal") || l.Contains("spain") || l.Contains("germany") || l.Contains("netherlands") || l.Contains("ireland") || l.Contains("malta") || l.Contains("estonia") || l.Contains("latvia") || l.Contains("lithuania");
         var sponsorship = l.Contains("visa sponsorship") || l.Contains("sponsor visa") || l.Contains("relocation support") || l.Contains("relocation package");
         var noSponsorship = l.Contains("no sponsorship") || l.Contains("cannot sponsor") || l.Contains("unable to sponsor") || l.Contains("without sponsorship");
         var usOnly = l.Contains("us only") || l.Contains("u.s. only") || l.Contains("must be based in the us") || l.Contains("must be located in the united states") || l.Contains("authorized to work in the united states") || l.Contains("us work authorization");
         var ukOnly = l.Contains("uk only") || l.Contains("must be based in the uk") || l.Contains("right to work in the uk");
-        var euOnly = l.Contains("eu only") || l.Contains("european union only") || l.Contains("must be based in the eu");
 
-        if (!remote) return ("Likely ineligible", "Система настроена только на удалённую работу (Remote Only).");
-        if (russia && _candidate.CurrentCountry.Equals("Russia", StringComparison.OrdinalIgnoreCase)) return ("Eligible", "Удалённая вакансия для РФ.");
-        if (worldwide) return ("Eligible", "Remote worldwide / anywhere — хороший международный вариант.");
-        if (contractor) return ("Eligible", "Есть признаки international contractor / B2B / freelance формата.");
-        if (sponsorship && _candidate.OpenToRelocationWithVisaSponsorship) return ("Eligible", "Упомянуты visa sponsorship или relocation support.");
-        if ((usOnly || ukOnly || euOnly) && !sponsorship) return ("Likely ineligible", "Вакансия ограничена локальным правом на работу/локацией; проверьте условия перед откликом.");
-        if (noSponsorship && !worldwide && !_candidate.CurrentCountry.Equals(location, StringComparison.OrdinalIgnoreCase)) return ("Likely ineligible", "Работодатель явно не предоставляет sponsorship, а роль не обозначена как worldwide.");
-        if (remote && (emea || string.IsNullOrWhiteSpace(remoteScope))) return ("Verify", "Remote-вакансия: нужно проверить список стран, из которых компания может нанимать.");
-        if (remote) return ("Verify", "Удалённая роль, но географические ограничения найма нужно проверить.");
-        return ("Likely ineligible", "Система настроена только на Remote Only.");
+        if (russia && _candidate.RussiaWorkAuthorized)
+            return ("Eligible", "Russian citizen / work-authorized for Russia.");
+        if (eu && _candidate.EuWorkAuthorized)
+            return ("Eligible", "EU/Cyprus work authorization matches this role.");
+        if (europe && _candidate.EuWorkAuthorized && !usOnly && !ukOnly)
+            return ("Eligible", "European role; Violetta has EU work authorization. Confirm any country-residency/payroll restriction.");
+        if (worldwide) return ("Eligible", "Remote worldwide / anywhere.");
+        if (contractor) return ("Eligible", "International contractor / B2B / freelance format detected.");
+        if (sponsorship && _candidate.OpenToRelocationWithVisaSponsorship) return ("Eligible", "Visa sponsorship or relocation support is mentioned.");
+        if (usOnly || ukOnly) return ("Likely ineligible", "Role appears restricted to US/UK work authorization or location.");
+        if (noSponsorship && !worldwide && !russia && !europe)
+            return ("Likely ineligible", "Employer does not sponsor and the vacancy is not clearly within Violetta's work-authorized markets.");
+        return ("Verify", "Remote role; verify the exact countries from which the employer can hire/payroll.");
     }
 
     private static bool Contains(string text, string token)

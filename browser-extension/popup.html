@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Violetta Apply Assistant</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Violetta Apply Assistant</h1>
+        <p>Analyze → tailor → fill. HH can also submit through its official API.</p>
+      </div>
+      <span id="statusDot" class="dot"></span>
+    </header>
+
+    <label class="small" for="apiBase">Backend URL</label>
+    <div class="row">
+      <input id="apiBase" value="http://localhost:8080" />
+      <button id="saveApi" class="secondary">Save</button>
+    </div>
+
+    <button id="analyze" class="primary full">Analyze this vacancy</button>
+
+    <section id="result" class="hidden">
+      <div class="scoreRow">
+        <div>
+          <span class="small">Fit score</span>
+          <strong id="score">—</strong>
+        </div>
+        <div class="right">
+          <span class="small">Recommendation</span>
+          <strong id="recommendation">—</strong>
+        </div>
+      </div>
+
+      <h2 id="headline"></h2>
+      <p id="matchWhy" class="muted"></p>
+
+      <div class="chips" id="matched"></div>
+      <div class="chips warning" id="missing"></div>
+
+      <label class="small" for="coverLetter">Tailored cover letter</label>
+      <textarea id="coverLetter" rows="12"></textarea>
+
+      <div class="grid">
+        <button id="copyLetter" class="secondary">Copy letter</button>
+        <button id="fillForm" class="primary">Fill application</button>
+      </div>
+
+      <button id="applyHh" class="primary full hidden">Apply on HH via official API</button>
+
+      <p id="fillNote" class="note">External sites: review the filled form before submitting. HH: the dedicated button can submit directly after an explicit confirmation when HH OAuth and a resume are configured.</p>
+    </section>
+
+    <p id="error" class="error hidden"></p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
