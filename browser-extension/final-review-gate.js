@@ -8,7 +8,7 @@
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
   }
 
-  function evaluate(readiness, submitControl = null) {
+  function evaluate(readiness, submitControl = null, options = {}) {
     if (!readiness) {
       return { state: "not-analyzed", title: "Analyze the application first", canLocateSubmit: false, canConfirmReview: false };
     }
@@ -24,12 +24,13 @@
     }
 
     const cvStatus = readiness.cvCheckpoint?.status || "unknown";
-    if (cvStatus === "check") {
+    if (cvStatus === "check" && options.attachmentVerified !== true) {
       return {
         state: "attachment-review",
         title: "Verify the CV attachment before final review",
         canLocateSubmit: false,
-        canConfirmReview: false
+        canConfirmReview: false,
+        canConfirmAttachment: true
       };
     }
 
