@@ -70,7 +70,7 @@ public sealed class OutcomeAnalyticsService(AppDbContext db)
             .ToList();
     }
 
-    internal static OutcomeSegment Segment(string key, string label, IEnumerable<Vacancy> rows)
+    public static OutcomeSegment Segment(string key, string label, IEnumerable<Vacancy> rows)
     {
         var list = rows.ToList();
         var applications = list.Count;
@@ -92,7 +92,7 @@ public sealed class OutcomeAnalyticsService(AppDbContext db)
             Rate(offers, applications));
     }
 
-    internal static bool HasResponse(VacancyStatus status)
+    public static bool HasResponse(VacancyStatus status)
         => status is VacancyStatus.HrContact
             or VacancyStatus.HrInterview
             or VacancyStatus.TechInterview
@@ -100,13 +100,13 @@ public sealed class OutcomeAnalyticsService(AppDbContext db)
             or VacancyStatus.Rejected
             or VacancyStatus.Offer;
 
-    internal static bool HasInterview(VacancyStatus status)
+    public static bool HasInterview(VacancyStatus status)
         => status is VacancyStatus.HrInterview
             or VacancyStatus.TechInterview
             or VacancyStatus.TestTask
             or VacancyStatus.Offer;
 
-    internal static string ScoreBand(Vacancy vacancy)
+    public static string ScoreBand(Vacancy vacancy)
         => vacancy.MatchScore switch
         {
             >= 90 => "90-100",
@@ -126,7 +126,7 @@ public sealed class OutcomeAnalyticsService(AppDbContext db)
             _ => "Below 65"
         };
 
-    internal static string CvKey(Vacancy vacancy)
+    public static string CvKey(Vacancy vacancy)
     {
         var resume = vacancy.Application?.ResumeExternalId?.Trim() ?? "";
         if (resume.StartsWith("external/", StringComparison.OrdinalIgnoreCase))
