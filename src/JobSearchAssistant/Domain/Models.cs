@@ -106,7 +106,7 @@ public sealed class AppState
 public sealed record CandidateProfileOptions
 {
     public string Name { get; init; } = "Violetta Nicolaou";
-    public string RussianName { get; init; } = "Виолетта Николау";
+    public string RussianName { get; init; } = "Виолетта Николаевна";
     public string GreekName { get; init; } = "Βιολέττα Νικολάου";
     public string Email { get; init; } = "violettanicolaou@gmail.com";
     public string Phone { get; init; } = "";

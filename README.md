@@ -210,7 +210,7 @@ Tests cover vacancy scoring, application queue ordering, rich browser import, sa
 
 ## Deployment
 
-The repository contains `vercel.json` and `Dockerfile.vercel` for Vercel Container Services. The app can start in in-memory demo mode without PostgreSQL, but **do not use the in-memory fallback for real application history**, because container restarts can erase it.
+The repository contains `vercel.json` and `Dockerfile.vercel` for Vercel Container Services. The app uses persistent local SQLite when PostgreSQL is not configured. On container hosting, configure PostgreSQL or a persistent volume for SQLite; an ephemeral container filesystem cannot preserve application history across replacements.
 
 Persistent PostgreSQL startup applies registered EF migrations automatically. The container exposes `/health/live` and database-aware `/health/ready`; Docker health checks use readiness. For persistent production use, configure PostgreSQL and the relevant HH/Telegram secrets through environment variables. Never commit access tokens, bot tokens or encryption keys to the repository.
 

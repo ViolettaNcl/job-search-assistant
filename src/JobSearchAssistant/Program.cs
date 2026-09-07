@@ -109,8 +109,7 @@ app.MapGet("/api/dashboard", async (AppDbContext db, StatsService stats, Cancell
     var state = await db.AppStates.SingleAsync(x => x.Id == 1, ct);
     var bestRows = await db.Vacancies.Include(x => x.Company)
         .Where(x => x.Status == VacancyStatus.New && !x.Company.IsBlacklisted && x.IsRemote)
-        .OrderByDescending(x => x.MatchScore).ThenByDescending(x => x.PublishedAt)
-        .Take(100).ToListAsync(ct);
+        .RankedAsync(100, ct);
 
     var best = bestRows.Select(x => new
     {
@@ -124,7 +123,7 @@ app.MapGet("/api/dashboard", async (AppDbContext db, StatsService stats, Cancell
 
     var pipelineRows = await db.Vacancies.Include(x => x.Company)
         .Where(x => x.Status == VacancyStatus.Applied || x.Status == VacancyStatus.HrContact || x.Status == VacancyStatus.HrInterview || x.Status == VacancyStatus.TechInterview || x.Status == VacancyStatus.TestTask || x.Status == VacancyStatus.Offer)
-        .OrderByDescending(x => x.UpdatedAt).Take(50).ToListAsync(ct);
+        .RecentAsync(50, ct);
     var pipeline = pipelineRows.Select(x => new
     {
         x.Id, x.Title, company = x.Company.Name, x.Url, status = x.Status.ToString(), x.UpdatedAt,
@@ -166,7 +165,9 @@ app.MapGet("/api/vacancies", async (AppDbContext db, string? status, int? minSco
     if (Enum.TryParse<VacancyStatus>(status, true, out var parsed)) q = q.Where(x => x.Status == parsed);
     if (minScore.HasValue) q = q.Where(x => x.MatchScore >= minScore.Value);
     q = q.Where(x => x.IsRemote);
-    var rows = await q.OrderByDescending(x => x.UpdatedAt).Take(300).ToListAsync(ct);
+    var rows = await q.RecentAsync(300, ct, x =>
+        (string.IsNullOrWhiteSpace(market) || VacancyClassifier.Market(x).Equals(market, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(type) || VacancyClassifier.OpportunityType(x).Equals(type, StringComparison.OrdinalIgnoreCase)));
 
     var items = rows.Select(x => new
     {
@@ -177,8 +178,6 @@ app.MapGet("/api/vacancies", async (AppDbContext db, string? status, int? minSco
         market = VacancyClassifier.Market(x), marketLabel = VacancyClassifier.MarketLabel(VacancyClassifier.Market(x)),
         opportunityType = VacancyClassifier.OpportunityType(x), opportunityTypeLabel = VacancyClassifier.TypeLabel(VacancyClassifier.OpportunityType(x))
     });
-    if (!string.IsNullOrWhiteSpace(market)) items = items.Where(x => x.market.Equals(market, StringComparison.OrdinalIgnoreCase));
-    if (!string.IsNullOrWhiteSpace(type)) items = items.Where(x => x.opportunityType.Equals(type, StringComparison.OrdinalIgnoreCase));
     return Results.Ok(items.ToList());
 });
 

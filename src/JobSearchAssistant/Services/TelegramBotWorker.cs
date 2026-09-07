@@ -127,8 +127,8 @@ public sealed class TelegramBotWorker(
         if (text.StartsWith("/today") || text.StartsWith("/best"))
         {
             var q = db.Vacancies.Include(x => x.Company).Where(x => x.Status == VacancyStatus.New && !x.Company.IsBlacklisted);
-            if (text.StartsWith("/today")) q = q.Where(x => x.FirstSeenAt >= DateTimeOffset.UtcNow.AddDays(-1));
-            var list = await q.OrderByDescending(x => x.MatchScore).ThenByDescending(x => x.PublishedAt).Take(10).ToListAsync(ct);
+            var since = text.StartsWith("/today") ? DateTimeOffset.UtcNow.AddDays(-1) : (DateTimeOffset?)null;
+            var list = await q.RankedAsync(10, ct, firstSeenSince: since);
             if (list.Count == 0) { await SendAsync(chatId, "Подходящих новых вакансий пока нет.", null, ct); return; }
             foreach (var v in list) await SendVacancyAsync(chatId, v, ct);
             return;
@@ -137,7 +137,7 @@ public sealed class TelegramBotWorker(
         {
             var list = await db.Vacancies.Include(x => x.Company)
                 .Where(x => x.Status == VacancyStatus.New && x.Source == "hh" && x.IsRemote && !x.Company.IsBlacklisted)
-                .OrderByDescending(x => x.MatchScore).ThenByDescending(x => x.PublishedAt).Take(12).ToListAsync(ct);
+                .RankedAsync(12, ct);
             if (list.Count == 0) { await SendAsync(chatId, "Удалённых вакансий по РФ пока нет. Запустите сбор.", null, ct); return; }
             foreach (var v in list) await SendVacancyAsync(chatId, v, ct);
             return;
@@ -146,17 +146,16 @@ public sealed class TelegramBotWorker(
         {
             var list = await db.Vacancies.Include(x => x.Company)
                 .Where(x => x.Status == VacancyStatus.New && x.Source != "hh" && x.IsRemote && !x.Company.IsBlacklisted)
-                .OrderByDescending(x => x.MatchScore).ThenByDescending(x => x.PublishedAt).Take(12).ToListAsync(ct);
+                .RankedAsync(12, ct);
             if (list.Count == 0) { await SendAsync(chatId, "Международных remote-вакансий пока нет. Запустите сбор или включите Adzuna.", null, ct); return; }
             foreach (var v in list) await SendVacancyAsync(chatId, v, ct);
             return;
         }
         if (text.StartsWith("/internships"))
         {
-            var candidates = await db.Vacancies.Include(x => x.Company)
+            var list = await db.Vacancies.Include(x => x.Company)
                 .Where(x => x.Status == VacancyStatus.New && x.IsRemote && !x.Company.IsBlacklisted)
-                .OrderByDescending(x => x.MatchScore).ThenByDescending(x => x.PublishedAt).Take(200).ToListAsync(ct);
-            var list = candidates.Where(x => VacancyClassifier.OpportunityType(x) == VacancyClassifier.TypeInternship).Take(12).ToList();
+                .RankedAsync(12, ct, filter: x => VacancyClassifier.OpportunityType(x) == VacancyClassifier.TypeInternship);
             if (list.Count == 0) { await SendAsync(chatId, "Удалённых C#/.NET стажировок пока нет.", null, ct); return; }
             foreach (var v in list) await SendVacancyAsync(chatId, v, ct);
             return;
@@ -170,7 +169,7 @@ public sealed class TelegramBotWorker(
         }
         if (text.StartsWith("/applied"))
         {
-            var list = await db.Vacancies.Include(x => x.Company).Where(x => x.Status == VacancyStatus.Applied).OrderByDescending(x => x.UpdatedAt).Take(10).ToListAsync(ct);
+            var list = await db.Vacancies.Include(x => x.Company).Where(x => x.Status == VacancyStatus.Applied).RecentAsync(10, ct);
             if (list.Count == 0) { await SendAsync(chatId, "Откликов пока нет.", null, ct); return; }
             foreach (var v in list) await SendPipelineCardAsync(chatId, v, ct);
             return;
@@ -189,7 +188,7 @@ public sealed class TelegramBotWorker(
         }
         if (text.StartsWith("/interviews"))
         {
-            var list = await db.Vacancies.Include(x => x.Company).Where(x => x.Status == VacancyStatus.HrContact || x.Status == VacancyStatus.HrInterview || x.Status == VacancyStatus.TechInterview || x.Status == VacancyStatus.TestTask).OrderByDescending(x => x.UpdatedAt).Take(10).ToListAsync(ct);
+            var list = await db.Vacancies.Include(x => x.Company).Where(x => x.Status == VacancyStatus.HrContact || x.Status == VacancyStatus.HrInterview || x.Status == VacancyStatus.TechInterview || x.Status == VacancyStatus.TestTask).RecentAsync(10, ct);
             if (list.Count == 0) { await SendAsync(chatId, "Активных интервью/тестовых пока нет.", null, ct); return; }
             foreach (var v in list) await SendPipelineCardAsync(chatId, v, ct);
             return;

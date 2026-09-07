@@ -339,14 +339,13 @@ public sealed class JobService(
     {
         if (string.IsNullOrWhiteSpace(state.HhResumeId)) return;
         var today = new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero);
-        var alreadyToday = await db.Applications.CountAsync(x => x.AppliedAt >= today, ct);
+        var alreadyToday = await db.Applications.CountAppliedSinceAsync(today, ct);
         var available = Math.Max(0, state.DailyAutoApplyLimit - alreadyToday);
         if (available == 0) return;
 
         var candidates = await db.Vacancies.Include(x => x.Company).Include(x => x.Application)
             .Where(x => x.Source == "hh" && x.Status == VacancyStatus.New && x.Application == null && !x.Company.IsBlacklisted && x.MatchScore >= state.AutoApplyMinimumScore)
-            .OrderByDescending(x => x.MatchScore).ThenByDescending(x => x.PublishedAt)
-            .Take(available).ToListAsync(ct);
+            .RankedAsync(available, ct);
 
         foreach (var vacancy in candidates)
         {
