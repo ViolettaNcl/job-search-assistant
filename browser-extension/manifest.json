@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "2.4.2",
-  "description": "Prepare and review applications safely with reusable contacts, verified submissions, SQLite-compatible ranked queue continuation, follow-ups, and persistent Windows history.",
+  "version": "2.5.0",
+  "description": "Analyze, tailor and submit employer-site applications with local CV insertion, safe-field review, Russian/EU job support, and persistent application tracking.",
   "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
   "background": {
@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "matches": ["https://*/*", "http://*/*"],
-      "js": ["ats-structured.js", "ats-controls.js", "field-verification.js", "content.js", "cv-upload.js", "review-navigator-content.js", "final-submit-control.js", "final-submit-locator.js", "submission-receipt.js", "submission-receipt-content.js"],
+      "js": ["ats-structured.js", "ats-controls.js", "field-verification.js", "content.js", "cv-upload.js", "site-apply.js", "review-navigator-content.js", "final-submit-control.js", "final-submit-locator.js", "submission-receipt.js", "submission-receipt-content.js"],
       "run_at": "document_idle"
     }
   ]
