@@ -6,9 +6,9 @@
   button.replaceWith(replacement);
   replacement.id = 'connectHh';
   replacement.textContent = 'HH.ru website apply enabled';
-  replacement.title = 'The local bundle uses the HH.ru website flow. Official HH API OAuth is optional and requires separate developer credentials.';
+  replacement.title = 'The local bundle uses the normal HH.ru website flow. Official HH API OAuth is not required.';
   replacement.addEventListener('click', () => {
-    window.alert('HH.ru website application mode is enabled. Open an HH.ru vacancy and use “Apply now — site + CV + letter”. Official HH API authorization is optional and is not required for normal applications.');
+    window.alert('HH.ru website application mode is enabled. Open an HH.ru vacancy and use “Apply + send now”. No HH OAuth connection is required.');
   });
 
   function patch() {

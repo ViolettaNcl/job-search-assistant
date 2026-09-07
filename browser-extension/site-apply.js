@@ -12,6 +12,12 @@
     catch { return null; }
   }
 
+  function isHhUrl(value) {
+    const parsed = safeUrl(value);
+    const host = (parsed?.hostname || "").toLowerCase();
+    return host === "hh.ru" || host.endsWith(".hh.ru");
+  }
+
   function hostFamily(value) {
     const parsed = safeUrl(value);
     const host = (parsed?.hostname || "").toLowerCase();
@@ -134,6 +140,40 @@
     return { found: true, ambiguous: false, count: 1, candidate: ties[0] };
   }
 
+  function normalizeResumeHint(value) {
+    return clean(value).toLowerCase().replace(/\.pdf$/i, "").replace(/[_-]+/g, " ");
+  }
+
+  function chooseHhResumeChoice(candidates = [], preferredLabel = "") {
+    const usable = candidates.filter(item => item && !item.metadata?.disabled);
+    if (!usable.length) return { found: false, ambiguous: false, count: 0 };
+
+    const selected = usable.filter(item => item.metadata?.selected === true);
+    if (selected.length === 1) return { found: true, ambiguous: false, count: 1, candidate: selected[0], reason: "already-selected" };
+    if (selected.length > 1) return { found: false, ambiguous: true, count: selected.length, reason: "multiple-selected" };
+    if (usable.length === 1) return { found: true, ambiguous: false, count: 1, candidate: usable[0], reason: "single-resume" };
+
+    const preferred = normalizeResumeHint(preferredLabel);
+    if (preferred) {
+      const preferredTokens = preferred.split(/\s+/).filter(token => token.length >= 3);
+      const ranked = usable.map((item, index) => {
+        const label = normalizeResumeHint(item.label);
+        let score = label === preferred ? 100 : 0;
+        if (!score && label && (label.includes(preferred) || preferred.includes(label))) score = 70;
+        if (!score && preferredTokens.length) {
+          const matches = preferredTokens.filter(token => label.includes(token)).length;
+          score = Math.round(50 * (matches / preferredTokens.length));
+        }
+        return { ...item, index, score };
+      }).sort((a, b) => b.score - a.score || a.index - b.index);
+      const best = ranked[0];
+      const ties = ranked.filter(item => item.score === best.score);
+      if (best.score >= 35 && ties.length === 1) return { found: true, ambiguous: false, count: 1, candidate: best, reason: "preferred-match" };
+    }
+
+    return { found: false, ambiguous: true, count: usable.length, labels: usable.slice(0, 5).map(item => clean(item.label)), reason: "resume-choice-required" };
+  }
+
   function unresolvedRequired(fields = []) {
     const checkedRadioGroups = new Set(fields.filter(field => field?.type === "radio" && field.checked).map(field => clean(field.group)));
     return fields.filter(field => {
@@ -155,5 +195,5 @@
     return { ok: true, reason: "ready" };
   }
 
-  return { clean, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, scoreCoverLetterField, chooseCoverLetterField, unresolvedRequired, canSubmit };
+  return { clean, safeUrl, isHhUrl, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, scoreCoverLetterField, chooseCoverLetterField, chooseHhResumeChoice, unresolvedRequired, canSubmit };
 });

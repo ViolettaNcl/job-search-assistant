@@ -15,6 +15,40 @@ start = apply.chooseStartAction([
 assert.equal(start.found, true);
 assert.equal(start.candidate.label, 'Apply now');
 
+assert.equal(apply.isHhUrl('https://hh.ru/vacancy/123'), true);
+assert.equal(apply.isHhUrl('https://spb.hh.ru/vacancy/123'), true);
+assert.equal(apply.isHhUrl('https://career.habr.com/vacancies/123'), false);
+
+let hhResume = apply.chooseHhResumeChoice([
+  { label: 'Java Developer', metadata: { selected: false } },
+  { label: 'Junior Fullstack Developer', metadata: { selected: true } }
+]);
+assert.equal(hhResume.found, true);
+assert.equal(hhResume.candidate.label, 'Junior Fullstack Developer');
+assert.equal(hhResume.reason, 'already-selected');
+
+hhResume = apply.chooseHhResumeChoice([
+  { label: 'Junior Fullstack Developer', metadata: { selected: false } }
+]);
+assert.equal(hhResume.found, true);
+assert.equal(hhResume.reason, 'single-resume');
+
+hhResume = apply.chooseHhResumeChoice([
+  { label: 'Backend Java Engineer', metadata: { selected: false } },
+  { label: 'Junior Fullstack Developer', metadata: { selected: false } }
+], 'Junior Fullstack Developer.pdf');
+assert.equal(hhResume.found, true);
+assert.equal(hhResume.candidate.label, 'Junior Fullstack Developer');
+assert.equal(hhResume.reason, 'preferred-match');
+
+hhResume = apply.chooseHhResumeChoice([
+  { label: 'Backend Java Engineer', metadata: { selected: false } },
+  { label: 'QA Engineer', metadata: { selected: false } }
+]);
+assert.equal(hhResume.found, false);
+assert.equal(hhResume.ambiguous, true);
+assert.equal(hhResume.reason, 'resume-choice-required');
+
 const letter = apply.chooseCoverLetterField([
   { label: 'Expected salary', metadata: { textarea: false } },
   { label: 'Сопроводительное письмо', metadata: { textarea: true } }

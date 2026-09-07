@@ -6,7 +6,8 @@ function vjaEnsureSiteApplyButton() {
   button = document.createElement("button");
   button.id = "siteApplyNow";
   button.className = "primary full";
-  button.textContent = "Apply now — site + CV + letter";
+  button.textContent = "Apply + send now";
+  button.title = "Clicking this button is the confirmation to open the employer response, fill the tailored letter, select/attach the resume and submit when the form is clear.";
   anchor.insertAdjacentElement("beforebegin", button);
   return button;
 }
@@ -34,8 +35,11 @@ function vjaSiteApplyReason(result) {
     return names.length ? `Required fields still need you: ${names.join(", ")}.` : "Required fields still need your review before submission.";
   }
   if (reason === "cv-not-uploaded") return "The site exposes a CV upload field, but the CV could not be attached automatically.";
+  if (reason === "cover-letter-not-persisted") return "The tailored cover letter did not stay in the employer form, so the assistant stopped before Send.";
+  if (reason === "hh-resume-choice-required") return "HH.ru shows several resumes and none is selected. Select the resume once, then press Apply + send now again.";
+  if (reason === "hh-resume-selection-not-persisted") return "HH.ru did not keep the selected resume. Select the resume once, then press Apply + send now again.";
   if (reason === "application-ui-not-found") return "The Apply action did not open a recognizable application form. The assistant stopped before any final click.";
-  if (reason === "final-action-not-found") return "The application was filled, but no safe final Submit/Откликнуться action was found.";
+  if (reason === "final-action-not-found") return "The application was filled, but no safe final Send/Submit/Откликнуться action was found.";
   if (reason === "final-action-ambiguous") return "Several possible final submission buttons were found. The assistant stopped instead of clicking the wrong one.";
   return reason || "The site needs a manual review before it can be submitted safely.";
 }
@@ -44,19 +48,20 @@ async function vjaHandleSiteApplyResult(envelope, cvName = "") {
   const result = envelope?.result || envelope || {};
   const note = $("fillNote");
   if (result.submitted && result.status === "confirmed") {
-    const recorded = await vjaRecordConfirmedSiteApply(envelope, cvName || result?.cvResult?.filename || "");
+    const resumeLabel = result.resumeLabel || cvName || result?.cvResult?.filename || "";
+    const recorded = await vjaRecordConfirmedSiteApply(envelope, resumeLabel);
     if (note) note.textContent = recorded
-      ? "Application submitted on the employer site with the prepared data and recorded as Applied."
+      ? "Application submitted with the tailored letter and selected resume/CV, then recorded as Applied."
       : "Application submitted on the employer site. The local tracker could not be updated automatically.";
     const button = $("siteApplyNow");
     if (button) {
-      button.textContent = "Applied on site ✓";
+      button.textContent = "Applied ✓";
       button.disabled = true;
     }
     return;
   }
   if (result.status === "clicked-unverified" || result.status === "verification-needed") {
-    if (note) note.textContent = "The employer's final action was clicked, but the site did not expose a reliable confirmation signal. Check the page once before recording it as Applied.";
+    if (note) note.textContent = "The employer's final Send action was clicked, but the site did not expose a reliable confirmation signal. Check the page once before recording it as Applied.";
     return;
   }
   if (result.status === "needs-review") {
@@ -70,29 +75,37 @@ async function vjaApplyNowOnSite() {
   clearError();
   if (!latest || !latestPage?.url) return showError("Analyze the vacancy first.");
 
-  if (Number(latest.match?.score || 0) < 65) {
-    const proceed = window.confirm(`This vacancy is currently scored ${latest.match?.score || 0}/100 (${latest.recommendation || "low fit"}).\n\nSubmit anyway?`);
+  const fit = Number(latest.match?.score || 0);
+  if (fit < 65) {
+    const proceed = window.confirm(`This vacancy is currently scored ${fit}/100 (${latest.recommendation || "low fit"}).\n\nSubmit anyway?`);
     if (!proceed) return;
   }
 
+  const hhWebsite = Boolean(window.vjaSiteApply?.isHhUrl?.(latestPage.url)) || isHhVacancy(latestPage.url);
   const language = latest.draft?.language === "ru" ? "ru" : "en";
-  const cvKey = language === "ru" ? "cvVaultRu" : "cvVaultEn";
-  const stored = await chrome.storage.local.get(cvKey);
-  const fileData = stored[cvKey];
-  if (!fileData?.base64) {
-    showError(`${language === "ru" ? "Russian" : "English"} CV is not stored in the CV Vault yet.`);
-    await chrome.runtime.openOptionsPage();
-    return;
-  }
+  const cvKey = hhWebsite ? "" : (language === "ru" ? "cvVaultRu" : "cvVaultEn");
+  let fileData = null;
 
-  const confirmed = window.confirm(`Apply on this employer site now?\n\n${latestPage.title || "Vacancy"}\nFit: ${latest.match?.score || 0}/100\n\nThe assistant will click Apply/Откликнуться, attach ${fileData.name}, fill the tailored cover letter when the site provides a field, and click the final submission action only when required fields are clear.`);
-  if (!confirmed) return;
+  if (!hhWebsite) {
+    const stored = await chrome.storage.local.get(cvKey);
+    fileData = stored[cvKey];
+    if (!fileData?.base64) {
+      showError(`${language === "ru" ? "Russian" : "English"} CV is not stored in the CV Vault yet.`);
+      await chrome.runtime.openOptionsPage();
+      return;
+    }
+  }
 
   const button = vjaEnsureSiteApplyButton();
   if (button) {
     button.disabled = true;
-    button.textContent = "Applying…";
+    button.textContent = hhWebsite ? "Sending on HH…" : "Applying…";
   }
+
+  const note = $("fillNote");
+  if (note) note.textContent = hhWebsite
+    ? "Opening HH response, filling the tailored cover letter, using the selected HH account resume and pressing Send…"
+    : `Opening the application, attaching ${fileData?.name || "the recommended CV"}, filling the tailored cover letter and submitting…`;
 
   let trackedId = latestTrackedId || "";
   try { trackedId = await ensureTracked(); } catch { }
@@ -107,6 +120,8 @@ async function vjaApplyNowOnSite() {
     jobTitle: latestPage.title || latest?.draft?.title || '',
     coverLetter: $("coverLetter")?.value || latest.draft?.coverLetter || "",
     cvKey,
+    resumeHint: latest.draft?.recommendedCv || "",
+    siteKind: hhWebsite ? "hh" : "generic",
     createdAt: Date.now(),
     expiresAt: Date.now() + 10 * 60 * 1000,
     finalClicked: false
@@ -114,16 +129,16 @@ async function vjaApplyNowOnSite() {
   await chrome.storage.local.set({ vjaPendingSiteApply: pending });
 
   try {
-    const result = await sendToPage({ type: "siteApplyNow", plan: { ...pending, fileData } });
+    const plan = fileData ? { ...pending, fileData } : pending;
+    const result = await sendToPage({ type: "siteApplyNow", plan });
     const envelope = { id: pending.id, trackedId, sourceUrl: pending.sourceUrl, result };
-    await vjaHandleSiteApplyResult(envelope, fileData.name);
+    await vjaHandleSiteApplyResult(envelope, result?.resumeLabel || fileData?.name || "");
   } catch (error) {
-    const note = $("fillNote");
     if (note) note.textContent = "Application flow started. If the employer site navigated to a new step, the extension will resume there automatically.";
   } finally {
     if (button && !button.textContent.includes("Applied")) {
       button.disabled = false;
-      button.textContent = "Apply now — site + CV + letter";
+      button.textContent = "Apply + send now";
     }
   }
 }
@@ -132,10 +147,7 @@ async function vjaRestoreSiteApplyResult() {
   const stored = await chrome.storage.local.get("vjaSiteApplyResult");
   const envelope = stored.vjaSiteApplyResult;
   if (!envelope || Date.now() - Number(envelope.createdAt || 0) > 15 * 60 * 1000) return;
-  const language = latest?.draft?.language === "ru" ? "ru" : "en";
-  const cvKey = language === "ru" ? "cvVaultRu" : "cvVaultEn";
-  const cvStored = await chrome.storage.local.get(cvKey);
-  await vjaHandleSiteApplyResult(envelope, cvStored[cvKey]?.name || "");
+  await vjaHandleSiteApplyResult(envelope, envelope?.result?.resumeLabel || envelope?.result?.cvResult?.filename || "");
 }
 
 const vjaSiteApplyButton = vjaEnsureSiteApplyButton();
@@ -153,7 +165,7 @@ function vjaPreferWebsiteApplyForHh() {
   const button = $("applyHh");
   if (!button) return;
   button.classList.add("hidden");
-  button.title = "Official HH API OAuth is optional. Use Apply now — site + CV + letter for the normal HH.ru website flow.";
+  button.title = "Normal HH.ru applications use Apply + send now. Official HH API OAuth is not required.";
 }
 
 vjaPreferWebsiteApplyForHh();
