@@ -51,7 +51,7 @@
 
   <section class="card">
     <h2>System readiness</h2>
-    <p>Employer-site applications need a reachable backend and a verified core candidate profile. HH.ru works through the normal website application flow; official HH API OAuth is optional.</p>
+    <p>Employer-site applications need a reachable backend and a verified core candidate profile. HH.ru works through the normal website application flow and uses the resume selected in your HH account; no HH OAuth connection is required.</p>
     <label class="status" for="apiBase">Backend URL</label>
     <div class="row">
       <input id="apiBase" type="url" value="http://localhost:8080" />
@@ -93,11 +93,11 @@
   </section>
 
   <h1 style="margin-top:32px;font-size:24px">CV Vault</h1>
-  <p>Choose each PDF once. The files are stored only inside this Chrome profile and can then be inserted into an employer application upload field when the Apply Assistant recommends that CV.</p>
+  <p>Choose each PDF once for employer sites that expose a normal file-upload field. The files are stored only inside this Chrome profile.</p>
 
   <section class="card">
     <h2>English CV</h2>
-    <p>Used for European and international applications.</p>
+    <p>Used for European and international employer forms that require a PDF upload.</p>
     <div class="row">
       <input id="enFile" type="file" accept="application/pdf,.pdf" />
       <button id="saveEn" class="primary">Save English CV</button>
@@ -107,7 +107,7 @@
 
   <section class="card">
     <h2>Russian CV</h2>
-    <p>Used for Russian / HH.ru / Habr Career applications and Russian-language employers.</p>
+    <p>Used for Russian employer forms that require a PDF upload, including Habr Career when it exposes one. HH.ru itself uses the resume selected in your HH account instead of this PDF.</p>
     <div class="row">
       <input id="ruFile" type="file" accept="application/pdf,.pdf" />
       <button id="saveRu" class="primary">Save Russian CV</button>
@@ -124,7 +124,7 @@
   </section>
 
   <div class="privacy">
-    <strong>Privacy:</strong> CV files are kept in <code>chrome.storage.local</code> and are not uploaded to the Job Search Assistant backend. The local phone is also persisted in <code>chrome.storage.local</code> as application memory and is sent only to your configured backend during field resolution. Official HH API authorization is optional; the normal HH.ru workflow uses the website application flow.
+    <strong>Privacy:</strong> CV files are kept in <code>chrome.storage.local</code> and are not uploaded to the Job Search Assistant backend. The local phone is also persisted in <code>chrome.storage.local</code> as application memory and is sent only to your configured backend during field resolution. The normal HH.ru workflow uses the website application form and your selected HH account resume.
   </div>
 
   <script src="candidate-local-profile.js"></script>
