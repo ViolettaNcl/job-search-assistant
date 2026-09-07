@@ -108,10 +108,10 @@ function renderReadiness(result) {
   capabilities.replaceChildren();
   const labels = [
     ["externalAts", "External ATS"],
-    ["contactAutofill", "Phone + LinkedIn"],
+    ["contactAutofill", "Phone"],
     ["cvAutoload", "Both CVs ready"],
     ["dailyQueue", "Daily queue"],
-    ["hhDirect", "HH direct apply"]
+    ["hhDirect", "HH website apply"]
   ];
   for (const [key, label] of labels) {
     const chip = document.createElement("span");
@@ -145,19 +145,17 @@ async function runSystemCheck() {
   button.textContent = "Checking…";
   const summary = $("readinessSummary");
   summary.dataset.state = "neutral";
-  summary.innerHTML = "<strong>Checking setup…</strong><span>Verifying backend, profile, local contacts, CVs, queue and HH capability.</span>";
+  summary.innerHTML = "<strong>Checking setup…</strong><span>Verifying backend, profile, phone, local CVs and the strong-job queue.</span>";
 
   try {
     const api = await getApiBase();
     $("apiBase").value = api;
     const local = await chrome.storage.local.get([keys.en, keys.ru, applicationMemoryKey]);
 
-    const [health, candidate, dashboard, queue, hhResumes] = await Promise.all([
+    const [health, candidate, queue] = await Promise.all([
       safeFetchJson(`${api}/health/ready`),
       safeFetchJson(`${api}/api/candidate`),
-      safeFetchJson(`${api}/api/dashboard`),
-      safeFetchJson(`${api}/api/application-queue?limit=20&minScore=75`),
-      safeFetchJson(`${api}/api/hh/resumes`)
+      safeFetchJson(`${api}/api/application-queue?limit=20&minScore=75`)
     ]);
 
     const contactState = window.vjaLocalContactProfile.resolve({
@@ -168,13 +166,9 @@ async function runSystemCheck() {
     const result = window.vjaSetupReadiness.build({
       backend: { reachable: health.reachable, ready: health.ok },
       candidate: { coreReady: candidate.ok && candidate.data?.readiness?.coreReady === true },
-      contacts: { phone: contactState.phoneReady, linkedin: contactState.linkedinReady },
+      contacts: { phone: contactState.phoneReady },
       cv: { english: Boolean(local[keys.en]?.base64), russian: Boolean(local[keys.ru]?.base64) },
-      queue: { strongCount: queue.ok && Array.isArray(queue.data) ? queue.data.length : 0 },
-      hh: {
-        authorized: hhResumes.ok && Array.isArray(hhResumes.data),
-        resumeSelected: dashboard.ok && Boolean(dashboard.data?.state?.hhResumeId)
-      }
+      queue: { strongCount: queue.ok && Array.isArray(queue.data) ? queue.data.length : 0 }
     });
     renderReadiness(result);
   } catch (error) {
@@ -194,13 +188,13 @@ async function openBackendPath(path) {
 async function refreshLocalContacts() {
   const memory = await getApplicationMemory();
   $("localPhone").value = String(memory.phone || "");
-  $("localLinkedIn").value = String(memory.linkedin || "");
+  if ($("localLinkedIn")) $("localLinkedIn").value = "";
   const state = window.vjaLocalContactProfile.resolve({ candidate: {}, memory });
   const status = $("contactStatus");
-  status.className = state.bothReady ? "status ok" : "status";
-  status.textContent = state.bothReady
-    ? "Phone and LinkedIn are stored locally for reusable contact autofill."
-    : window.vjaLocalContactProfile.summary(state);
+  status.className = state.phoneReady ? "status ok" : "status";
+  status.textContent = state.phoneReady
+    ? "Phone is stored locally for reusable contact autofill."
+    : "Add your phone once so the extension can reuse it in application forms.";
 }
 
 async function saveLocalContacts() {
@@ -208,33 +202,29 @@ async function saveLocalContacts() {
   status.className = "status";
   status.textContent = "Saving…";
 
-  const raw = {
-    phone: $("localPhone").value,
-    linkedin: $("localLinkedIn").value
-  };
-  if (!String(raw.phone || "").trim() && !String(raw.linkedin || "").trim()) {
+  const raw = { phone: $("localPhone").value, linkedin: "" };
+  if (!String(raw.phone || "").trim()) {
     status.className = "status warning";
-    status.textContent = "Enter at least one contact value, or use Clear local contacts.";
+    status.textContent = "Enter a phone number, or use Clear phone.";
     return;
   }
 
   const validation = window.vjaLocalContactProfile.validate(raw);
   if (!validation.ok) {
-    const messages = [validation.errors.phone, validation.errors.linkedin].filter(Boolean);
     status.className = "status warning";
-    status.textContent = messages.join(" ");
+    status.textContent = validation.errors.phone || "Check the phone number.";
     return;
   }
 
   const memory = await getApplicationMemory();
-  const next = window.vjaLocalContactProfile.applyToMemory(memory, validation.values);
+  const next = window.vjaLocalContactProfile.applyToMemory(memory, { phone: validation.values.phone, linkedin: "" });
   await setApplicationMemory(next);
   await refreshLocalContacts();
   await runSystemCheck();
 }
 
 async function clearLocalContacts() {
-  if (!confirm("Clear the locally stored phone and LinkedIn values? Other remembered application answers will be kept.")) return;
+  if (!confirm("Clear the locally stored phone? Other remembered application answers will be kept.")) return;
   const memory = await getApplicationMemory();
   const next = window.vjaLocalContactProfile.applyToMemory(memory, { phone: "", linkedin: "" });
   await setApplicationMemory(next);
@@ -288,7 +278,7 @@ $("saveApi").addEventListener("click", saveApiBase);
 $("runReadiness").addEventListener("click", runSystemCheck);
 $("openDashboard").addEventListener("click", () => openBackendPath("/"));
 $("openQueue").addEventListener("click", () => openBackendPath("/queue.html"));
-$("connectHh").addEventListener("click", () => openBackendPath("/api/hh/oauth/start"));
+$("connectHh").addEventListener("click", () => alert("HH.ru website application mode is enabled. Open an HH.ru vacancy and use Apply + send now. No HH OAuth connection is required."));
 $("saveContacts").addEventListener("click", saveLocalContacts);
 $("clearContacts").addEventListener("click", clearLocalContacts);
 $("saveEn").addEventListener("click", () => save("en"));
