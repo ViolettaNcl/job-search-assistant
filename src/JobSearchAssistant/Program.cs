@@ -35,6 +35,7 @@ builder.Services.AddHttpClient("adzuna");
 builder.Services.AddSingleton<SecretCipher>();
 builder.Services.AddSingleton<MatchScoringService>();
 builder.Services.AddSingleton<ApplicationDraftService>();
+builder.Services.AddSingleton<AutoApplyRunTracker>();
 builder.Services.AddSingleton<ApplicationQuestionService>();
 builder.Services.AddSingleton<CandidateProfileReadinessService>();
 builder.Services.AddScoped<HhClient>();
@@ -195,7 +196,7 @@ app.MapGet("/api/applications/activity", async (int? limit, AppDbContext db, Can
     return Results.Ok(items);
 });
 
-app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, IOptions<SecurityOptions> security, CancellationToken ct) =>
+app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobService jobs, AutoApplyRunTracker runs, IOptions<SecurityOptions> security, CancellationToken ct) =>
 {
     var state = await db.AppStates.AsNoTracking().SingleAsync(x => x.Id == 1, ct);
     var localNow = DateTimeOffset.Now;
@@ -205,23 +206,32 @@ app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, IOptio
         .Where(x => x.Type == "AutoApplied" || x.Type == "AutoApplyFailed")
         .ToListAsync(ct);
     var last = autoEvents.OrderByDescending(x => x.CreatedAt).FirstOrDefault();
+    var hhConfigured = hh.IsOAuthConfigured;
     var hhConnected = false;
-    try { hhConnected = await hh.HasOAuthAsync(ct); } catch { }
+    try { hhConnected = await hh.IsConnectedAsync(ct); } catch { }
     var allowed = security.Value.EnableAutomaticSubmission;
     var ready = state.AutoApplyEnabled && allowed && hhConnected && !string.IsNullOrWhiteSpace(state.HhResumeId);
+    var diagnostics = await jobs.GetAutoApplyDiagnosticsAsync(state.AutoApplyMinimumScore, ct);
+    var latestRun = runs.LastResult;
     return Results.Ok(new
     {
         state.AutoApplyEnabled,
         allowed,
         ready,
+        hhConfigured,
         hhConnected,
         resumeSelected = !string.IsNullOrWhiteSpace(state.HhResumeId),
         state.AutoApplyMinimumScore,
         state.DailyAutoApplyLimit,
         appliedToday,
         remainingToday = Math.Max(0, state.DailyAutoApplyLimit - appliedToday),
-        lastRunAt = last?.CreatedAt,
-        lastResult = last is null ? null : new { last.Type, last.Note }
+        state.LastCollectedAt,
+        lastRunAt = latestRun?.CheckedAt ?? last?.CreatedAt,
+        lastMessage = latestRun?.Message ?? last?.Note,
+        lastResult = latestRun is null
+            ? (last is null ? null : new { type = last.Type, message = last.Note, attempted = 0, submitted = 0, failed = 0 })
+            : new { type = latestRun.Ready ? "Cycle" : "Setup", message = latestRun.Message, latestRun.Attempted, latestRun.Submitted, latestRun.Failed },
+        diagnostics
     });
 });
 
@@ -385,19 +395,29 @@ app.MapPost("/api/settings/resume", async (ResumeRequest request, AppDbContext d
 {
     var state = await db.AppStates.SingleAsync(x => x.Id == 1, ct); state.HhResumeId = request.ResumeId; await db.SaveChangesAsync(ct); return Results.Ok();
 });
-app.MapPost("/api/settings/autoapply", async (AutoApplyRequest request, AppDbContext db, JobService jobs, CancellationToken ct) =>
+app.MapPost("/api/settings/autoapply", async (AutoApplyRequest request, AppDbContext db, JobService jobs, IOptions<SearchOptions> search, CancellationToken ct) =>
 {
     var state = await db.AppStates.SingleAsync(x => x.Id == 1, ct);
     state.AutoApplyEnabled = request.Enabled;
     state.AutoApplyMinimumScore = Math.Clamp(request.MinimumScore, 75, 100);
     state.DailyAutoApplyLimit = Math.Clamp(request.DailyLimit, 1, 50);
     await db.SaveChangesAsync(ct);
-    var cycle = request.Enabled ? await jobs.RunAutoApplyCycleAsync(ct) : null;
-    return Results.Ok(new { state.AutoApplyEnabled, state.AutoApplyMinimumScore, state.DailyAutoApplyLimit, cycle });
+    CollectResult? collection = null;
+    AutoApplyCycleResult? cycle = null;
+    if (request.Enabled)
+    {
+        collection = await jobs.CollectAsync(search.Value, ct);
+        cycle = await jobs.RunAutoApplyCycleAsync(ct);
+    }
+    return Results.Ok(new { state.AutoApplyEnabled, state.AutoApplyMinimumScore, state.DailyAutoApplyLimit, collection, cycle });
 });
 
-app.MapPost("/api/automation/run", async (JobService jobs, CancellationToken ct)
-    => Results.Ok(await jobs.RunAutoApplyCycleAsync(ct)));
+app.MapPost("/api/automation/run", async (JobService jobs, IOptions<SearchOptions> search, CancellationToken ct) =>
+{
+    var collection = await jobs.CollectAsync(search.Value, ct);
+    var cycle = await jobs.RunAutoApplyCycleAsync(ct);
+    return Results.Ok(new { collection, cycle });
+});
 
 app.MapFallbackToFile("index.html");
 app.Run();

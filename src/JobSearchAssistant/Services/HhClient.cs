@@ -34,6 +34,10 @@ public sealed class HhClient(
 {
     private readonly HhOptions _options = options.Value;
 
+    public bool IsOAuthConfigured =>
+        !string.IsNullOrWhiteSpace(_options.ClientId) &&
+        !string.IsNullOrWhiteSpace(_options.ClientSecret);
+
     public async Task<IReadOnlyList<string>> SearchIdsAsync(string query, string experience, CancellationToken ct)
     {
         var client = CreateClient(await TryGetAccessTokenAsync(ct));
@@ -59,6 +63,7 @@ public sealed class HhClient(
         var employer = root.TryGetProperty("employer", out var e) ? e : default;
         var salary = FormatSalary(root.TryGetProperty("salary", out var s) ? s : default);
         var schedule = ReadNestedName(root, "schedule");
+        var scheduleId = ReadNestedId(root, "schedule");
         var experience = root.TryGetProperty("experience", out var exp) && exp.ValueKind == JsonValueKind.Object
             ? exp.GetProperty("id").GetString() ?? ""
             : "";
@@ -84,7 +89,9 @@ public sealed class HhClient(
             salary,
             schedule,
             experience,
-            schedule.Contains("удален", StringComparison.OrdinalIgnoreCase) || schedule.Contains("remote", StringComparison.OrdinalIgnoreCase),
+            scheduleId.Equals("remote", StringComparison.OrdinalIgnoreCase) ||
+            schedule.Contains("удален", StringComparison.OrdinalIgnoreCase) ||
+            schedule.Contains("remote", StringComparison.OrdinalIgnoreCase),
             root.TryGetProperty("published_at", out var p) && DateTimeOffset.TryParse(p.GetString(), out var published) ? published : null,
             relations.Contains("got_response", StringComparer.OrdinalIgnoreCase));
     }
@@ -202,6 +209,19 @@ public sealed class HhClient(
         return !string.IsNullOrWhiteSpace(app.ProtectedAccessToken) || !string.IsNullOrWhiteSpace(app.ProtectedRefreshToken);
     }
 
+    public async Task<bool> IsConnectedAsync(CancellationToken ct)
+    {
+        if (!IsOAuthConfigured) return false;
+        try
+        {
+            return !string.IsNullOrWhiteSpace(await GetAccessTokenAsync(ct));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private HttpClient CreateClient(string? token = null)
     {
         var client = httpClientFactory.CreateClient("hh");
@@ -267,6 +287,11 @@ public sealed class HhClient(
     private static string ReadNestedName(JsonElement root, string property)
         => root.TryGetProperty(property, out var x) && x.ValueKind == JsonValueKind.Object && x.TryGetProperty("name", out var n)
             ? n.GetString() ?? ""
+            : "";
+
+    private static string ReadNestedId(JsonElement root, string property)
+        => root.TryGetProperty(property, out var x) && x.ValueKind == JsonValueKind.Object && x.TryGetProperty("id", out var id)
+            ? id.GetString() ?? ""
             : "";
 
     private static string FormatSalary(JsonElement salary)

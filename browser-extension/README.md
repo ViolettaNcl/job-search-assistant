@@ -2,7 +2,7 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **2.6.0** supports two modes: a one-click browser application for the vacancy currently open, and the backend's optional all-day HH Apply Autopilot controlled from the local dashboard.
+Version **2.6.1** supports two modes: a one-click browser application for the vacancy currently open, and the backend's optional all-day HH Apply Autopilot controlled from the local dashboard. Cover letters are short, human-sounding, and selected from the actual vacancy description instead of using one fixed developer template.
 
 The main popup button **Отправить отклик + письмо** performs the current-vacancy flow in one action: analyze, tailor, choose the HH resume or CV Vault file, fill verified-safe fields and click the final employer action only when it is unambiguous. It stops for unknown required answers, CAPTCHA, legal declarations, a missing CV, or an unverified submission result.
 
