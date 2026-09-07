@@ -27,12 +27,16 @@ jobs:
           node --check browser-extension/site-apply.js
           node --check browser-extension/site-apply-content.js
           node --check browser-extension/site-apply-popup.js
+          node --check browser-extension/final-submit-control.js
           node --check browser-extension/phone-only-ui.js
           node --check browser-extension/hh-site-mode-options.js
           node --check browser-extension/candidate-local-profile.js
           node --check browser-extension/setup-readiness.js
+          node --check browser-extension/options.js
       - name: Run one-click application safeguards
         run: node browser-extension/site-apply.test.js
+      - name: Run final Send control safeguards
+        run: node browser-extension/final-submit-control.test.js
       - name: Run phone-only contact regression tests
         run: node browser-extension/candidate-local-profile.test.js
       - name: Run setup readiness regression tests
@@ -43,7 +47,7 @@ jobs:
           node - <<'NODE'
           const fs = require('fs');
           const manifest = JSON.parse(fs.readFileSync('browser-extension/manifest.json', 'utf8'));
-          if (manifest.version !== '2.5.1') throw new Error(`Unexpected extension version ${manifest.version}`);
+          if (manifest.version !== '2.5.2') throw new Error(`Unexpected extension version ${manifest.version}`);
           const scripts = manifest.content_scripts.flatMap(x => x.js || []);
           for (const required of ['site-apply.js', 'site-apply-content.js', 'cv-upload.js', 'final-submit-control.js', 'submission-receipt.js']) {
             if (!scripts.includes(required)) throw new Error(`Manifest is missing ${required}`);
