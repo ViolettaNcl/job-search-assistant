@@ -146,3 +146,16 @@ if (vjaMarkAppliedButton && !vjaMarkAppliedButton.textContent.includes("Record")
 }
 
 setTimeout(() => vjaRestoreSiteApplyResult().catch(() => {}), 500);
+
+function vjaPreferWebsiteApplyForHh() {
+  const button = $("applyHh");
+  if (!button) return;
+  button.classList.add("hidden");
+  button.title = "Official HH API OAuth is optional. Use Apply now — site + CV + letter for the normal HH.ru website flow.";
+}
+
+vjaPreferWebsiteApplyForHh();
+const vjaHhApiButton = $("applyHh");
+if (vjaHhApiButton) {
+  new MutationObserver(vjaPreferWebsiteApplyForHh).observe(vjaHhApiButton, { attributes: true, attributeFilter: ["class"] });
+}
