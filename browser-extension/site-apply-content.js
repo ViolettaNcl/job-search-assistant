@@ -59,12 +59,12 @@ function vjaSiteStartCandidates() {
 }
 
 function vjaSiteCoverLetterField(container = document) {
-  const fields = [...container.querySelectorAll('textarea, input[type="text"]')]
+  const fields = [...container.querySelectorAll('textarea, input[type="text"], [contenteditable="true"][role="textbox"], [contenteditable="true"]')]
     .filter(vjaSiteVisible)
     .map(el => ({
       el,
       label: vjaSiteLabel(el),
-      metadata: { textarea: el instanceof HTMLTextAreaElement, required: Boolean(el.required || el.getAttribute?.('aria-required') === 'true') }
+      metadata: { textarea: el instanceof HTMLTextAreaElement || el.isContentEditable, required: Boolean(el.required || el.getAttribute?.('aria-required') === 'true') }
     }));
   const choice = window.vjaSiteApply?.chooseCoverLetterField?.(fields) || { found: false };
   if (choice.found) return choice.candidate.el;
@@ -74,6 +74,14 @@ function vjaSiteCoverLetterField(container = document) {
 
 function vjaSiteSetText(el, value) {
   if (!el || !value) return false;
+  if (el.isContentEditable) {
+    el.focus();
+    el.textContent = value;
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+    return vjaSiteText(el).length > 0;
+  }
   const prototype = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
   descriptor?.set?.call(el, value);
@@ -83,14 +91,19 @@ function vjaSiteSetText(el, value) {
   return String(el.value || '').trim().length > 0;
 }
 
+function vjaSiteFieldValue(el) {
+  return el?.isContentEditable ? vjaSiteText(el) : String(el?.value || '').trim();
+}
+
 async function vjaSiteSetTextVerified(el, value) {
   const expected = String(value || '').trim();
   if (!el || !expected) return false;
+  const normalize = window.vjaSiteApply?.clean || (input => String(input || '').replace(/\s+/g, ' ').trim());
   for (let attempt = 0; attempt < 3; attempt++) {
     vjaSiteSetText(el, expected);
     await vjaSiteWait(120 + attempt * 80);
-    const actual = String(el.value || '').trim();
-    if (actual === expected) return true;
+    const actual = vjaSiteFieldValue(el);
+    if (normalize(actual) === normalize(expected)) return true;
   }
   return false;
 }
@@ -153,7 +166,7 @@ async function vjaSiteWaitForApplicationUi(timeoutMs = 9000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     const container = vjaSiteApplicationContainer();
-    if (container || document.querySelector('input[type="file"], textarea, [data-qa*="resume" i], input[type="radio"]')) return true;
+    if (container || document.querySelector('input[type="file"], textarea, [contenteditable="true"], [data-qa*="resume" i], input[type="radio"]')) return true;
     await vjaSiteWait(250);
   }
   return false;
@@ -216,7 +229,7 @@ async function vjaHhSelectResume(container = document, plan = {}) {
   const nowSelected = candidate.el instanceof HTMLInputElement
     ? Boolean(candidate.el.checked)
     : candidate.el.getAttribute?.('aria-checked') === 'true' || candidate.wrapper?.getAttribute?.('aria-checked') === 'true';
-  if (!candidate.metadata?.selected && !nowSelected && candidates.length > 1) {
+  if (!candidate.metadata?.selected && !nowSelected) {
     return { ok: false, found: true, reason: 'hh-resume-selection-not-persisted', choices: candidates.map(item => item.label).filter(Boolean).slice(0, 5) };
   }
 
@@ -258,7 +271,7 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
   }
 
   let container = vjaSiteApplicationContainer();
-  let applicationUiFound = Boolean(container || document.querySelector('input[type="file"], textarea, input[required], select[required], [aria-required="true"]'));
+  let applicationUiFound = Boolean(container || document.querySelector('input[type="file"], textarea, [contenteditable="true"], input[required], select[required], [aria-required="true"]'));
   if (!container && !applicationUiFound) {
     const startChoice = window.vjaSiteApply?.chooseStartAction?.(vjaSiteStartCandidates()) || { found: false };
     if (!startChoice.found) {
@@ -266,12 +279,13 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
       await vjaSiteStoreResult(plan, result);
       return result;
     }
+    const receiptBeforeStart = vjaSiteReceipt();
     startChoice.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     startChoice.candidate.el.click();
     applicationUiFound = await vjaSiteWaitForApplicationUi();
 
     const postStartReceipt = vjaSiteReceipt();
-    if (postStartReceipt.confirmed) {
+    if (!receiptBeforeStart.confirmed && postStartReceipt.confirmed) {
       const result = { submitted: true, status: 'confirmed', receipt: postStartReceipt, startActionSubmitted: true };
       await vjaSiteStoreResult(plan, result);
       return result;
@@ -280,15 +294,22 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
   }
 
   const scope = container || document;
+  const coverLetter = String(plan.coverLetter || '').trim();
+  const coverLetterRequired = vjaSiteIsHh() && Boolean(coverLetter);
   const coverField = vjaSiteCoverLetterField(scope);
   let coverLetterFilled = false;
-  if (coverField && String(plan.coverLetter || '').trim()) {
-    coverLetterFilled = await vjaSiteSetTextVerified(coverField, plan.coverLetter);
+  if (coverField && coverLetter) {
+    coverLetterFilled = await vjaSiteSetTextVerified(coverField, coverLetter);
     if (!coverLetterFilled) {
       const result = { submitted: false, status: 'needs-review', reason: 'cover-letter-not-persisted', coverLetterFilled: false };
       await vjaSiteStoreResult(plan, result);
       return result;
     }
+  }
+  if (coverLetterRequired && !coverLetterFilled) {
+    const result = { submitted: false, status: 'needs-review', reason: 'cover-letter-not-persisted', coverLetterFilled: false };
+    await vjaSiteStoreResult(plan, result);
+    return result;
   }
 
   const hhResume = await vjaHhSelectResume(scope, plan);
@@ -324,6 +345,8 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
   const finalChoice = vjaSiteFinalChoice(scope);
   const permission = window.vjaSiteApply?.canSubmit?.({
     applicationUiFound,
+    coverLetterRequired,
+    coverLetterFilled,
     unresolvedRequired: unresolved.length,
     cvFieldPresent: fileInputPresent,
     cvUploaded,
