@@ -13,7 +13,7 @@
     .card { margin-top: 18px; padding: 18px; background: white; border: 1px solid #e1e4e9; border-radius: 14px; }
     .card h2 { margin: 0 0 6px; font-size: 17px; }
     .row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; margin-top: 14px; }
-    .fieldGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+    .fieldGrid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 14px; }
     .fieldGrid label { display: grid; gap: 6px; font-size: 12px; color: #6a717d; font-weight: 700; }
     .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
     input[type=file], input[type=url], input[type=text], input[type=tel] { width: 100%; padding: 10px; border: 1px solid #d6dae1; border-radius: 9px; background: #fafbfc; font: inherit; }
@@ -41,6 +41,7 @@
     .capability.on { background: #e8f7ed; color: #146c39; }
     .privacy { margin-top: 24px; padding: 14px 16px; border-radius: 12px; background: #eef3ff; color: #33466d; font-size: 13px; line-height: 1.5; }
     code { background: #f0f1f3; padding: 2px 5px; border-radius: 5px; }
+    #localLinkedIn { display: none; }
     @media (max-width: 560px) { .row, .fieldGrid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -51,7 +52,7 @@
 
   <section class="card">
     <h2>System readiness</h2>
-    <p>External ATS applications need a reachable backend and a verified core candidate profile. HH.ru direct submission is checked separately and never blocks other job sites.</p>
+    <p>Russian and European employer-site applications use the browser Apply/Откликнуться workflow. HH.ru no longer requires backend OAuth for browser submission.</p>
     <label class="status" for="apiBase">Backend URL</label>
     <div class="row">
       <input id="apiBase" type="url" value="http://localhost:8080" />
@@ -61,7 +62,7 @@
       <button id="runReadiness" class="primary">Run system check</button>
       <button id="openDashboard">Open dashboard</button>
       <button id="openQueue">Open apply queue</button>
-      <button id="connectHh">Connect / refresh HH.ru</button>
+      <button id="connectHh">Open HH.ru profile</button>
     </div>
     <div id="readinessSummary" class="readinessSummary" data-state="neutral">
       <strong>Not checked yet</strong>
@@ -72,24 +73,22 @@
   </section>
 
   <h1 style="margin-top:32px;font-size:24px">Local contact profile</h1>
-  <p>Save your phone and LinkedIn once in this Chrome profile. They become reusable application-memory facts when the backend candidate profile does not already contain a verified value.</p>
+  <p>Save your phone number once in this Chrome profile. It becomes a reusable application-memory fact when the backend candidate profile does not already contain a verified value.</p>
 
   <section class="card">
     <h2>Reusable contact details</h2>
     <p>Verified backend values always take precedence. Local values are never committed to GitHub and can be cleared without affecting other remembered application answers.</p>
     <div class="fieldGrid">
       <label for="localPhone">Phone number
-        <input id="localPhone" type="tel" autocomplete="tel" placeholder="+357 …" />
+        <input id="localPhone" type="tel" autocomplete="tel" placeholder="+7 …" />
       </label>
-      <label for="localLinkedIn">LinkedIn profile
-        <input id="localLinkedIn" type="url" autocomplete="url" placeholder="https://www.linkedin.com/in/…" />
-      </label>
+      <input id="localLinkedIn" type="hidden" value="" />
     </div>
     <div class="actions">
-      <button id="saveContacts" class="primary">Save local contacts</button>
-      <button id="clearContacts" class="danger">Clear local contacts</button>
+      <button id="saveContacts" class="primary">Save phone</button>
+      <button id="clearContacts" class="danger">Clear phone</button>
     </div>
-    <div id="contactStatus" class="status">No local contact details checked yet.</div>
+    <div id="contactStatus" class="status">No local phone checked yet.</div>
   </section>
 
   <h1 style="margin-top:32px;font-size:24px">CV Vault</h1>
@@ -107,7 +106,7 @@
 
   <section class="card">
     <h2>Russian CV</h2>
-    <p>Used for Russian / HH.ru applications and Russian-language employers.</p>
+    <p>Used for Russian / HH.ru / Habr Career applications and Russian-language employers.</p>
     <div class="row">
       <input id="ruFile" type="file" accept="application/pdf,.pdf" />
       <button id="saveRu" class="primary">Save Russian CV</button>
@@ -124,12 +123,15 @@
   </section>
 
   <div class="privacy">
-    <strong>Privacy:</strong> CV files are kept in <code>chrome.storage.local</code> and are not uploaded to the Job Search Assistant backend. Local phone/LinkedIn values are also persisted in <code>chrome.storage.local</code> as application memory; during form preparation those reusable values are included in the field-resolution request sent to your configured backend, but they are not committed to GitHub. Setup checks read backend health/configuration plus the presence of local CV/contact slots. HH authorization is performed by HH.ru through the backend OAuth flow.
+    <strong>Privacy:</strong> CV files are kept in <code>chrome.storage.local</code> and are not uploaded to the Job Search Assistant backend. Your local phone value is also kept in <code>chrome.storage.local</code> as application memory. HH.ru uses the same browser Apply/Откликнуться workflow as other supported sites, so the previous OAuth error path is no longer required for normal applications.
   </div>
 
   <script src="candidate-local-profile.js"></script>
+  <script src="candidate-phone-only.js"></script>
   <script src="setup-readiness.js"></script>
+  <script src="setup-browser-mode.js"></script>
   <script src="options.js"></script>
+  <script src="options-browser-mode.js"></script>
 </main>
 </body>
 </html>
