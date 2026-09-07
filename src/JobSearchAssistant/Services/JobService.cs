@@ -268,6 +268,8 @@ public sealed class JobService(
         if (vacancy.Application is not null || vacancy.HasExistingHhResponse || vacancy.Status == VacancyStatus.Applied)
             return new HhApplyResult(false, "already_applied_local", "This vacancy is already marked as applied.");
         if (vacancy.Source != "hh") return new HhApplyResult(false, "external_apply_required", "Open the official application page, submit there, then mark the vacancy as applied in Job Assistant.");
+        if (!AutomaticSubmissionPolicy.IsVerifiedEligible(vacancy))
+            return new HhApplyResult(false, "eligibility_not_verified", "This vacancy requires a location/work-authorization review before submission.");
 
         var state = await GetStateAsync(ct);
         if (string.IsNullOrWhiteSpace(state.HhResumeId)) return new HhApplyResult(false, "resume_not_selected", "Select an HH resume first.");
@@ -344,15 +346,11 @@ public sealed class JobService(
         if (available == 0) return;
 
         var candidates = await db.Vacancies.Include(x => x.Company).Include(x => x.Application)
-            .Where(x => x.Source == "hh" && x.Status == VacancyStatus.New && x.Application == null && !x.Company.IsBlacklisted && x.MatchScore >= state.AutoApplyMinimumScore)
-            .RankedAsync(available, ct);
+            .Where(x => x.Source == "hh" && x.Status == VacancyStatus.New && x.Application == null && !x.HasExistingHhResponse && !x.Company.IsBlacklisted && x.MatchScore >= state.AutoApplyMinimumScore && x.EligibilityStatus == "Eligible")
+            .RankedAsync(available, ct, filter: x => AutomaticSubmissionPolicy.CanSubmit(x, state.AutoApplyMinimumScore));
 
         foreach (var vacancy in candidates)
-        {
-            var title = vacancy.Title.ToLowerInvariant();
-            if (title.Contains("senior") || title.Contains("lead") || title.Contains("ведущ")) continue;
             await ApplyAsync(vacancy.Id, ct);
-        }
     }
 
     private async Task<Company> GetOrCreateCompanyAsync(string name, string externalHint, CancellationToken ct)

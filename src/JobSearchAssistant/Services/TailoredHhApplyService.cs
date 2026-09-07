@@ -24,6 +24,8 @@ public sealed class TailoredHhApplyService(
             return new HhApplyResult(false, "blacklisted", "Company is blacklisted.");
         if (vacancy.MatchScore < 75)
             return new HhApplyResult(false, "fit_below_threshold", $"Fit score {vacancy.MatchScore}/100 is below the 75-point one-click threshold. Review manually first.");
+        if (!AutomaticSubmissionPolicy.IsVerifiedEligible(vacancy))
+            return new HhApplyResult(false, "eligibility_not_verified", "This vacancy requires a location/work-authorization review before submission.");
         if (vacancy.Application is not null || vacancy.HasExistingHhResponse || vacancy.Status == VacancyStatus.Applied)
             return new HhApplyResult(false, "already_applied_local", "This vacancy is already marked as applied.");
 

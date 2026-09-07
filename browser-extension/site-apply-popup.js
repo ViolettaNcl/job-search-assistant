@@ -34,6 +34,7 @@ function vjaSiteApplyReason(result) {
     return names.length ? `Required fields still need you: ${names.join(", ")}.` : "Required fields still need your review before submission.";
   }
   if (reason === "cv-not-uploaded") return "The site exposes a CV upload field, but the CV could not be attached automatically.";
+  if (reason === "application-ui-not-found") return "The Apply action did not open a recognizable application form. The assistant stopped before any final click.";
   if (reason === "final-action-not-found") return "The application was filled, but no safe final Submit/Откликнуться action was found.";
   if (reason === "final-action-ambiguous") return "Several possible final submission buttons were found. The assistant stopped instead of clicking the wrong one.";
   return reason || "The site needs a manual review before it can be submitted safely.";
@@ -103,6 +104,7 @@ async function vjaApplyNowOnSite() {
     trackedId,
     sourceUrl: latestPage.url,
     sourceHost,
+    jobTitle: latestPage.title || latest?.draft?.title || '',
     coverLetter: $("coverLetter")?.value || latest.draft?.coverLetter || "",
     cvKey,
     createdAt: Date.now(),

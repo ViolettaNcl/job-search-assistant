@@ -28,7 +28,26 @@ assert.equal(apply.unresolvedRequired([
   { required: false, type: 'text', value: '' }
 ]).length, 1);
 
-assert.deepEqual(apply.canSubmit({ unresolvedRequired: 0, cvFieldPresent: true, cvUploaded: true, finalFound: true }), { ok: true, reason: 'ready' });
-assert.equal(apply.canSubmit({ unresolvedRequired: 1, cvFieldPresent: true, cvUploaded: true, finalFound: true }).reason, 'required-fields');
-assert.equal(apply.canSubmit({ unresolvedRequired: 0, cvFieldPresent: true, cvUploaded: false, finalFound: true }).reason, 'cv-not-uploaded');
+assert.equal(apply.unresolvedRequired([
+  { required: true, type: 'radio', group: 'authorization', checked: false },
+  { required: true, type: 'radio', group: 'authorization', checked: true },
+  { required: true, type: 'text', value: '', hidden: true }
+]).length, 0, 'a checked radio satisfies its required group and hidden future-step fields do not block the current step');
+
+const ready = { applicationUiFound: true, unresolvedRequired: 0, cvFieldPresent: true, cvUploaded: true, finalFound: true };
+assert.deepEqual(apply.canSubmit(ready), { ok: true, reason: 'ready' });
+assert.equal(apply.canSubmit({ ...ready, applicationUiFound: false }).reason, 'application-ui-not-found');
+assert.equal(apply.canSubmit({ ...ready, unresolvedRequired: 1 }).reason, 'required-fields');
+assert.equal(apply.canSubmit({ ...ready, cvUploaded: false }).reason, 'cv-not-uploaded');
+
+assert.equal(apply.canAcceptReceipt({ finalClicked: false, receiptConfirmed: true }), false,
+  'confirmation-looking vacancy copy cannot be recorded before a final action');
+assert.equal(apply.canAcceptReceipt({ finalClicked: true, receiptConfirmed: true }), true);
+
+const smartSource = 'https://jobs.smartrecruiters.com/SoftwareMind/744000146148409--rtc-intern-ai-driven-software-engineer';
+const smartForm = 'https://jobs.smartrecruiters.com/oneclick-ui/company/SoftwareMind/publication/74820555-f582-4a4b-94b0-7d183a71175a?dcr_ci=SoftwareMind';
+const matchingPage = '[RTC] Intern AI-Driven Software Engineer Personal information Resume';
+assert.equal(apply.canResume({ sourceUrl: smartSource, currentUrl: smartForm, jobTitle: '[RTC] Intern AI-Driven Software Engineer', pageText: matchingPage }).ok, true);
+assert.equal(apply.canResume({ sourceUrl: smartSource, currentUrl: smartForm.replace('/SoftwareMind/', '/OtherCompany/'), jobTitle: '[RTC] Intern AI-Driven Software Engineer', pageText: matchingPage }).reason, 'different-ats-tenant');
+assert.equal(apply.canResume({ sourceUrl: smartSource, currentUrl: smartForm, jobTitle: '[RTC] Intern AI-Driven Software Engineer', pageText: 'Senior Java Engineer application' }).reason, 'different-job');
 console.log('site-apply tests passed');

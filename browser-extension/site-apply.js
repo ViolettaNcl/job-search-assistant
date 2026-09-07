@@ -7,6 +7,75 @@
     return String(value || "").replace(/\s+/g, " ").trim();
   }
 
+  function safeUrl(value) {
+    try { return new URL(String(value || "")); }
+    catch { return null; }
+  }
+
+  function hostFamily(value) {
+    const parsed = safeUrl(value);
+    const host = (parsed?.hostname || "").toLowerCase();
+    return ["myworkdayjobs.com", "smartrecruiters.com", "greenhouse.io", "lever.co", "ashbyhq.com", "teamtailor.com", "recruitee.com", "workable.com", "personio.de", "personio.com"]
+      .find(domain => host === domain || host.endsWith(`.${domain}`)) || host;
+  }
+
+  function tenantKey(value) {
+    const parsed = safeUrl(value);
+    if (!parsed) return "";
+    const host = parsed.hostname.toLowerCase();
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const workday = host.match(/^([^.]+)\.wd\d+\.myworkdayjobs\.com$/);
+    if (workday) return `workday:${workday[1].toLowerCase()}`;
+    if (host === "jobs.smartrecruiters.com") {
+      const companyIndex = parts.findIndex(x => x.toLowerCase() === "company");
+      const tenant = companyIndex >= 0 ? parts[companyIndex + 1] : parts[0];
+      return tenant ? `smartrecruiters:${tenant.toLowerCase()}` : "";
+    }
+    const shared = new Map([
+      ["boards.greenhouse.io", "greenhouse"], ["job-boards.greenhouse.io", "greenhouse"],
+      ["jobs.lever.co", "lever"], ["jobs.ashbyhq.com", "ashby"], ["apply.workable.com", "workable"]
+    ]);
+    if (shared.has(host) && parts[0]) return `${shared.get(host)}:${parts[0].toLowerCase()}`;
+    for (const domain of ["teamtailor.com", "recruitee.com", "personio.de", "personio.com"]) {
+      if (host.endsWith(`.${domain}`)) return `${domain}:${host.slice(0, -(domain.length + 1)).split(".")[0]}`;
+    }
+    return "";
+  }
+
+  function isApplicationLike(value) {
+    const parsed = safeUrl(value);
+    if (!parsed) return false;
+    const route = `${parsed.pathname} ${parsed.search}`.toLowerCase();
+    return /apply|application|candidate|questionnaire|screening|respond|negotiation|oneclick-ui|thank-?you|submitted|confirmation/.test(route);
+  }
+
+  function titleMatches(expectedTitle, pageText) {
+    const expected = clean(expectedTitle).toLowerCase();
+    const current = clean(pageText).toLowerCase();
+    if (!expected || !current) return false;
+    if (current.includes(expected)) return true;
+    const tokens = [...new Set(expected.split(/[^\p{L}\p{N}#+.]+/u).filter(x => x.length >= 3 && !/^(jobs?|career|apply|vacancy|software|developer)$/.test(x)))];
+    return tokens.length >= 2 && tokens.filter(token => current.includes(token)).length / tokens.length >= 0.8;
+  }
+
+  function canResume(input = {}) {
+    const source = safeUrl(input.sourceUrl);
+    const current = safeUrl(input.currentUrl);
+    if (!source || !current || !isApplicationLike(current)) return { ok: false, reason: "invalid-route" };
+    const sourceFamily = hostFamily(source);
+    const currentFamily = hostFamily(current);
+    if (!sourceFamily || sourceFamily !== currentFamily) return { ok: false, reason: "different-host-family" };
+    const sharedFamily = ["myworkdayjobs.com", "smartrecruiters.com", "greenhouse.io", "lever.co", "ashbyhq.com", "workable.com"].includes(sourceFamily);
+    if (sharedFamily && (!tenantKey(source) || tenantKey(source) !== tenantKey(current))) return { ok: false, reason: "different-ats-tenant" };
+    if (!sharedFamily && source.origin !== current.origin) return { ok: false, reason: "different-origin" };
+    if (!titleMatches(input.jobTitle, input.pageText)) return { ok: false, reason: "different-job" };
+    return { ok: true, reason: "same-job" };
+  }
+
+  function canAcceptReceipt(input = {}) {
+    return Boolean(input.finalClicked && input.receiptConfirmed);
+  }
+
   function scoreStartAction(label, metadata = {}) {
     const text = clean(label).toLowerCase();
     if (!text) return -100;
@@ -66,9 +135,11 @@
   }
 
   function unresolvedRequired(fields = []) {
+    const checkedRadioGroups = new Set(fields.filter(field => field?.type === "radio" && field.checked).map(field => clean(field.group)));
     return fields.filter(field => {
       if (!field?.required || field.disabled || field.hidden) return false;
-      if (field.type === "checkbox" || field.type === "radio") return !field.checked;
+      if (field.type === "radio") return !field.checked && !checkedRadioGroups.has(clean(field.group));
+      if (field.type === "checkbox") return !field.checked;
       if (field.type === "file") return Number(field.fileCount || 0) < 1;
       return !clean(field.value);
     });
@@ -76,6 +147,7 @@
 
   function canSubmit(input = {}) {
     const unresolved = Math.max(0, Number(input.unresolvedRequired || 0));
+    if (!input.applicationUiFound) return { ok: false, reason: "application-ui-not-found" };
     if (unresolved) return { ok: false, reason: "required-fields" };
     if (input.cvFieldPresent && !input.cvUploaded) return { ok: false, reason: "cv-not-uploaded" };
     if (!input.finalFound) return { ok: false, reason: "final-action-not-found" };
@@ -83,5 +155,5 @@
     return { ok: true, reason: "ready" };
   }
 
-  return { clean, scoreStartAction, chooseStartAction, scoreCoverLetterField, chooseCoverLetterField, unresolvedRequired, canSubmit };
+  return { clean, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, scoreCoverLetterField, chooseCoverLetterField, unresolvedRequired, canSubmit };
 });
