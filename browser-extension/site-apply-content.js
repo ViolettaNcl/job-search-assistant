@@ -105,7 +105,13 @@ function vjaSiteFinalChoice(container = document) {
         applicationRoute
       }
     }));
-  return window.vjaFinalSubmitControl?.choose?.(candidates) || { found: false, ambiguous: false, count: 0 };
+  const choice = window.vjaFinalSubmitControl?.choose?.(candidates) || { found: false, ambiguous: false, count: 0 };
+  if (choice.found || choice.ambiguous) return choice;
+  const submitButtons = candidates.filter(item => item.metadata.submitType);
+  if (submitButtons.length === 1 && container !== document) {
+    return { found: true, ambiguous: false, count: 1, candidate: { ...submitButtons[0], score: 8, fallback: 'single-submit-control' } };
+  }
+  return choice;
 }
 
 function vjaSiteReceipt() {
@@ -184,6 +190,12 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
     startChoice.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     startChoice.candidate.el.click();
     await vjaSiteWaitForApplicationUi();
+    const postStartReceipt = vjaSiteReceipt();
+    if (postStartReceipt.confirmed) {
+      const result = { submitted: true, status: 'confirmed', receipt: postStartReceipt, startActionSubmitted: true };
+      await vjaSiteStoreResult(plan, result);
+      return result;
+    }
     container = vjaSiteApplicationContainer();
   }
 
