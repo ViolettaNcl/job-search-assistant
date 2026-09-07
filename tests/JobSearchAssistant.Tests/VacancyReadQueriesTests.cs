@@ -15,6 +15,10 @@ public sealed class VacancyReadQueriesTests
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
+        await using var versionCommand = connection.CreateCommand();
+        versionCommand.CommandText = "SELECT sqlite_version()";
+        var sqliteVersion = Version.Parse((string)(await versionCommand.ExecuteScalarAsync())!);
+        Assert.IsTrue(sqliteVersion >= new Version(3, 50, 2), "Native SQLite must include the CVE-2025-6965 fix.");
         await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options);
         await db.Database.EnsureCreatedAsync();
         var midnight = new DateTimeOffset(2026, 9, 7, 0, 0, 0, TimeSpan.Zero);
