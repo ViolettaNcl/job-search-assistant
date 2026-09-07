@@ -8,7 +8,8 @@ const allReady = readiness.build({
 assert.equal(allReady.state, "ready", "LinkedIn and HH API OAuth are not required for website applications");
 assert.equal(allReady.capabilities.externalAts, true);
 assert.equal(allReady.capabilities.contactAutofill, true);
-assert.equal(allReady.capabilities.hhDirect, false);
+assert.equal(allReady.capabilities.hhDirect, true, "legacy capability key now represents HH website apply readiness");
+assert.equal(allReady.total, 6);
 assert.doesNotMatch(allReady.items.find(x => x.id === "contacts").detail, /LinkedIn/i);
 
 const phoneMissing = readiness.build({
