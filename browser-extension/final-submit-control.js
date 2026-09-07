@@ -20,6 +20,10 @@
       value += 7;
     }
     else if (/подать (заявку|отклик)|отправить (заявку|отклик)|откликнуться/i.test(text)) value += 10;
+    else if (/^(отправить|send)$/i.test(text)) {
+      if (!metadata.inForm && !metadata.applicationRoute) return -100;
+      value += 9;
+    }
     else return -100;
 
     if (metadata.submitType) value += 3;
