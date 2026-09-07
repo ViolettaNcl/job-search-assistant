@@ -25,7 +25,17 @@ public sealed record AutoApplyCycleResult(
     int Failed,
     int AppliedToday,
     int RemainingToday,
-    DateTimeOffset CheckedAt);
+    DateTimeOffset CheckedAt,
+    AutoApplyDiagnostics Diagnostics);
+
+public sealed record AutoApplyDiagnostics(
+    int NewHhVacancies,
+    int Eligible,
+    int SafeSeniority,
+    int AboveMinimumScore,
+    int CoolingDown,
+    int ReadyToApply,
+    int MinimumScore);
 
 public sealed class JobService(
     AppDbContext db,
@@ -33,7 +43,8 @@ public sealed class JobService(
     RemotiveClient remotive,
     AdzunaClient adzuna,
     MatchScoringService scoring,
-    IOptions<CandidateProfileOptions> candidate,
+    ApplicationDraftService drafts,
+    AutoApplyRunTracker autoApplyRuns,
     IOptions<SecurityOptions> security,
     IOptions<HhOptions> hhOptions,
     IOptions<AutomationOptions> automation)
@@ -51,14 +62,18 @@ public sealed class JobService(
 
         if (hhOptions.Value.Enabled && remaining > 0)
         {
-            var ids = new HashSet<string>();
+            var ids = new List<string>();
+            var seenIds = new HashSet<string>();
             foreach (var query in options.RussiaQueries)
             {
                 foreach (var exp in new[] { "noExperience", "between1And3" })
                 {
                     try
                     {
-                        foreach (var id in await hh.SearchIdsAsync(query, exp, ct)) ids.Add(id);
+                        foreach (var id in await hh.SearchIdsAsync(query, exp, ct))
+                        {
+                            if (seenIds.Add(id)) ids.Add(id);
+                        }
                     }
                     catch { }
                 }
@@ -67,10 +82,14 @@ public sealed class JobService(
             var existingIds = await db.Vacancies.Where(x => x.Source == "hh").Select(x => x.ExternalId).ToHashSetAsync(ct);
             // Reserve at least half of each collection cycle for international sources.
             var hhBudget = Math.Min(remaining, Math.Max(10, options.MaxNewVacanciesPerRun / 2));
-            foreach (var id in ids.Where(id => !existingIds.Contains(id)).Take(hhBudget))
+            // Inspect more search results than the final storage budget so senior/lead
+            // vacancies cannot crowd junior roles out of the daily candidate pool.
+            foreach (var id in ids.Where(id => !existingIds.Contains(id)).Take(hhBudget * 4))
             {
                 var dto = await hh.GetVacancyAsync(id, ct);
                 if (dto is null) continue;
+                if (!AutomaticSubmissionPolicy.HasSafeSeniority(dto.Title)) continue;
+                if (!dto.Remote) continue;
                 var vacancy = await AddExternalAsync(new ExternalVacancyDto(
                     "hh", "HeadHunter", dto.Id, dto.Title, dto.Url, dto.Url, dto.EmployerId, dto.EmployerName,
                     dto.Description, dto.Salary, dto.Schedule, dto.Experience, dto.Remote, "Russia", "Россия", dto.Remote ? "Remote Russia" : dto.Schedule, dto.PublishedAt),
@@ -349,39 +368,60 @@ public sealed class JobService(
     }
 
     public string BuildCoverLetter(Vacancy vacancy)
+        => drafts.Build(vacancy).CoverLetter;
+
+    public async Task<AutoApplyDiagnostics> GetAutoApplyDiagnosticsAsync(int minimumScore, CancellationToken ct)
     {
-        var profile = candidate.Value;
-        var strongest = vacancy.MatchedSkills.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(5);
-        return $"Здравствуйте! Меня заинтересовала вакансия «{vacancy.Title}». " +
-               $"Мой основной стек — C#/.NET, ASP.NET Core, EF Core, SQL и REST API; по вакансии особенно совпадают: {string.Join(", ", strongest)}. " +
-               "В портфолио есть full-stack DentalClinic для реальной стоматологической практики и другие законченные проекты с тестами и CI. " +
-               $"GitHub: {profile.GitHubUrl}  CV/Portfolio: {profile.CvUrl}. Буду рада обсудить задачи команды.";
+        var retryAfter = DateTimeOffset.UtcNow.AddMinutes(-Math.Clamp(automation.Value.FailureCooldownMinutes, 30, 1440));
+        var rows = await db.Vacancies
+            .Include(x => x.Company)
+            .Include(x => x.Application)
+            .Include(x => x.Events)
+            .Where(x => x.Source == "hh" && x.Status == VacancyStatus.New && x.Application == null && !x.HasExistingHhResponse && !x.Company.IsBlacklisted)
+            .ToListAsync(ct);
+
+        var eligible = rows.Where(AutomaticSubmissionPolicy.IsVerifiedEligible).ToArray();
+        var safe = eligible.Where(x => AutomaticSubmissionPolicy.HasSafeSeniority(x.Title)).ToArray();
+        var aboveScore = safe.Where(x => x.MatchScore >= minimumScore).ToArray();
+        var coolingDown = aboveScore.Count(x => x.Events.Any(e => e.Type == "AutoApplyFailed" && e.CreatedAt >= retryAfter));
+        return new AutoApplyDiagnostics(
+            rows.Count,
+            eligible.Length,
+            safe.Length,
+            aboveScore.Length,
+            coolingDown,
+            Math.Max(0, aboveScore.Length - coolingDown),
+            minimumScore);
     }
 
     public async Task<AutoApplyCycleResult> RunAutoApplyCycleAsync(CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
+        AutoApplyCycleResult Finish(AutoApplyCycleResult result) => autoApplyRuns.Record(result);
         if (!await AutoApplyLock.WaitAsync(0, ct))
-            return new AutoApplyCycleResult(true, false, "Another Apply Autopilot cycle is already running.", 0, 0, 0, 0, 0, now);
+            return Finish(new AutoApplyCycleResult(true, false, "Проверка уже выполняется. Подождите завершения текущего цикла.", 0, 0, 0, 0, 0, now, new(0, 0, 0, 0, 0, 0, 0)));
 
         try
         {
             var state = await GetStateAsync(ct);
+            var diagnostics = await GetAutoApplyDiagnosticsAsync(state.AutoApplyMinimumScore, ct);
             if (!state.AutoApplyEnabled)
-                return new AutoApplyCycleResult(false, false, "Apply Autopilot is paused.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now);
+                return Finish(new AutoApplyCycleResult(false, false, "AI-ассистент стоит на паузе.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
             if (!security.Value.EnableAutomaticSubmission)
-                return new AutoApplyCycleResult(true, false, "Automatic submission is disabled in local security settings.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now);
+                return Finish(new AutoApplyCycleResult(true, false, "Автоматическая отправка отключена в локальных настройках программы.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
             if (string.IsNullOrWhiteSpace(state.HhResumeId))
-                return new AutoApplyCycleResult(true, false, "Select an HH resume before starting Apply Autopilot.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now);
-            if (!await hh.HasOAuthAsync(ct))
-                return new AutoApplyCycleResult(true, false, "Connect HH OAuth before starting Apply Autopilot.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now);
+                return Finish(new AutoApplyCycleResult(true, false, "Выберите HH-резюме: без него отклик отправить нельзя.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
+            if (!hh.IsOAuthConfigured)
+                return Finish(new AutoApplyCycleResult(true, false, "Сначала настройте доступ HH API в файле user-settings.cmd.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
+            if (!await hh.IsConnectedAsync(ct))
+                return Finish(new AutoApplyCycleResult(true, false, "Подключите аккаунт HH и снова запустите AI-ассистента.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
 
             var localNow = DateTimeOffset.Now;
             var today = new DateTimeOffset(localNow.Date, localNow.Offset);
             var alreadyToday = await db.Applications.CountAppliedSinceAsync(today, ct);
             var available = Math.Max(0, state.DailyAutoApplyLimit - alreadyToday);
             if (available == 0)
-                return new AutoApplyCycleResult(true, true, "The daily application limit has been reached.", 0, 0, 0, alreadyToday, 0, now);
+                return Finish(new AutoApplyCycleResult(true, true, "Дневной лимит откликов уже достигнут.", 0, 0, 0, alreadyToday, 0, now, diagnostics));
 
             var retryAfter = now.AddMinutes(-Math.Clamp(automation.Value.FailureCooldownMinutes, 30, 1440));
             var candidates = await db.Vacancies.Include(x => x.Company).Include(x => x.Application).Include(x => x.Events)
@@ -424,14 +464,29 @@ public sealed class JobService(
             var appliedToday = alreadyToday + submitted;
             var remaining = Math.Max(0, state.DailyAutoApplyLimit - appliedToday);
             var message = candidates.Count == 0
-                ? "No new verified matching HH vacancies are ready right now."
-                : $"Apply Autopilot submitted {submitted} of {candidates.Count} selected vacancies.";
-            return new AutoApplyCycleResult(true, true, message, candidates.Count, submitted, failed, appliedToday, remaining, now);
+                ? ExplainEmptyQueue(diagnostics)
+                : $"Готово: отправлено {submitted} из {candidates.Count} выбранных откликов" + (failed > 0 ? $", ошибок: {failed}." : ".");
+            return Finish(new AutoApplyCycleResult(true, true, message, candidates.Count, submitted, failed, appliedToday, remaining, now, diagnostics));
         }
         finally
         {
             AutoApplyLock.Release();
         }
+    }
+
+    private static string ExplainEmptyQueue(AutoApplyDiagnostics diagnostics)
+    {
+        if (diagnostics.NewHhVacancies == 0)
+            return "Новых HH-вакансий в очереди пока нет. Обновите поиск или дождитесь следующего автоматического сбора.";
+        if (diagnostics.Eligible == 0)
+            return $"Найдено новых HH-вакансий: {diagnostics.NewHhVacancies}, но ни одна пока не прошла проверку страны и права на работу.";
+        if (diagnostics.SafeSeniority == 0)
+            return $"Подходящих по стране вакансий: {diagnostics.Eligible}, но все они относятся к senior/lead уровню.";
+        if (diagnostics.AboveMinimumScore == 0)
+            return $"Безопасных вакансий: {diagnostics.SafeSeniority}, но ни одна не достигла порога {diagnostics.MinimumScore}%. Можно снизить порог до 75%.";
+        if (diagnostics.CoolingDown > 0)
+            return $"Подходящих вакансий: {diagnostics.AboveMinimumScore}, но после предыдущей ошибки они временно ожидают повторной попытки.";
+        return "Новых вакансий для отправки сейчас нет.";
     }
 
     private async Task<Company> GetOrCreateCompanyAsync(string name, string externalHint, CancellationToken ct)

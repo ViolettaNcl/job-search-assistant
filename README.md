@@ -35,7 +35,7 @@ The project is built around one principle: find fewer but stronger opportunities
 
 ## Two working modes
 
-1. **Autonomous HH mode:** start the Windows program, connect HH once, choose an HH resume, then press **Запустить AI-ассистента** on the dashboard. While the backend window is running, it collects vacancies hourly and checks the verified HH queue every 10 minutes. It applies only to eligible non-senior jobs above the chosen score, attaches a vacancy-specific letter, respects the daily limit and records every result.
+1. **Autonomous HH mode:** start the Windows program, connect HH once, choose an HH resume, then press **Запустить AI-ассистента** on the dashboard. Starting or manually checking the assistant first refreshes the vacancy feed, then applies only to eligible non-senior HH jobs above the chosen score. The dashboard explains how many jobs passed each filter, attaches a short description-specific letter, respects the daily limit and records every result.
 2. **Manual browser mode:** keep the backend running, open any vacancy in Chrome and press **Отправить отклик + письмо** in the extension. It analyzes the job, creates the letter, selects the HH resume or stored CV, fills safe fields and presses the unambiguous final action. It stops when a required answer, CAPTCHA, legal declaration or ambiguous button needs the candidate.
 
 The dashboard pipeline shows the employer, vacancy, source, application time, manual/autopilot origin, cover-letter status and later HR/interview/rejection/offer updates.
