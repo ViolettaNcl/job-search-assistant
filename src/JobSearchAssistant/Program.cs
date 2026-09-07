@@ -230,7 +230,7 @@ app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobSer
         lastMessage = latestRun?.Message ?? last?.Note,
         lastResult = latestRun is null
             ? (last is null ? null : new { type = last.Type, message = last.Note, attempted = 0, submitted = 0, failed = 0 })
-            : new { type = latestRun.Ready ? "Cycle" : "Setup", message = latestRun.Message, latestRun.Attempted, latestRun.Submitted, latestRun.Failed },
+            : new { type = latestRun.Ready ? "Cycle" : "Setup", message = latestRun.Message, attempted = latestRun.Attempted, submitted = latestRun.Submitted, failed = latestRun.Failed },
         diagnostics
     });
 });
