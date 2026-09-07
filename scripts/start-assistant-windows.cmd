@@ -35,7 +35,9 @@ goto end
 echo Backend is ready.
 start "" "http://127.0.0.1:8080/"
 echo.
-echo Next: open Chrome, pin Violetta Apply Assistant, then open Setup ^& Readiness.
+echo The assistant is now running. Keep the "Violetta Apply Assistant" backend window open all day.
+echo On the dashboard, use "Start AI assistant" to enable or pause automatic HH applications.
+echo For manual one-click applications, open Chrome and pin Violetta Apply Assistant.
 echo If this is the first install, load the included "extension" folder from chrome://extensions using Developer mode.
 
 :end

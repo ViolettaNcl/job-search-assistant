@@ -2,7 +2,9 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **1.2** is a review-first application autopilot for Russia and Europe. It uses the backend's ranked vacancy queue to make the daily workflow continuous: open the next strong job, analyze it, tailor the application, safely fill what can be verified, preserve context across compatible ATS steps and safe opener-linked tabs, record the application, then advance to the next strong unapplied vacancy.
+Version **2.6.0** supports two modes: a one-click browser application for the vacancy currently open, and the backend's optional all-day HH Apply Autopilot controlled from the local dashboard.
+
+The main popup button **Отправить отклик + письмо** performs the current-vacancy flow in one action: analyze, tailor, choose the HH resume or CV Vault file, fill verified-safe fields and click the final employer action only when it is unambiguous. It stops for unknown required answers, CAPTCHA, legal declarations, a missing CV, or an unverified submission result.
 
 ## Daily apply loop
 
@@ -95,8 +97,8 @@ This is intentionally stricter than scanning every open tab for a vaguely simila
 7. If the ATS moves to a compatible same-tab step or a safely linked new tab, reopen the extension and the application context is restored.
 8. Correct any review/manual-only/failed-fill items yourself. **Recheck submission checklist** remains available after manual edits.
 9. Click **Upload recommended CV** when a stored CV is available and verify the employer page shows the expected attachment.
-10. Review the entire employer form, then press the website's final Submit/Apply button yourself.
-11. Click **Mark applied** after submission so the application is recorded in the CRM and the daily queue can advance.
+10. Press **Отправить отклик + письмо** for the combined flow, or use the individual preparation controls when you want to inspect each step.
+11. A confirmed submission is recorded in the CRM automatically. If the site does not provide a reliable receipt, inspect it and use **Record applied** only after you can see that it succeeded.
 
 **Save to tracker** can store a vacancy before applying. Rich browser import keeps the job description, country/location, fit score and eligibility instead of saving only a shallow link. Duplicate source URLs reuse the existing CRM record.
 

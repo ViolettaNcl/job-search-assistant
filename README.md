@@ -14,7 +14,7 @@ The project is built around one principle: find fewer but stronger opportunities
 - Generates vacancy-specific Russian or English application drafts using verified candidate facts.
 - Repositions truthfully for .NET/backend/full-stack, QA and technical/implementation roles.
 - HH OAuth2 + encrypted tokens + resume selection + existing-application import.
-- Direct HH submission through HH's official applicant-authorized API for strong jobs after explicit confirmation.
+- Optional all-day HH Apply Autopilot through HH's official applicant-authorized API, with dashboard start/pause, fit threshold, daily limit, duplicate protection and an auditable activity history.
 - Chrome extension companion with HH, Greenhouse, Lever, Ashby and generic ATS detection.
 - Safe form resolver classifies fields as **fill / review / blocked**.
 - Browser-local Application Memory can reuse explicitly confirmed answers such as phone or LinkedIn.
@@ -33,18 +33,12 @@ The project is built around one principle: find fewer but stronger opportunities
 - Telegram commands and responsive web dashboard.
 - PostgreSQL, Docker, GitHub Actions and MSTest.
 
-## Daily workflow
+## Two working modes
 
-1. Run/visit the Job Search Assistant.
-2. Open **`/queue.html`** for the strongest current applications ranked by fit + freshness + eligibility.
-3. For HH.ru, use the official API apply flow when available.
-4. For Greenhouse, Lever, Ashby or another employer site, open the vacancy and use the Chrome extension.
-5. Check the extension's candidate-profile readiness message. Missing phone/LinkedIn remain review/manual until Violetta confirms them.
-6. Review the generated message and any fields marked **review** or **blocked**.
-7. Upload the recommended CV from CV Vault when appropriate, verify the attachment, and submit the external form yourself.
-8. Click **Mark applied** so the CRM stays accurate. If the extension actually inserted the PDF, that filename is attributed to the application for analytics.
-9. Check **`/followups.html`** for applications that are due a polite recruiter follow-up.
-10. Use **`/analytics.html`** to learn which sources/markets/role types and CV variants are producing real responses.
+1. **Autonomous HH mode:** start the Windows program, connect HH once, choose an HH resume, then press **Запустить AI-ассистента** on the dashboard. While the backend window is running, it collects vacancies hourly and checks the verified HH queue every 10 minutes. It applies only to eligible non-senior jobs above the chosen score, attaches a vacancy-specific letter, respects the daily limit and records every result.
+2. **Manual browser mode:** keep the backend running, open any vacancy in Chrome and press **Отправить отклик + письмо** in the extension. It analyzes the job, creates the letter, selects the HH resume or stored CV, fills safe fields and presses the unambiguous final action. It stops when a required answer, CAPTCHA, legal declaration or ambiguous button needs the candidate.
+
+The dashboard pipeline shows the employer, vacancy, source, application time, manual/autopilot origin, cover-letter status and later HR/interview/rejection/offer updates.
 
 The application queue excludes jobs already marked Applied and jobs classified as likely ineligible. The follow-up queue only includes applications still in Applied status; HR contact/interview/rejection/offer states automatically leave the queue.
 
@@ -54,14 +48,14 @@ The `Candidate` section of `src/JobSearchAssistant/appsettings.json` contains th
 
 The system knows, among other verified facts, that Violetta has Russian and Cyprus/EU work authorization, speaks Russian/English/Greek, has an honours programming diploma, and has a real-client DentalClinic project. It must never convert project work into invented years of salaried commercial employment.
 
-`Phone` and `LinkedInUrl` intentionally default to blank until Violetta explicitly confirms the values. When they are configured, the backend becomes the authoritative source for those fields. Until then the extension may reuse a value that the user explicitly confirmed in browser-local Application Memory, or it leaves the field for review.
+The verified phone number is configured in the local profile. `LinkedInUrl` remains blank until Violetta explicitly confirms it. Configured values are authoritative; unknown values stay for review instead of being guessed.
 
 ## Application policy
 
 There is no safe universal candidate API that can submit applications to every employer website.
 
-- **HH.ru:** direct application is supported through an applicant-authorized official API when OAuth and resume selection are configured.
-- **External ATS / company sites:** the extension analyzes and safely fills forms, but the final Submit/Apply action remains with the candidate.
+- **HH.ru:** the background autopilot uses the applicant-authorized official API when OAuth and resume selection are configured. It only submits verified eligible jobs and never sends duplicates.
+- **External ATS / company sites:** the extension can perform the final click from the explicit **Отправить отклик + письмо** action when the form, CV and confirmation signal are unambiguous. It stops for unknown mandatory answers or unclear site state.
 - CAPTCHA, 2FA and employer-specific legal declarations are never bypassed.
 
 This avoids account-risky mass-apply automation while still removing most repetitive work.
@@ -98,6 +92,8 @@ Browser: Ashby / other career sites ─┤
 Tech: **.NET 10 LTS, ASP.NET Core Minimal API, EF Core, PostgreSQL, HttpClient, Chrome Manifest V3, Docker, GitHub Actions, MSTest**.
 
 ## Setup
+
+To run directly from the source archive on Windows, install the .NET 10 SDK and double-click **`START_FROM_SOURCE.cmd`**. The dashboard opens at `http://127.0.0.1:8080`; keep the backend terminal open while the assistant is working.
 
 For the full Windows + Visual Studio Code walkthrough:
 
@@ -143,7 +139,11 @@ GET  /api/dashboard
 GET  /api/application-queue?limit=20&minScore=75
 GET  /api/followups?afterBusinessDays=5&maxAttempts=2&limit=30
 GET  /api/analytics/outcomes
+GET  /api/automation/status
+GET  /api/applications/activity?limit=100
 POST /api/collect
+POST /api/automation/run
+POST /api/settings/autoapply
 POST /api/extension/analyze
 POST /api/extension/resolve-fields
 POST /api/import/browser
@@ -196,9 +196,9 @@ The generated follow-up is Russian for Russia/HH applications and English for in
 
 ## Automatic submission
 
-`Security__EnableAutomaticSubmission=false` remains the safe default.
+Apply Autopilot is off until the user starts it from the local dashboard. The start/pause choice persists in the local database, so an enabled autopilot resumes after restarting the program. New installations default to an 85% fit threshold and 25 applications per local calendar day; the dashboard supports 75–100% and 1–50 per day.
 
-Background automatic submission is deliberately limited. HH's explicit applicant-authorized flow is the supported direct-submit path; external job sites remain review-first.
+Background submission is deliberately HH-only. External employer forms need an open browser tab and the extension's explicit one-click action.
 
 ## Tests
 

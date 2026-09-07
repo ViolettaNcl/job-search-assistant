@@ -41,7 +41,7 @@ function clearError() {
 }
 
 function setBusy(busy) {
-  for (const id of ["analyze", "fillForm", "copyLetter", "applyHh", "findCv", "rememberAnswers", "clearMemory", "trackJob", "markApplied", "nextReviewField", "confirmReviewField"]) {
+  for (const id of ["oneClickApply", "analyze", "fillForm", "copyLetter", "applyHh", "findCv", "rememberAnswers", "clearMemory", "trackJob", "markApplied", "nextReviewField", "confirmReviewField"]) {
     if ($(id)) $(id).disabled = busy;
   }
   $("analyze").textContent = busy ? "Working…" : "Analyze this vacancy";

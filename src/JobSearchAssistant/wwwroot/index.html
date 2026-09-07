@@ -28,6 +28,7 @@
     .pipeline-card{display:flex;justify-content:space-between;gap:12px;align-items:center}.pipeline-info{min-width:0}.pipeline-info b{display:block}.pipeline-info .meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;background:var(--accent-soft);color:#583681}
     .empty{padding:30px 18px;text-align:center;color:var(--muted);background:#fff;border:1px dashed #d9d0df;border-radius:14px}.notice{display:none;padding:9px 11px;border-radius:9px;margin-top:8px;font-size:13px}.notice.show{display:block}.notice.ok{background:#ebf6ef;color:#246b4b}.notice.err{background:#fff0f1;color:#8d3540}
     .legend{display:grid;gap:8px;font-size:13px;color:#594e60}.legend div{display:flex;gap:8px;align-items:center}.dot{width:9px;height:9px;border-radius:50%;background:#9d81bd;flex:none}
+    .autopilot-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.autopilot-state{font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;background:#f2eef5;color:#64566e}.autopilot-state.running{background:#eaf6ef;color:#236b4b}.autopilot-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.autopilot-grid label{font-size:11px;color:var(--muted)}.autopilot-grid input{margin-top:4px}.autopilot-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.autopilot-actions .btn{width:100%;padding:9px 8px}.activity-line{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
     .footer-note{color:var(--muted);font-size:12px;margin-top:18px}
     @media(max-width:1040px){.summary-grid{grid-template-columns:repeat(4,1fr)}.layout{grid-template-columns:1fr}.side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.side .panel{margin:0}.attention{grid-template-columns:1fr 1fr}}
     @media(max-width:680px){.shell{padding:18px 14px 40px}.header{flex-direction:column}.toolbar{justify-content:flex-start}.attention{grid-template-columns:1fr}.summary-grid{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:1fr}.side{grid-template-columns:1fr}.card-head,.pipeline-card{align-items:flex-start;flex-direction:column}.score small{text-align:left}.form-row{grid-template-columns:1fr}.actions>*{flex-grow:1;text-align:center}}
@@ -105,6 +106,17 @@
 
     <aside class="side">
       <section class="panel">
+        <div class="autopilot-head"><h3>AI-ассистент откликов</h3><span id="autoState" class="autopilot-state">Проверяю…</span></div>
+        <div class="help">Автономно отправляет подходящие HH-отклики с персональным письмом, пока программа запущена.</div>
+        <div class="autopilot-grid">
+          <label>Минимум совпадения<input id="autoScore" type="number" min="75" max="100" value="85" /></label>
+          <label>Лимит в день<input id="autoLimit" type="number" min="1" max="50" value="25" /></label>
+        </div>
+        <div class="autopilot-actions"><button id="autoToggle" class="btn small" onclick="toggleAutopilot()">Запустить</button><button class="btn secondary small" onclick="runAutopilotNow()">Проверить сейчас</button></div>
+        <div id="autoStatus" class="activity-line">—</div>
+      </section>
+
+      <section class="panel">
         <h3>Добавить вакансию вручную</h3>
         <div class="form-row"><input id="jobUrl" placeholder="HH / Wellfound / career site…" /><button class="btn small" onclick="importAny()">Добавить</button></div>
         <div class="help">Система сохранит ссылку и не даст создать тот же отклик повторно.</div>
@@ -139,27 +151,37 @@
 <script>
 const $=id=>document.getElementById(id);
 const esc=s=>(s??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let state={view:'all',jobs:[],pipeline:[],dashboard:null};
+let state={view:'all',jobs:[],pipeline:[],dashboard:null,automation:null};
 async function api(url,opt){const r=await fetch(url,opt);const txt=await r.text();let data;try{data=JSON.parse(txt)}catch{data=txt}if(!r.ok)throw new Error(typeof data==='string'?data:JSON.stringify(data));return data}
 function opportunityClass(v){return v.opportunityType==='Internship'?'intern':''}
 function marketClass(v){return v.market==='Russia'?'market-russia':'market-world'}
-function statusLabel(s){return ({Applied:'📤 Отклик',HrContact:'💬 HR contact',HrInterview:'🧑 HR interview',TechInterview:'💻 Tech interview',TestTask:'📝 Test task',Offer:'🏆 Offer'})[s]||s}
+function statusLabel(s){return ({Applied:'📤 Отклик',HrContact:'💬 HR contact',HrInterview:'🧑 HR interview',TechInterview:'💻 Tech interview',TestTask:'📝 Test task',Rejected:'❌ Отказ',Offer:'🏆 Offer'})[s]||s}
 function showNotice(text,ok=true){const el=$('importNotice');el.textContent=text;el.className='notice show '+(ok?'ok':'err');setTimeout(()=>el.className='notice',4500)}
 async function load(){
-  const [d,all,queue,followups,outcomes]=await Promise.all([
+  const [d,all,queue,followups,outcomes,automation]=await Promise.all([
     api('/api/dashboard'),
     api('/api/vacancies?status=New'),
     api('/api/application-queue?limit=100&minScore=75'),
     api('/api/followups?afterBusinessDays=5&limit=100&maxAttempts=2'),
-    api('/api/analytics/outcomes')
+    api('/api/analytics/outcomes'),
+    api('/api/automation/status')
   ]);
-  state.dashboard=d;state.jobs=all;state.pipeline=d.pipeline||[];
+  state.dashboard=d;state.jobs=all;state.pipeline=d.pipeline||[];state.automation=automation;
   const s=d.stats,seg=d.segments;
   $('stats').innerHTML=[['Всего',s.vacancies],['Россия',seg.russia],['Международные',seg.international],['Стажировки',seg.internships],['Strong Match',s.strong],['Отклики',s.applied],['Интервью',s.interviews],['Офферы',s.offers]].map(x=>`<div class="stat"><span class="label">${x[0]}</span><strong>${x[1]}</strong></div>`).join('');
   $('countAll').textContent=all.length;$('countRussia').textContent=all.filter(v=>v.market==='Russia').length;$('countInternational').textContent=all.filter(v=>v.market==='International').length;$('countInternship').textContent=all.filter(v=>v.opportunityType==='Internship').length;$('countStrong').textContent=all.filter(v=>v.matchScore>=85).length;$('countPipeline').textContent=state.pipeline.length;
   $('attentionQueue').textContent=queue.length;$('attentionFollowups').textContent=followups.length;$('attentionPipeline').textContent=state.pipeline.length;$('attentionResponseRate').textContent=`${Number(outcomes?.overall?.responseRate||0).toFixed(1)}%`;
   $('lastCollected').textContent=d.state.lastCollectedAt?new Date(d.state.lastCollectedAt).toLocaleString('ru-RU'):'Сбор ещё не запускался';
-  renderJobs();renderPipeline();
+  renderJobs();renderPipeline();renderAutomation();
+}
+function fmtTime(value){return value?new Date(value).toLocaleString('ru-RU'):'—'}
+function renderAutomation(){
+  const a=state.automation||{};const running=Boolean(a.ready);const enabled=Boolean(a.autoApplyEnabled);
+  $('autoState').textContent=running?'Работает':enabled?'Нужна настройка':'На паузе';$('autoState').className='autopilot-state'+(running?' running':'');
+  $('autoToggle').textContent=enabled?'⏸ Остановить':'▶ Запустить AI-ассистента';
+  $('autoScore').value=a.autoApplyMinimumScore??85;$('autoLimit').value=a.dailyAutoApplyLimit??25;
+  const setup=[];if(!a.allowed)setup.push('автопилот запрещён настройками');if(!a.hhConnected)setup.push('подключите HH');if(!a.resumeSelected)setup.push('выберите HH-резюме');
+  $('autoStatus').textContent=setup.length?`Нужно: ${setup.join(', ')}.`:`Сегодня отправлено: ${a.appliedToday||0}; осталось: ${a.remainingToday||0}. Последнее действие: ${fmtTime(a.lastRunAt)}.`;
 }
 function filteredJobs(){
   let items=[...state.jobs];const q=$('search').value.trim().toLowerCase();const type=$('typeFilter').value;
@@ -181,7 +203,7 @@ function renderJobs(){
   }).join('')||'<div class="empty">По этому фильтру пока нет вакансий. Попробуйте обновить поиск.</div>';
 }
 function renderPipeline(){
-  $('pipeline').innerHTML=state.pipeline.map(v=>`<article class="card pipeline-card"><div class="pipeline-info"><span class="status">${esc(statusLabel(v.status))}</span><b>${esc(v.title)}</b><div class="meta">${esc(v.company)} · ${esc(v.marketLabel)} · ${esc(v.opportunityTypeLabel)}</div></div><div class="actions"><button onclick="statusJob('${v.id}','HrContact')">💬 HR</button><button onclick="statusJob('${v.id}','HrInterview')">🧑 HR</button><button onclick="statusJob('${v.id}','TechInterview')">💻 Tech</button><button onclick="statusJob('${v.id}','TestTask')">📝 Test</button><button onclick="statusJob('${v.id}','Rejected')">❌ Reject</button><button onclick="statusJob('${v.id}','Offer')">🏆 Offer</button><a target="_blank" rel="noopener" href="${esc(v.url)}">Открыть</a></div></article>`).join('')||'<div class="empty">Пока нет активных откликов.</div>'
+  $('pipeline').innerHTML=state.pipeline.map(v=>`<article class="card pipeline-card"><div class="pipeline-info"><span class="status">${esc(statusLabel(v.status))}</span><b>${esc(v.title)}</b><div class="meta">${esc(v.company)} · ${esc(v.marketLabel)} · ${esc(v.opportunityTypeLabel)}</div><div class="meta">${v.automatic?'🤖 Автопилот':'👤 Вручную'} · ${v.coverLetterIncluded?'✉️ письмо приложено':'без сохранённого письма'} · ${esc(fmtTime(v.appliedAt||v.updatedAt))}</div>${v.latestEvent?.note?`<div class="meta">Последнее: ${esc(v.latestEvent.note)} · ${esc(fmtTime(v.latestEvent.createdAt))}</div>`:''}</div><div class="actions"><button onclick="statusJob('${v.id}','HrContact')">💬 HR</button><button onclick="statusJob('${v.id}','HrInterview')">🧑 HR</button><button onclick="statusJob('${v.id}','TechInterview')">💻 Tech</button><button onclick="statusJob('${v.id}','TestTask')">📝 Test</button><button onclick="statusJob('${v.id}','Rejected')">❌ Reject</button><button onclick="statusJob('${v.id}','Offer')">🏆 Offer</button><a target="_blank" rel="noopener" href="${esc(v.url)}">Открыть</a></div></article>`).join('')||'<div class="empty">Пока нет активных откликов.</div>'
 }
 function openPipeline(){const btn=document.querySelector('.tab[data-view="pipeline"]');if(btn)btn.click()}
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');state.view=btn.dataset.view;const pipeline=state.view==='pipeline';$('vacancyView').style.display=pipeline?'none':'block';$('pipelineView').style.display=pipeline?'block':'none';if(!pipeline)renderJobs()}));
@@ -192,6 +214,12 @@ async function applyJob(id){if(!confirm('Отправить отклик на э
 async function markApplied(id){await api(`/api/vacancies/${id}/mark-applied`,{method:'POST'});showNotice('Отклик отмечен');await load()}
 async function loadResumes(){try{const rs=await api('/api/hh/resumes');$('resumes').innerHTML=rs.map(r=>`<button class="btn secondary small" onclick="setResume('${esc(r.id)}')">${esc(r.title||r.id)}</button>`).join(' ')||'Резюме не найдены'}catch(e){$('resumes').textContent=e.message}}
 async function setResume(id){await api('/api/settings/resume',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({resumeId:id})});$('resumes').textContent='Выбрано HH resume id: '+id}
+async function toggleAutopilot(){
+  const enabled=!Boolean(state.automation?.autoApplyEnabled);const score=Math.max(75,Math.min(100,Number($('autoScore').value)||85));const dailyLimit=Math.max(1,Math.min(50,Number($('autoLimit').value)||25));
+  if(enabled&&!confirm(`Запустить автономные HH-отклики?\n\nМинимум совпадения: ${score}%\nЛимит: ${dailyLimit} в день\nК каждому отклику будет приложено персональное письмо.`))return;
+  try{$('autoToggle').disabled=true;const r=await api('/api/settings/autoapply',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({enabled,minimumScore:score,dailyLimit})});showNotice(enabled?(r.cycle?.message||'AI-ассистент запущен'):'AI-ассистент остановлен');await load()}catch(e){showNotice(e.message,false)}finally{$('autoToggle').disabled=false}
+}
+async function runAutopilotNow(){try{const r=await api('/api/automation/run',{method:'POST'});showNotice(r.message,r.ready||!r.enabled);await load()}catch(e){showNotice(e.message,false)}}
 load().catch(e=>showNotice(e.message,false));
 </script>
 </body>

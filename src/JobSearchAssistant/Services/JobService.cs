@@ -16,6 +16,17 @@ public sealed record CollectResult(
     int RemotiveFound,
     int AdzunaFound);
 
+public sealed record AutoApplyCycleResult(
+    bool Enabled,
+    bool Ready,
+    string Message,
+    int Attempted,
+    int Submitted,
+    int Failed,
+    int AppliedToday,
+    int RemainingToday,
+    DateTimeOffset CheckedAt);
+
 public sealed class JobService(
     AppDbContext db,
     HhClient hh,
@@ -24,8 +35,11 @@ public sealed class JobService(
     MatchScoringService scoring,
     IOptions<CandidateProfileOptions> candidate,
     IOptions<SecurityOptions> security,
-    IOptions<HhOptions> hhOptions)
+    IOptions<HhOptions> hhOptions,
+    IOptions<AutomationOptions> automation)
 {
+    private static readonly SemaphoreSlim AutoApplyLock = new(1, 1);
+
     public async Task<CollectResult> CollectAsync(SearchOptions options, CancellationToken ct)
     {
         var added = 0;
@@ -125,9 +139,6 @@ public sealed class JobService(
         state.LastCollectedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         var imported = await SyncExistingApplicationsAsync(ct);
-
-        if (state.AutoApplyEnabled && security.Value.EnableAutomaticSubmission)
-            await RunConservativeAutoApplyAsync(state, ct);
 
         return new CollectResult(hhFound + remotiveFound + adzunaFound, added, strong, imported, hhFound, remotiveFound, adzunaFound);
     }
@@ -261,7 +272,10 @@ public sealed class JobService(
         return imported;
     }
 
-    public async Task<HhApplyResult> ApplyAsync(Guid vacancyId, CancellationToken ct)
+    public Task<HhApplyResult> ApplyAsync(Guid vacancyId, CancellationToken ct)
+        => ApplyInternalAsync(vacancyId, automatic: false, ct);
+
+    private async Task<HhApplyResult> ApplyInternalAsync(Guid vacancyId, bool automatic, CancellationToken ct)
     {
         var vacancy = await db.Vacancies.Include(x => x.Application).Include(x => x.Company).SingleAsync(x => x.Id == vacancyId, ct);
         if (vacancy.Company.IsBlacklisted) return new HhApplyResult(false, "blacklisted", "Company is blacklisted.");
@@ -292,7 +306,14 @@ public sealed class JobService(
         vacancy.Status = VacancyStatus.Applied;
         vacancy.HasExistingHhResponse = true;
         db.Applications.Add(new Application { VacancyId = vacancy.Id, ResumeExternalId = state.HhResumeId, CoverLetter = letter });
-        db.ApplicationEvents.Add(new ApplicationEvent { VacancyId = vacancy.Id, Type = "Applied", Note = "Submitted via HH API" });
+        db.ApplicationEvents.Add(new ApplicationEvent
+        {
+            VacancyId = vacancy.Id,
+            Type = automatic ? "AutoApplied" : "Applied",
+            Note = automatic
+                ? "Submitted automatically via HH API with a vacancy-specific cover letter"
+                : "Submitted manually from the dashboard via HH API"
+        });
         await db.SaveChangesAsync(ct);
         return result;
     }
@@ -337,20 +358,80 @@ public sealed class JobService(
                $"GitHub: {profile.GitHubUrl}  CV/Portfolio: {profile.CvUrl}. Буду рада обсудить задачи команды.";
     }
 
-    private async Task RunConservativeAutoApplyAsync(AppState state, CancellationToken ct)
+    public async Task<AutoApplyCycleResult> RunAutoApplyCycleAsync(CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(state.HhResumeId)) return;
-        var today = new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero);
-        var alreadyToday = await db.Applications.CountAppliedSinceAsync(today, ct);
-        var available = Math.Max(0, state.DailyAutoApplyLimit - alreadyToday);
-        if (available == 0) return;
+        var now = DateTimeOffset.UtcNow;
+        if (!await AutoApplyLock.WaitAsync(0, ct))
+            return new AutoApplyCycleResult(true, false, "Another Apply Autopilot cycle is already running.", 0, 0, 0, 0, 0, now);
 
-        var candidates = await db.Vacancies.Include(x => x.Company).Include(x => x.Application)
-            .Where(x => x.Source == "hh" && x.Status == VacancyStatus.New && x.Application == null && !x.HasExistingHhResponse && !x.Company.IsBlacklisted && x.MatchScore >= state.AutoApplyMinimumScore && x.EligibilityStatus == "Eligible")
-            .RankedAsync(available, ct, filter: x => AutomaticSubmissionPolicy.CanSubmit(x, state.AutoApplyMinimumScore));
+        try
+        {
+            var state = await GetStateAsync(ct);
+            if (!state.AutoApplyEnabled)
+                return new AutoApplyCycleResult(false, false, "Apply Autopilot is paused.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now);
+            if (!security.Value.EnableAutomaticSubmission)
+                return new AutoApplyCycleResult(true, false, "Automatic submission is disabled in local security settings.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now);
+            if (string.IsNullOrWhiteSpace(state.HhResumeId))
+                return new AutoApplyCycleResult(true, false, "Select an HH resume before starting Apply Autopilot.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now);
+            if (!await hh.HasOAuthAsync(ct))
+                return new AutoApplyCycleResult(true, false, "Connect HH OAuth before starting Apply Autopilot.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now);
 
-        foreach (var vacancy in candidates)
-            await ApplyAsync(vacancy.Id, ct);
+            var localNow = DateTimeOffset.Now;
+            var today = new DateTimeOffset(localNow.Date, localNow.Offset);
+            var alreadyToday = await db.Applications.CountAppliedSinceAsync(today, ct);
+            var available = Math.Max(0, state.DailyAutoApplyLimit - alreadyToday);
+            if (available == 0)
+                return new AutoApplyCycleResult(true, true, "The daily application limit has been reached.", 0, 0, 0, alreadyToday, 0, now);
+
+            var retryAfter = now.AddMinutes(-Math.Clamp(automation.Value.FailureCooldownMinutes, 30, 1440));
+            var candidates = await db.Vacancies.Include(x => x.Company).Include(x => x.Application).Include(x => x.Events)
+                .Where(x => x.Source == "hh" && x.Status == VacancyStatus.New && x.Application == null && !x.HasExistingHhResponse && !x.Company.IsBlacklisted && x.MatchScore >= state.AutoApplyMinimumScore && x.EligibilityStatus == "Eligible")
+                .RankedAsync(available, ct, filter: x =>
+                    AutomaticSubmissionPolicy.CanSubmit(x, state.AutoApplyMinimumScore) &&
+                    !x.Events.Any(e => e.Type == "AutoApplyFailed" && e.CreatedAt >= retryAfter));
+
+            var submitted = 0;
+            var failed = 0;
+            foreach (var vacancy in candidates)
+            {
+                HhApplyResult result;
+                try
+                {
+                    result = await ApplyInternalAsync(vacancy.Id, automatic: true, ct);
+                }
+                catch (Exception ex)
+                {
+                    result = new HhApplyResult(false, "exception", ex.Message);
+                }
+
+                if (result.Success)
+                {
+                    submitted++;
+                    continue;
+                }
+
+                failed++;
+                var failureNote = $"{result.ErrorCode}: {result.ErrorText}";
+                db.ApplicationEvents.Add(new ApplicationEvent
+                {
+                    VacancyId = vacancy.Id,
+                    Type = "AutoApplyFailed",
+                    Note = failureNote[..Math.Min(500, failureNote.Length)]
+                });
+                await db.SaveChangesAsync(ct);
+            }
+
+            var appliedToday = alreadyToday + submitted;
+            var remaining = Math.Max(0, state.DailyAutoApplyLimit - appliedToday);
+            var message = candidates.Count == 0
+                ? "No new verified matching HH vacancies are ready right now."
+                : $"Apply Autopilot submitted {submitted} of {candidates.Count} selected vacancies.";
+            return new AutoApplyCycleResult(true, true, message, candidates.Count, submitted, failed, appliedToday, remaining, now);
+        }
+        finally
+        {
+            AutoApplyLock.Release();
+        }
     }
 
     private async Task<Company> GetOrCreateCompanyAsync(string name, string externalHint, CancellationToken ct)

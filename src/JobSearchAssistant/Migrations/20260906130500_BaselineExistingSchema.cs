@@ -107,7 +107,7 @@ public sealed class BaselineExistingSchema : Migration
                 "Id", "HhResumeId", "ProtectedAccessToken", "ProtectedRefreshToken",
                 "AccessTokenExpiresAt", "OAuthState", "OAuthCodeVerifier", "OAuthCreatedAt",
                 "AutoApplyEnabled", "AutoApplyMinimumScore", "DailyAutoApplyLimit", "LastCollectedAt")
-            VALUES (1, '', '', '', NULL, '', '', NULL, FALSE, 95, 3, NULL)
+            VALUES (1, '', '', '', NULL, '', '', NULL, FALSE, 85, 25, NULL)
             ON CONFLICT ("Id") DO NOTHING;
             """);
     }

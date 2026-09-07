@@ -143,6 +143,44 @@ async function vjaApplyNowOnSite() {
   }
 }
 
+let vjaOneClickRunning = false;
+async function vjaOneClickApply() {
+  if (vjaOneClickRunning) return;
+  const button = $("oneClickApply");
+  const status = $("oneClickStatus");
+  vjaOneClickRunning = true;
+  clearError();
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Готовлю и отправляю…";
+  }
+  if (status) status.textContent = "Анализирую вакансию и создаю персональное сопроводительное письмо…";
+
+  try {
+    const summary = await window.vjaPrepareCurrentApplication?.();
+    if (!latest || !latestPage?.url || summary?.state === "failed") {
+      throw new Error("Не удалось подготовить отклик. Проверьте соединение с запущенной программой.");
+    }
+    if (status) status.textContent = "Открываю форму, выбираю резюме/CV, вставляю письмо и проверяю финальную отправку…";
+    await vjaApplyNowOnSite();
+    const submitted = $("siteApplyNow")?.disabled && $("siteApplyNow")?.textContent?.includes("Applied");
+    if (submitted) {
+      button.textContent = "Отклик отправлен ✓";
+      status.textContent = "Работодатель получил отклик, резюме/CV и сопроводительное письмо; запись сохранена на дашборде.";
+      return;
+    }
+    button.textContent = "Продолжить отклик";
+    status.textContent = $("fillNote")?.textContent || "Расширение остановилось на обязательном шаге, который нужно проверить.";
+  } catch (error) {
+    showError(error?.message || String(error));
+    if (button) button.textContent = "Повторить отправку";
+    if (status) status.textContent = "Отклик не отправлен. Исправьте указанную проблему и повторите.";
+  } finally {
+    vjaOneClickRunning = false;
+    if (button && !button.textContent.includes("отправлен")) button.disabled = false;
+  }
+}
+
 async function vjaRestoreSiteApplyResult() {
   const stored = await chrome.storage.local.get("vjaSiteApplyResult");
   const envelope = stored.vjaSiteApplyResult;
@@ -152,6 +190,7 @@ async function vjaRestoreSiteApplyResult() {
 
 const vjaSiteApplyButton = vjaEnsureSiteApplyButton();
 vjaSiteApplyButton?.addEventListener("click", vjaApplyNowOnSite);
+$("oneClickApply")?.addEventListener("click", vjaOneClickApply);
 
 const vjaMarkAppliedButton = $("markApplied");
 if (vjaMarkAppliedButton && !vjaMarkAppliedButton.textContent.includes("Record")) {

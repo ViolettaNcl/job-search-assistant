@@ -13,6 +13,7 @@ builder.Services.Configure<HhOptions>(builder.Configuration.GetSection("HH"));
 builder.Services.Configure<RemotiveOptions>(builder.Configuration.GetSection("Remotive"));
 builder.Services.Configure<AdzunaOptions>(builder.Configuration.GetSection("Adzuna"));
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection("Security"));
+builder.Services.Configure<AutomationOptions>(builder.Configuration.GetSection("Automation"));
 
 var postgresConnection = builder.Configuration.GetConnectionString("Postgres");
 DatabaseStorageMode storageMode;
@@ -48,6 +49,7 @@ builder.Services.AddScoped<ApplicationAttributionService>();
 builder.Services.AddScoped<OutcomeAnalyticsService>();
 builder.Services.AddScoped<StatsService>();
 builder.Services.AddHostedService<VacancyCollectorWorker>();
+builder.Services.AddHostedService<AutoApplyWorker>();
 builder.Services.AddHostedService<TelegramBotWorker>();
 
 var app = builder.Build();
@@ -121,12 +123,17 @@ app.MapGet("/api/dashboard", async (AppDbContext db, StatsService stats, Cancell
         opportunityType = VacancyClassifier.OpportunityType(x), opportunityTypeLabel = VacancyClassifier.TypeLabel(VacancyClassifier.OpportunityType(x))
     }).ToList();
 
-    var pipelineRows = await db.Vacancies.Include(x => x.Company)
-        .Where(x => x.Status == VacancyStatus.Applied || x.Status == VacancyStatus.HrContact || x.Status == VacancyStatus.HrInterview || x.Status == VacancyStatus.TechInterview || x.Status == VacancyStatus.TestTask || x.Status == VacancyStatus.Offer)
+    var pipelineRows = await db.Vacancies.Include(x => x.Company).Include(x => x.Application).Include(x => x.Events)
+        .Where(x => x.Status == VacancyStatus.Applied || x.Status == VacancyStatus.HrContact || x.Status == VacancyStatus.HrInterview || x.Status == VacancyStatus.TechInterview || x.Status == VacancyStatus.TestTask || x.Status == VacancyStatus.Rejected || x.Status == VacancyStatus.Offer)
         .RecentAsync(50, ct);
     var pipeline = pipelineRows.Select(x => new
     {
         x.Id, x.Title, company = x.Company.Name, x.Url, status = x.Status.ToString(), x.UpdatedAt,
+        appliedAt = x.Application?.AppliedAt,
+        resume = x.Application?.ResumeExternalId,
+        coverLetterIncluded = x.Application != null && !string.IsNullOrWhiteSpace(x.Application.CoverLetter),
+        automatic = x.Events.Any(e => e.Type == "AutoApplied"),
+        latestEvent = x.Events.OrderByDescending(e => e.CreatedAt).Select(e => new { e.Type, e.Note, e.CreatedAt }).FirstOrDefault(),
         market = VacancyClassifier.Market(x), marketLabel = VacancyClassifier.MarketLabel(VacancyClassifier.Market(x)),
         opportunityType = VacancyClassifier.OpportunityType(x), opportunityTypeLabel = VacancyClassifier.TypeLabel(VacancyClassifier.OpportunityType(x))
     }).ToList();
@@ -158,6 +165,65 @@ app.MapGet("/api/followups", async (int? afterBusinessDays, int? limit, int? max
 
 app.MapGet("/api/analytics/outcomes", async (OutcomeAnalyticsService analytics, CancellationToken ct)
     => Results.Ok(await analytics.GetAsync(ct)));
+
+app.MapGet("/api/applications/activity", async (int? limit, AppDbContext db, CancellationToken ct) =>
+{
+    var rows = await db.Applications.AsNoTracking()
+        .Include(x => x.Vacancy).ThenInclude(x => x.Company)
+        .Include(x => x.Vacancy).ThenInclude(x => x.Events)
+        .ToListAsync(ct);
+    var items = rows.OrderByDescending(x => x.AppliedAt).ThenBy(x => x.Id)
+        .Take(Math.Clamp(limit ?? 100, 1, 500))
+        .Select(x => new
+        {
+            x.Id,
+            x.VacancyId,
+            x.Vacancy.Title,
+            company = x.Vacancy.Company.Name,
+            x.Vacancy.Url,
+            source = x.Vacancy.SourceLabel,
+            status = x.Vacancy.Status.ToString(),
+            x.AppliedAt,
+            x.Vacancy.UpdatedAt,
+            resume = x.ResumeExternalId,
+            coverLetterIncluded = !string.IsNullOrWhiteSpace(x.CoverLetter),
+            automatic = x.Vacancy.Events.Any(e => e.Type == "AutoApplied"),
+            latestEvent = x.Vacancy.Events.OrderByDescending(e => e.CreatedAt)
+                .Select(e => new { e.Type, e.Note, e.CreatedAt }).FirstOrDefault(),
+            x.LastError
+        });
+    return Results.Ok(items);
+});
+
+app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, IOptions<SecurityOptions> security, CancellationToken ct) =>
+{
+    var state = await db.AppStates.AsNoTracking().SingleAsync(x => x.Id == 1, ct);
+    var localNow = DateTimeOffset.Now;
+    var today = new DateTimeOffset(localNow.Date, localNow.Offset);
+    var appliedToday = await db.Applications.CountAppliedSinceAsync(today, ct);
+    var autoEvents = await db.ApplicationEvents.AsNoTracking()
+        .Where(x => x.Type == "AutoApplied" || x.Type == "AutoApplyFailed")
+        .ToListAsync(ct);
+    var last = autoEvents.OrderByDescending(x => x.CreatedAt).FirstOrDefault();
+    var hhConnected = false;
+    try { hhConnected = await hh.HasOAuthAsync(ct); } catch { }
+    var allowed = security.Value.EnableAutomaticSubmission;
+    var ready = state.AutoApplyEnabled && allowed && hhConnected && !string.IsNullOrWhiteSpace(state.HhResumeId);
+    return Results.Ok(new
+    {
+        state.AutoApplyEnabled,
+        allowed,
+        ready,
+        hhConnected,
+        resumeSelected = !string.IsNullOrWhiteSpace(state.HhResumeId),
+        state.AutoApplyMinimumScore,
+        state.DailyAutoApplyLimit,
+        appliedToday,
+        remainingToday = Math.Max(0, state.DailyAutoApplyLimit - appliedToday),
+        lastRunAt = last?.CreatedAt,
+        lastResult = last is null ? null : new { last.Type, last.Note }
+    });
+});
 
 app.MapGet("/api/vacancies", async (AppDbContext db, string? status, int? minScore, string? market, string? type, CancellationToken ct) =>
 {
@@ -319,15 +385,19 @@ app.MapPost("/api/settings/resume", async (ResumeRequest request, AppDbContext d
 {
     var state = await db.AppStates.SingleAsync(x => x.Id == 1, ct); state.HhResumeId = request.ResumeId; await db.SaveChangesAsync(ct); return Results.Ok();
 });
-app.MapPost("/api/settings/autoapply", async (AutoApplyRequest request, AppDbContext db, CancellationToken ct) =>
+app.MapPost("/api/settings/autoapply", async (AutoApplyRequest request, AppDbContext db, JobService jobs, CancellationToken ct) =>
 {
     var state = await db.AppStates.SingleAsync(x => x.Id == 1, ct);
     state.AutoApplyEnabled = request.Enabled;
-    state.AutoApplyMinimumScore = Math.Clamp(request.MinimumScore, 90, 100);
-    state.DailyAutoApplyLimit = Math.Clamp(request.DailyLimit, 1, 10);
+    state.AutoApplyMinimumScore = Math.Clamp(request.MinimumScore, 75, 100);
+    state.DailyAutoApplyLimit = Math.Clamp(request.DailyLimit, 1, 50);
     await db.SaveChangesAsync(ct);
-    return Results.Ok(new { state.AutoApplyEnabled, state.AutoApplyMinimumScore, state.DailyAutoApplyLimit });
+    var cycle = request.Enabled ? await jobs.RunAutoApplyCycleAsync(ct) : null;
+    return Results.Ok(new { state.AutoApplyEnabled, state.AutoApplyMinimumScore, state.DailyAutoApplyLimit, cycle });
 });
+
+app.MapPost("/api/automation/run", async (JobService jobs, CancellationToken ct)
+    => Results.Ok(await jobs.RunAutoApplyCycleAsync(ct)));
 
 app.MapFallbackToFile("index.html");
 app.Run();

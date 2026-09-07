@@ -98,8 +98,8 @@ public sealed class AppState
     public string OAuthCodeVerifier { get; set; } = "";
     public DateTimeOffset? OAuthCreatedAt { get; set; }
     public bool AutoApplyEnabled { get; set; }
-    public int AutoApplyMinimumScore { get; set; } = 95;
-    public int DailyAutoApplyLimit { get; set; } = 3;
+    public int AutoApplyMinimumScore { get; set; } = 85;
+    public int DailyAutoApplyLimit { get; set; } = 25;
     public DateTimeOffset? LastCollectedAt { get; set; }
 }
 
@@ -175,6 +175,12 @@ public sealed record SearchOptions
     public int MinimumTelegramScore { get; init; } = 65;
     public bool RemoteOnly { get; init; } = true;
     public bool IncludeRelocationWithVisa { get; init; } = false;
+}
+
+public sealed record AutomationOptions
+{
+    public int CycleMinutes { get; init; } = 10;
+    public int FailureCooldownMinutes { get; init; } = 180;
 }
 
 public sealed record TelegramOptions

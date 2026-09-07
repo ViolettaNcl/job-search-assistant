@@ -120,7 +120,9 @@ The extension can find and highlight file-upload controls but cannot silently ch
 
 Missing technologies may be acknowledged honestly but are never added to the candidate profile automatically.
 
-For external job sites the extension never clicks the final Submit button. HH.ru is the explicit exception: after user confirmation, HH OAuth and resume selection, the dedicated HH button can submit via the official applicant API.
+The local dashboard can run an unattended HH-only submission loop after HH OAuth and resume selection are configured. It checks every 10 minutes, applies only to verified eligible non-senior vacancies above the chosen threshold, respects the daily limit and records success/failure events.
+
+For an external job site, the extension clicks the final action only from the user's explicit **Отправить отклик + письмо** command and only when required fields, the CV and the submission action are unambiguous. CAPTCHA, legal declarations, unknown mandatory answers and unreliable confirmation states still stop the flow.
 
 ## Next implementation batch
 

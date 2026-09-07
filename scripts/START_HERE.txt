@@ -41,13 +41,28 @@ VIOLETTA APPLY ASSISTANT — WINDOWS QUICK START
 
    HH is optional. External ATS application preparation works without HH direct API access.
 
-7. Normal application workflow:
-   - Open a vacancy (or use Open next strong job)
-   - Click Prepare application
-   - Review any highlighted checkpoints
-   - Verify the CV attachment
-   - Submit the employer form yourself on external ATS sites
-   - Record the verified submission in the assistant
+7. Choose a working mode:
+
+   AUTONOMOUS HH MODE
+   - Keep the backend window open for the whole working day
+   - Open the dashboard and connect HH once
+   - Load and select your HH resume
+   - Set the minimum fit and daily limit
+   - Click "Запустить AI-ассистента"
+   - The program collects jobs hourly and checks the HH queue every 10 minutes
+   - Click "Остановить" whenever you want to pause it
+
+   MANUAL EXTENSION MODE
+   - Open a vacancy in Chrome
+   - Open Violetta Apply Assistant
+   - Click "Отправить отклик + письмо"
+   - The extension prepares the tailored letter, selects/attaches the CV and
+     submits only when the final action and required fields are verified
+   - If it stops, review the mandatory field shown in the extension and retry
+
+8. The dashboard records who received each application, the exact time,
+   whether Autopilot or the extension was used, whether a letter was attached,
+   and later HR/interview/rejection/offer updates.
 
 OPTIONAL DATABASE SETTINGS
 --------------------------
