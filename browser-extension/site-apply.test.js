@@ -73,6 +73,8 @@ assert.deepEqual(apply.canSubmit(ready), { ok: true, reason: 'ready' });
 assert.equal(apply.canSubmit({ ...ready, applicationUiFound: false }).reason, 'application-ui-not-found');
 assert.equal(apply.canSubmit({ ...ready, unresolvedRequired: 1 }).reason, 'required-fields');
 assert.equal(apply.canSubmit({ ...ready, cvUploaded: false }).reason, 'cv-not-uploaded');
+assert.equal(apply.canSubmit({ ...ready, coverLetterRequired: true, coverLetterFilled: false }).reason, 'cover-letter-not-persisted');
+assert.deepEqual(apply.canSubmit({ ...ready, coverLetterRequired: true, coverLetterFilled: true }), { ok: true, reason: 'ready' });
 
 assert.equal(apply.canAcceptReceipt({ finalClicked: false, receiptConfirmed: true }), false,
   'confirmation-looking vacancy copy cannot be recorded before a final action');

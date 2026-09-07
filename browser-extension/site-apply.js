@@ -188,6 +188,7 @@
   function canSubmit(input = {}) {
     const unresolved = Math.max(0, Number(input.unresolvedRequired || 0));
     if (!input.applicationUiFound) return { ok: false, reason: "application-ui-not-found" };
+    if (input.coverLetterRequired && !input.coverLetterFilled) return { ok: false, reason: "cover-letter-not-persisted" };
     if (unresolved) return { ok: false, reason: "required-fields" };
     if (input.cvFieldPresent && !input.cvUploaded) return { ok: false, reason: "cv-not-uploaded" };
     if (!input.finalFound) return { ok: false, reason: "final-action-not-found" };

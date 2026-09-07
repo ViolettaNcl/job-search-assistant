@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "2.5.2",
+  "version": "2.5.3",
   "description": "Analyze vacancies, tailor applications, attach or select the correct CV/resume, and submit employer-site applications from one explicit Apply + send action with conservative safety checks.",
   "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite"],
   "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
