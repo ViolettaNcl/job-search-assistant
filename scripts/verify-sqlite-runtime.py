@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.error
@@ -11,6 +12,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 DLL = ROOT / "src/JobSearchAssistant/bin/Release/net10.0/JobSearchAssistant.dll"
+BACKEND = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else DLL
 
 
 def verify():
@@ -35,8 +37,10 @@ def verify():
         vacancy_id = None
         for restart in range(2):
             with open(Path(directory) / f"server-{restart}.log", "w+") as log:
-                process = subprocess.Popen(["dotnet", str(DLL), "--urls", base],
-                    cwd=ROOT / "src/JobSearchAssistant", env=env, stdout=log, stderr=log)
+                command = [str(BACKEND)] if BACKEND.suffix == ".exe" else ["dotnet", str(BACKEND)]
+                content_root = BACKEND.parent if BACKEND.suffix == ".exe" else ROOT / "src/JobSearchAssistant"
+                process = subprocess.Popen(command + ["--urls", base],
+                    cwd=content_root, env=env, stdout=log, stderr=log)
                 try:
                     for attempt in range(100):
                         if process.poll() is not None:

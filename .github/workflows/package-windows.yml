@@ -65,3 +65,30 @@ jobs:
           path: dist/Violetta-Apply-Assistant-Windows.zip
           if-no-files-found: error
           retention-days: 30
+
+  verify-downloaded-package:
+    needs: package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: violetta-apply-assistant-windows
+          path: downloaded
+      - name: Inspect downloaded ZIP and bundled runtime
+        shell: pwsh
+        run: |
+          Expand-Archive downloaded/Violetta-Apply-Assistant-Windows.zip -DestinationPath verified
+          $required = @('backend/JobSearchAssistant.exe', 'backend/JobSearchAssistant.dll',
+            'backend/coreclr.dll', 'backend/hostfxr.dll', 'backend/JobSearchAssistant.runtimeconfig.json',
+            'backend/wwwroot/index.html', 'extension/manifest.json', 'start-assistant.cmd', 'START_HERE.txt')
+          foreach ($file in $required) {
+            if (-not (Test-Path "verified/$file")) { throw "Missing packaged file: $file" }
+          }
+          $source = Get-Content browser-extension/manifest.json -Raw | ConvertFrom-Json
+          $packaged = Get-Content verified/extension/manifest.json -Raw | ConvertFrom-Json
+          if ($source.version -ne $packaged.version) { throw 'Packaged version differs from source.' }
+          Write-Host "Verified downloaded extension version: $($packaged.version)"
+          Get-FileHash downloaded/Violetta-Apply-Assistant-Windows.zip -Algorithm SHA256
+      - name: Run packaged Windows executable and verify SQLite restart
+        run: python scripts/verify-sqlite-runtime.py verified/backend/JobSearchAssistant.exe
