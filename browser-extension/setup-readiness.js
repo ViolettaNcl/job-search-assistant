@@ -16,8 +16,6 @@
     const bothCvs = enCv && ruCv;
     const queueCount = Math.max(0, Number(input.queue?.strongCount || 0));
     const queueOk = queueCount > 0;
-    const hhAuthorized = bool(input.hh?.authorized);
-    const hhResumeSelected = bool(input.hh?.resumeSelected);
 
     const items = [
       item("backend", "Backend", backendOk, "required", backendOk ? "Backend is reachable and ready." : "Start/fix the Job Search Assistant backend before using the application autopilot.", "backend"),
@@ -25,9 +23,7 @@
       item("contacts", "Reusable phone", contactsReady, "recommended", contactsReady ? "Phone is available from the verified backend profile or this browser's local contact profile." : "Add your phone once so common contact fields do not need repeated manual entry.", "contacts"),
       item("english-cv", "English CV Vault", enCv, "recommended", enCv ? "English CV is stored locally." : "Store the English PDF once for European/international applications.", "cv"),
       item("russian-cv", "Russian CV Vault", ruCv, "recommended", ruCv ? "Russian CV is stored locally." : "Store the Russian PDF once for Russian/HH applications.", "cv"),
-      item("queue", "Strong-job queue", queueOk, "recommended", queueOk ? `${queueCount} strong unapplied job${queueCount === 1 ? "" : "s"} currently available.` : "No 75+ unapplied jobs are currently available; refresh collection or search/import more jobs.", "queue"),
-      item("hh-auth", "HH.ru API authorization (optional)", hhAuthorized, "optional", hhAuthorized ? "HH applicant API authorization is working." : "Official HH API authorization is not configured. Website applications remain available through the extension.", "hh"),
-      item("hh-resume", "HH.ru API resume selection (optional)", hhResumeSelected, "optional", hhResumeSelected ? "An HH resume is selected for official-API applications." : "Not needed for the normal HH.ru website application flow.", "hh")
+      item("queue", "Strong-job queue", queueOk, "recommended", queueOk ? `${queueCount} strong unapplied job${queueCount === 1 ? "" : "s"} currently available.` : "No 75+ unapplied jobs are currently available; refresh collection or search/import more jobs.", "queue")
     ];
 
     let state = "ready";
@@ -47,7 +43,7 @@
         contactAutofill: contactsReady,
         cvAutoload: bothCvs,
         dailyQueue: backendOk && queueOk,
-        hhDirect: backendOk && candidateOk && hhAuthorized && hhResumeSelected
+        hhDirect: backendOk && candidateOk
       }
     };
   }
