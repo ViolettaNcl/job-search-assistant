@@ -6,6 +6,7 @@
   const APPLY_RE = /^(?:откликнуться|отправить отклик|подать заявку|apply|apply now|submit application|send application|respond)$/i;
   const FINAL_RE = /(?:отправить\s+отклик|отправить\s+заявку|подать\s+заявку|submit\s+application|send\s+application|apply\s+now|откликнуться)/i;
   const COVER_RE = /(?:сопровод|мотивац|письм|сообщен|cover\s*letter|motivation|message\s+to)/i;
+  const APPLICATION_RE = /(?:отклик|заявк|apply|application|сопровод|resume|резюме)/i;
 
   function textOf(el) {
     return String(el?.innerText || el?.textContent || el?.value || "").replace(/\s+/g, " ").trim();
@@ -51,7 +52,7 @@
   function applicationSurface(doc = document) {
     const dialog = [...doc.querySelectorAll("[role='dialog'], dialog, [class*='modal'], [class*='application'], form")]
       .filter(visible)
-      .find(el => /отклик|заявк|apply|application|сопровод|resume|резюме/i.test(textOf(el)));
+      .find(el => APPLICATION_RE.test(textOf(el)));
     return dialog || doc;
   }
 
@@ -60,8 +61,10 @@
     const fields = [...surface.querySelectorAll("textarea, [contenteditable='true']")].filter(visible);
     const labelled = fields.find(el => COVER_RE.test(labelText(el, doc)));
     if (labelled) return labelled;
-    if (fields.length === 1) return fields[0];
-    return fields.sort((a, b) => (b.clientHeight || 0) - (a.clientHeight || 0))[0] || null;
+    if (surface !== doc && fields.length === 1) return fields[0];
+    const applicationLike = fields.filter(el => APPLICATION_RE.test(labelText(el, doc)));
+    if (applicationLike.length) return applicationLike.sort((a, b) => (b.clientHeight || 0) - (a.clientHeight || 0))[0];
+    return null;
   }
 
   function setValue(el, value) {
@@ -89,7 +92,7 @@
       .filter(el => el !== opener)
       .map(el => ({ el, text: textOf(el) }))
       .filter(x => x.text && FINAL_RE.test(x.text) && !/предпросмотр|preview|сохранить|save|назад|back/i.test(x.text));
-    if (inside.length) return inside[inside.length - 1].el;
+    if (surface !== doc && inside.length) return inside[inside.length - 1].el;
 
     const all = buttonCandidates(doc)
       .filter(x => x.el !== opener)
@@ -99,8 +102,14 @@
 
   function hasApplicationFields(doc = document) {
     const surface = applicationSurface(doc);
-    return [...surface.querySelectorAll("textarea, input[type='file'], input:not([type]), input[type='text'], input[type='email'], input[type='tel'], select")]
-      .some(visible);
+    const fields = [...surface.querySelectorAll("textarea, input[type='file'], input:not([type]), input[type='text'], input[type='email'], input[type='tel'], select")]
+      .filter(visible);
+    if (surface !== doc) return fields.length > 0;
+    return fields.some(el => {
+      if (el.matches?.("input[type='file']")) return APPLICATION_RE.test(labelText(el, doc));
+      if (el.matches?.("textarea")) return COVER_RE.test(labelText(el, doc)) || APPLICATION_RE.test(labelText(el, doc));
+      return false;
+    });
   }
 
   async function waitFor(predicate, timeoutMs = 4500, intervalMs = 120) {
