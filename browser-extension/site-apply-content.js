@@ -83,8 +83,9 @@ function vjaSiteRequiredFields(container = document) {
       label: vjaSiteLabel(el),
       required: true,
       disabled: Boolean(el.disabled),
-      hidden: el instanceof HTMLInputElement && el.type === 'hidden',
+      hidden: !vjaSiteVisible(el) || (el instanceof HTMLInputElement && el.type === 'hidden'),
       type: el instanceof HTMLInputElement ? el.type : (el instanceof HTMLSelectElement ? 'select' : 'text'),
+      group: el instanceof HTMLInputElement && el.type === 'radio' ? (el.name || vjaSiteLabel(el)) : '',
       value: 'value' in el ? String(el.value || '') : '',
       checked: Boolean(el.checked),
       fileCount: el instanceof HTMLInputElement && el.type === 'file' ? Number(el.files?.length || 0) : 0
@@ -151,22 +152,16 @@ async function vjaSiteStoreResult(plan, result) {
   };
   await chrome.storage.local.set({ vjaSiteApplyResult: payload });
   if (result?.submitted || result?.status === 'needs-review' || result?.status === 'verification-needed') {
-    await chrome.storage.local.remove('vjaPendingSiteApply');
+    const stored = await chrome.storage.local.get('vjaPendingSiteApply');
+    if (stored.vjaPendingSiteApply?.id === plan?.id) await chrome.storage.local.remove('vjaPendingSiteApply');
   }
 }
 
 async function vjaRunSiteApply(plan = {}, options = {}) {
-  const initialReceipt = vjaSiteReceipt();
-  if (initialReceipt.confirmed) {
-    const result = { submitted: true, status: 'confirmed', receipt: initialReceipt, resumed: Boolean(options.resumed) };
-    await vjaSiteStoreResult(plan, result);
-    return result;
-  }
-
   if (plan.finalClicked) {
     await vjaSiteWait(1200);
     const receipt = vjaSiteReceipt();
-    const result = receipt.confirmed
+    const result = window.vjaSiteApply?.canAcceptReceipt?.({ finalClicked: true, receiptConfirmed: receipt.confirmed })
       ? { submitted: true, status: 'confirmed', receipt, resumed: true }
       : { submitted: false, status: 'verification-needed', receipt, reason: 'The final employer action was already clicked, but submission could not be verified automatically.' };
     await vjaSiteStoreResult(plan, result);
@@ -174,7 +169,8 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
   }
 
   let container = vjaSiteApplicationContainer();
-  if (!container) {
+  let applicationUiFound = Boolean(container || document.querySelector('input[type="file"], textarea, input[required], select[required], [aria-required="true"]'));
+  if (!container && !applicationUiFound) {
     const startChoice = window.vjaSiteApply?.chooseStartAction?.(vjaSiteStartCandidates()) || { found: false };
     if (!startChoice.found) {
       const result = { submitted: false, status: 'needs-review', reason: startChoice.ambiguous ? 'Several Apply/Откликнуться buttons were found.' : 'No safe Apply/Откликнуться button was found.' };
@@ -183,7 +179,7 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
     }
     startChoice.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     startChoice.candidate.el.click();
-    await vjaSiteWaitForApplicationUi();
+    applicationUiFound = await vjaSiteWaitForApplicationUi();
     container = vjaSiteApplicationContainer();
   }
 
@@ -212,6 +208,7 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
   const unresolved = vjaSiteRequiredFields(scope);
   const finalChoice = vjaSiteFinalChoice(scope);
   const permission = window.vjaSiteApply?.canSubmit?.({
+    applicationUiFound,
     unresolvedRequired: unresolved.length,
     cvFieldPresent: fileInputPresent,
     cvUploaded,
@@ -258,9 +255,13 @@ async function vjaResumePendingSiteApply() {
     await chrome.storage.local.remove('vjaPendingSiteApply');
     return;
   }
-  let sourceHost = '';
-  try { sourceHost = new URL(pending.sourceUrl || '').hostname; } catch { }
-  if (sourceHost && sourceHost !== location.hostname) return;
+  const continuation = window.vjaSiteApply?.canResume?.({
+    sourceUrl: pending.sourceUrl,
+    currentUrl: location.href,
+    jobTitle: pending.jobTitle,
+    pageText: `${document.title}\n${String(document.body?.innerText || document.body?.textContent || '').slice(0, 50000)}`
+  });
+  if (!continuation?.ok) return;
   await vjaSiteWait(700);
   await vjaRunSiteApply(pending, { resumed: true });
 }
