@@ -19,6 +19,7 @@ jobs:
         run: |
           node --check browser-extension/background.js
           node --check browser-extension/browser-autopilot.js
+          node --check browser-extension/runtime-guard.js
           node --check browser-extension/site-apply.js
           node --check browser-extension/site-apply-content.js
           node --check browser-extension/site-apply-popup.js
@@ -84,6 +85,7 @@ jobs:
           node --check browser-extension/application-continuation.test.js
           node --check browser-extension/browser-autopilot.test.js
           node --check browser-extension/site-apply.test.js
+          node --check browser-extension/runtime-guard.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls
@@ -130,6 +132,8 @@ jobs:
         run: node browser-extension/browser-autopilot.test.js
       - name: Test one-click HH response and cover-letter continuation
         run: node browser-extension/site-apply.test.js
+      - name: Test popup timeout and recovery behavior
+        run: node browser-extension/runtime-guard.test.js
       - name: Validate dashboard inline JavaScript
         run: |
           python3 - <<'PY'

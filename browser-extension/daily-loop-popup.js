@@ -71,7 +71,7 @@ async function vjaLoadNextStrongJob({ quiet = false } = {}) {
 
   try {
     const [api, tab] = await Promise.all([getApiBase(), activeTab()]);
-    const response = await fetch(`${api}/api/application-queue?limit=20&minScore=75`);
+    const response = await vjaFetch(`${api}/api/application-queue?limit=20&minScore=75`);
     if (!response.ok) throw new Error(`Queue returned ${response.status}.`);
     const queue = await response.json();
     const next = window.vjaDailyQueue.selectNext(queue, {
@@ -143,7 +143,7 @@ async function vjaDeferNextStrongJob() {
 
   try {
     const api = await getApiBase();
-    const response = await fetch(`${api}${request.path}`, {
+    const response = await vjaFetch(`${api}${request.path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request.body)

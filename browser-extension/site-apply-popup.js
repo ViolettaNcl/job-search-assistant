@@ -18,7 +18,7 @@ async function vjaRecordConfirmedSiteApply(resultEnvelope, cvName = "") {
   try {
     const api = await getApiBase();
     const coverLetter = String(resultEnvelope?.coverLetter || $("coverLetter")?.value || latest?.draft?.coverLetter || "").trim();
-    const response = await fetch(`${api}/api/vacancies/${trackedId}/browser-applied`, {
+    const response = await vjaFetch(`${api}/api/vacancies/${trackedId}/browser-applied`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ coverLetter, resumeLabel: cvName, vacancyTitle: latestPage?.title || "" })
@@ -161,6 +161,7 @@ async function vjaApplyNowOnSite() {
 }
 
 let vjaOneClickRunning = false;
+window.vjaResetOneClickState = () => { vjaOneClickRunning = false; };
 async function vjaOneClickApply() {
   if (vjaOneClickRunning) return;
   const button = $("oneClickApply");

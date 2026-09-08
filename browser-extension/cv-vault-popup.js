@@ -66,7 +66,7 @@ async function vjaRecordActualCvAttribution() {
 
   try {
     const api = await getApiBase();
-    const response = await fetch(`${api}/api/vacancies/${vacancyId}/cv-attribution?resumeLabel=${encodeURIComponent(resumeName)}`, {
+    const response = await vjaFetch(`${api}/api/vacancies/${vacancyId}/cv-attribution?resumeLabel=${encodeURIComponent(resumeName)}`, {
       method: "POST"
     });
     if (!response.ok) return;

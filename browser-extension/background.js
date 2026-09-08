@@ -55,13 +55,31 @@ function browserAutopilotWait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function browserAutopilotWithTimeout(promise, timeoutMs, message) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), timeoutMs); })
+  ]).finally(() => clearTimeout(timer));
+}
+
 async function browserAutopilotApiBase() {
   const stored = await chrome.storage.sync.get({ apiBase: "http://localhost:8080" });
   return String(stored.apiBase || "http://localhost:8080").trim().replace(/\/$/, "");
 }
 
 async function browserAutopilotJson(url, options) {
-  const response = await fetch(url, options);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  let response;
+  try {
+    response = await fetch(url, { ...(options || {}), signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("The local Job Search Assistant did not answer within 15 seconds.");
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
   const text = await response.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
@@ -99,7 +117,11 @@ async function browserAutopilotSendPlan(tabId, plan) {
     const storedResult = await browserAutopilotStoredResult(plan.id);
     if (storedResult) return storedResult;
     try {
-      const result = await chrome.tabs.sendMessage(tabId, { type: "siteApplyNow", plan });
+      const result = await browserAutopilotWithTimeout(
+        chrome.tabs.sendMessage(tabId, { type: "siteApplyNow", plan }),
+        60000,
+        "The HH application page did not answer within 60 seconds."
+      );
       if (result) return result;
     } catch (error) {
       lastError = error;

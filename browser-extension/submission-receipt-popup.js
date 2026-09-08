@@ -170,7 +170,7 @@ async function vjaRecordSubmissionReceipt() {
 
     const id = await ensureTracked();
     const api = await getApiBase();
-    const response = await fetch(`${api}/api/vacancies/${id}/mark-applied`, { method: "POST" });
+    const response = await vjaFetch(`${api}/api/vacancies/${id}/mark-applied`, { method: "POST" });
     if (!response.ok) throw new Error(`Could not record the application (${response.status}).`);
 
     if ($("trackJob")) $("trackJob").textContent = "Saved ✓";

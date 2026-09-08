@@ -121,7 +121,7 @@ async function vjaLoadFollowUpDesk({ quiet = false } = {}) {
 
   try {
     const api = await getApiBase();
-    const response = await fetch(`${api}/api/followups?afterBusinessDays=5&limit=30&maxAttempts=2`);
+    const response = await vjaFetch(`${api}/api/followups?afterBusinessDays=5&limit=30&maxAttempts=2`);
     if (!response.ok) throw new Error(`Follow-up queue returned ${response.status}.`);
     const items = await response.json();
     const next = window.vjaFollowUpDesk.selectNext(items);
@@ -188,7 +188,7 @@ async function vjaMarkFollowUpSent() {
   vjaSetFollowUpBusy(true);
   try {
     const api = await getApiBase();
-    const response = await fetch(`${api}${request.path}`, {
+    const response = await vjaFetch(`${api}${request.path}`, {
       method: request.method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request.body)

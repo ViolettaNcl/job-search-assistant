@@ -5,6 +5,24 @@ let latestScan = null;
 let latestPlan = null;
 let latestTrackedId = null;
 
+async function vjaRecordDiagnostic(stage, error) {
+  try {
+    const stored = await chrome.storage.local.get({ vjaDiagnostics: [] });
+    const entries = Array.isArray(stored.vjaDiagnostics) ? stored.vjaDiagnostics : [];
+    entries.push({ at: new Date().toISOString(), stage, message: String(error?.message || error || "") });
+    await chrome.storage.local.set({ vjaDiagnostics: entries.slice(-40) });
+  } catch { }
+}
+
+async function vjaFetch(input, init = {}, timeoutMs = 10000) {
+  try {
+    return await window.vjaRuntimeGuard.fetchWithTimeout(fetch, input, init, timeoutMs);
+  } catch (error) {
+    void vjaRecordDiagnostic("backend-request", error);
+    throw error;
+  }
+}
+
 async function getApiBase() {
   const stored = await chrome.storage.sync.get({ apiBase: "http://localhost:8080" });
   return String(stored.apiBase || "http://localhost:8080").replace(/\/$/, "");
@@ -31,13 +49,17 @@ function setDot(ok) {
 }
 
 function showError(message) {
-  $("error").textContent = message;
+  const friendly = window.vjaRuntimeGuard?.userMessage?.(message) || String(message || "Unknown error");
+  $("error").textContent = friendly;
   $("error").classList.remove("hidden");
+  $("resetHungOperation")?.classList.remove("hidden");
+  void vjaRecordDiagnostic("popup-error", message);
 }
 
 function clearError() {
   $("error").classList.add("hidden");
   $("error").textContent = "";
+  $("resetHungOperation")?.classList.add("hidden");
 }
 
 function setBusy(busy) {
@@ -55,7 +77,33 @@ async function activeTab() {
 
 async function sendToPage(message) {
   const tab = await activeTab();
-  return await chrome.tabs.sendMessage(tab.id, message);
+  try {
+    return await window.vjaRuntimeGuard.withTimeout(
+      chrome.tabs.sendMessage(tab.id, message),
+      window.vjaRuntimeGuard.messageTimeout(message?.type),
+      `Page operation ${message?.type || "unknown"}`
+    );
+  } catch (error) {
+    void vjaRecordDiagnostic(`page-message:${message?.type || "unknown"}`, error);
+    throw error;
+  }
+}
+
+async function vjaResetHungOperation() {
+  await chrome.storage.local.remove("vjaPendingSiteApply");
+  window.vjaResetPreparationState?.();
+  window.vjaResetOneClickState?.();
+  setBusy(false);
+  clearError();
+  location.reload();
+}
+
+async function vjaRecoverStaleManualOperation() {
+  const stored = await chrome.storage.local.get("vjaPendingSiteApply");
+  const pending = stored.vjaPendingSiteApply;
+  if (!pending || pending.automatic) return;
+  const age = Date.now() - Number(pending.createdAt || 0);
+  if (age > 2 * 60 * 1000) await chrome.storage.local.remove("vjaPendingSiteApply");
 }
 
 function chips(container, values) {
@@ -86,7 +134,7 @@ async function refreshCandidateProfile() {
   if (!node) return;
   try {
     const api = await getApiBase();
-    const response = await fetch(`${api}/api/candidate`);
+    const response = await vjaFetch(`${api}/api/candidate`);
     if (!response.ok) throw new Error(`Candidate profile returned ${response.status}.`);
     const candidate = await response.json();
     const readiness = candidate.readiness || {};
@@ -117,7 +165,7 @@ async function refreshFieldPlan() {
   }
 
   const memory = await getMemory();
-  const response = await fetch(`${api}/api/extension/resolve-fields`, {
+  const response = await vjaFetch(`${api}/api/extension/resolve-fields`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -151,7 +199,7 @@ async function analyze() {
     latestPage = await sendToPage({ type: "extractPage" });
     if (latestPage?.error) throw new Error(latestPage.error);
     const api = await getApiBase();
-    const response = await fetch(`${api}/api/extension/analyze`, {
+    const response = await vjaFetch(`${api}/api/extension/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(latestPage)
@@ -287,7 +335,7 @@ async function ensureTracked() {
         source: latestPage.source || null,
         remote: Boolean(latestPage.remote)
       };
-  const response = await fetch(endpoint, {
+  const response = await vjaFetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -322,7 +370,7 @@ async function markApplied() {
   try {
     const id = await ensureTracked();
     const api = await getApiBase();
-    const response = await fetch(`${api}/api/vacancies/${id}/mark-applied`, { method: "POST" });
+    const response = await vjaFetch(`${api}/api/vacancies/${id}/mark-applied`, { method: "POST" });
     if (!response.ok) throw new Error(`Could not mark the vacancy as applied (${response.status}).`);
     $("trackJob").textContent = "Saved ✓";
     $("markApplied").textContent = "Applied ✓";
@@ -345,7 +393,7 @@ async function applyOnHh() {
   setBusy(true);
   try {
     const api = await getApiBase();
-    const importedResponse = await fetch(`${api}/api/import/hh`, {
+    const importedResponse = await vjaFetch(`${api}/api/import/hh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: latestPage.url })
@@ -354,7 +402,7 @@ async function applyOnHh() {
     const imported = await importedResponse.json();
     latestTrackedId = imported.id;
 
-    const applyResponse = await fetch(`${api}/api/vacancies/${imported.id}/apply-tailored`, { method: "POST" });
+    const applyResponse = await vjaFetch(`${api}/api/vacancies/${imported.id}/apply-tailored`, { method: "POST" });
     const payload = await applyResponse.json().catch(() => ({}));
     if (!applyResponse.ok) {
       const message = payload.errorText || payload.errorCode || `HH application failed (${applyResponse.status}).`;
@@ -372,6 +420,7 @@ async function applyOnHh() {
 }
 
 (async function init() {
+  await vjaRecoverStaleManualOperation();
   $("apiBase").value = await getApiBase();
   $("saveApi").addEventListener("click", saveApiBase);
   $("analyze").addEventListener("click", analyze);
@@ -383,10 +432,11 @@ async function applyOnHh() {
   $("trackJob").addEventListener("click", trackJob);
   $("markApplied").addEventListener("click", markApplied);
   $("applyHh").addEventListener("click", applyOnHh);
+  $("resetHungOperation")?.addEventListener("click", vjaResetHungOperation);
 
   try {
     const api = await getApiBase();
-    const response = await fetch(`${api}/health`);
+    const response = await vjaFetch(`${api}/health`, {}, 5000);
     setDot(response.ok);
   } catch {
     setDot(false);

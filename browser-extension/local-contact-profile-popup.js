@@ -17,7 +17,7 @@
     try {
       const api = await getApiBaseForContacts();
       const [response, memory] = await Promise.all([
-        fetch(`${api}/api/candidate`, { cache: "no-store" }),
+        vjaFetch(`${api}/api/candidate`, { cache: "no-store" }),
         getContactMemory()
       ]);
       if (!response.ok) throw new Error(`Candidate profile returned ${response.status}.`);

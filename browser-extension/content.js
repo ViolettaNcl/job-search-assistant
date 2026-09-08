@@ -476,6 +476,8 @@ function highlightCvUpload(filename) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const handled = new Set(["extractPage", "scanFields", "applyFieldPlan", "collectRememberable", "inspectUploads", "highlightCvUpload"]);
+  if (!handled.has(message?.type)) return false;
   try {
     if (message.type === "extractPage") sendResponse(extractPage());
     else if (message.type === "scanFields") sendResponse(scanFields());
@@ -490,5 +492,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } catch (error) {
     sendResponse({ error: error?.message || String(error), filled: 0, failed: 0 });
   }
-  return true;
+  return message.type === "applyFieldPlan";
 });
