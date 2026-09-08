@@ -36,6 +36,10 @@ assert.equal(apply.isHhUrl('https://career.habr.com/vacancies/123'), false);
 assert.equal(apply.sameJobUrl('https://hh.ru/vacancy/130452758?from=search', 'https://spb.hh.ru/vacancy/130452758'), true);
 assert.equal(apply.sameJobUrl('https://hh.ru/vacancy/130452758', 'https://hh.ru/vacancy/137044225'), false);
 assert.equal(apply.sameJobUrl('https://jobs.example.com/apply/42?source=a', 'https://jobs.example.com/apply/42?source=b'), true);
+assert.equal(apply.canResume({ sourceUrl: 'https://hh.ru/vacancy/130452758', currentUrl: 'https://hh.ru/vacancy/130452758?from=response', jobTitle: 'Специалист письменной поддержки', pageText: 'Резюме доставлено Специалист письменной поддержки Приложить сопроводительное письмо' }).ok, true,
+  'HH post-response continuation is allowed on the same ordinary vacancy URL');
+assert.equal(apply.canResume({ sourceUrl: 'https://hh.ru/vacancy/130452758', currentUrl: 'https://hh.ru/vacancy/137044225', jobTitle: 'Специалист письменной поддержки', pageText: 'Специалист письменной поддержки' }).ok, false,
+  'HH continuation never crosses into a different vacancy');
 
 let letterAction = apply.chooseHhCoverLetterAction([
   { label: 'Задать вопрос' },
@@ -43,12 +47,20 @@ let letterAction = apply.chooseHhCoverLetterAction([
 ]);
 assert.equal(letterAction.found, true);
 assert.match(letterAction.candidate.label, /^Приложить сопроводительное письмо/);
+letterAction = apply.chooseHhCoverLetterAction([
+  { label: 'Приложить сопроводительное письмо' },
+  { label: 'Приложить сопроводительное письмо' }
+]);
+assert.equal(letterAction.found, true, 'equivalent responsive HH cover-letter actions are one safe action');
+assert.equal(letterAction.equivalentDuplicates, true);
 assert.equal(apply.chooseHhCoverLetterAction([{ label: 'Отправить' }]).found, false);
 assert.equal(apply.isApplicationContainerText('Задайте вопрос работодателю. Он получит его с откликом.', true), false,
   'an unrelated HH employer-question form is not an application form');
 assert.equal(apply.isApplicationContainerText('Выберите резюме для отклика', true), true);
 
 assert.equal(apply.startReceiptDisposition({ receiptConfirmed: true, isHh: true, coverLetterRequired: true }), 'attach-cover-letter');
+assert.equal(apply.startReceiptDisposition({ receiptConfirmed: false, isHh: true, coverLetterRequired: true, coverLetterActionFound: true }), 'attach-cover-letter',
+  'the visible HH letter action wins even when the receipt text has not rendered yet');
 assert.equal(apply.startReceiptDisposition({ receiptConfirmed: true, isHh: true, coverLetterRequired: false }), 'accept');
 assert.equal(apply.startReceiptDisposition({ receiptConfirmed: false, isHh: true, coverLetterRequired: true }), 'continue');
 
@@ -108,6 +120,12 @@ assert.equal(apply.canSubmit({ ...ready, unresolvedRequired: 1 }).reason, 'requi
 assert.equal(apply.canSubmit({ ...ready, cvUploaded: false }).reason, 'cv-not-uploaded');
 assert.equal(apply.canSubmit({ ...ready, coverLetterRequired: true, coverLetterFilled: false }).reason, 'cover-letter-not-persisted');
 assert.deepEqual(apply.canSubmit({ ...ready, coverLetterRequired: true, coverLetterFilled: true }), { ok: true, reason: 'ready' });
+
+assert.equal(apply.finalSubmissionConfirmed({ receiptConfirmed: true, receiptAdvanced: true, coverLetterRequired: true }), true);
+assert.equal(apply.finalSubmissionConfirmed({ isHh: true, coverLetterRequired: true, startActionSubmitted: true, letterStepCompleted: true, receiptConfirmed: false }), true,
+  'closing the HH post-response letter form after its Send action confirms the second step');
+assert.equal(apply.finalSubmissionConfirmed({ isHh: true, coverLetterRequired: true, startActionSubmitted: true, letterStepCompleted: false, receiptConfirmed: true }), false,
+  'an old HH response receipt cannot confirm a cover letter that is still open');
 
 assert.equal(apply.canAcceptReceipt({ finalClicked: false, receiptConfirmed: true }), false,
   'confirmation-looking vacancy copy cannot be recorded before a final action');

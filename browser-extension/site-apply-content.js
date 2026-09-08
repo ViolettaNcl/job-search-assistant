@@ -181,6 +181,53 @@ function vjaSiteWait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+async function vjaSiteStorageGet(key) {
+  const response = await chrome.runtime.sendMessage({ type: 'vjaSiteApplyStorage', operation: 'get', key });
+  return response?.ok ? response.value : undefined;
+}
+
+async function vjaSiteStorageSet(key, value) {
+  const response = await chrome.runtime.sendMessage({ type: 'vjaSiteApplyStorage', operation: 'set', key, value });
+  if (!response?.ok) throw new Error(response?.error || 'Could not save application continuation state.');
+}
+
+async function vjaSiteStorageRemove(key) {
+  const response = await chrome.runtime.sendMessage({ type: 'vjaSiteApplyStorage', operation: 'remove', key });
+  if (!response?.ok) throw new Error(response?.error || 'Could not clear application continuation state.');
+}
+
+async function vjaSiteWaitForHhCoverLetterAction(timeoutMs = 12000) {
+  const started = Date.now();
+  let choice = { found: false, ambiguous: false, count: 0 };
+  while (Date.now() - started < timeoutMs) {
+    choice = vjaHhCoverLetterAction();
+    if (choice.found || choice.ambiguous) return choice;
+    await vjaSiteWait(250);
+  }
+  return choice;
+}
+
+async function vjaSiteWaitForCoverLetterField(timeoutMs = 9000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const container = vjaSiteApplicationContainer();
+    const field = vjaSiteCoverLetterField(container || document);
+    if (field) return { found: true, container, field };
+    await vjaSiteWait(250);
+  }
+  return { found: false, container: vjaSiteApplicationContainer(), field: null };
+}
+
+async function vjaSiteWaitForCoverLetterSubmission(field, timeoutMs = 6000) {
+  if (!field) return false;
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (!document.contains(field) || !vjaSiteVisible(field)) return true;
+    await vjaSiteWait(250);
+  }
+  return !document.contains(field) || !vjaSiteVisible(field);
+}
+
 function vjaSiteHasExplicitCoverLetterField() {
   return [...document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"][role="textbox"], [contenteditable="true"]')]
     .filter(vjaSiteVisible)
@@ -269,10 +316,7 @@ async function vjaHhSelectResume(container = document, plan = {}) {
 
 async function vjaSiteLoadCv(plan) {
   if (plan?.fileData?.base64) return plan.fileData;
-  const key = plan?.cvKey;
-  if (!key) return null;
-  const stored = await chrome.storage.local.get(key);
-  return stored[key] || null;
+  return null;
 }
 
 async function vjaSiteStoreResult(plan, result) {
@@ -280,13 +324,14 @@ async function vjaSiteStoreResult(plan, result) {
     id: plan?.id || '',
     trackedId: plan?.trackedId || '',
     sourceUrl: plan?.sourceUrl || '',
+    coverLetter: String(plan?.coverLetter || ''),
     result,
     createdAt: Date.now()
   };
-  await chrome.storage.local.set({ vjaSiteApplyResult: payload });
-  if (result?.submitted || result?.status === 'needs-review' || result?.status === 'verification-needed') {
-    const stored = await chrome.storage.local.get('vjaPendingSiteApply');
-    if (stored.vjaPendingSiteApply?.id === plan?.id) await chrome.storage.local.remove('vjaPendingSiteApply');
+  await vjaSiteStorageSet('vjaSiteApplyResult', payload);
+  if (result?.submitted || result?.status === 'needs-review') {
+    const pending = await vjaSiteStorageGet('vjaPendingSiteApply');
+    if (pending?.id === plan?.id) await vjaSiteStorageRemove('vjaPendingSiteApply');
   }
 }
 
@@ -294,9 +339,10 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
   if (plan.finalClicked) {
     await vjaSiteWait(1200);
     const receipt = vjaSiteReceipt();
+    const coverLetterFilled = Boolean(plan.coverLetterFilledBeforeFinal);
     const result = window.vjaSiteApply?.canAcceptReceipt?.({ finalClicked: true, receiptConfirmed: receipt.confirmed })
-      ? { submitted: true, status: 'confirmed', receipt, resumed: true }
-      : { submitted: false, status: 'verification-needed', receipt, reason: 'The final employer action was already clicked, but submission could not be verified automatically.' };
+      ? { submitted: true, status: 'confirmed', receipt, resumed: true, coverLetterFilled, resumeLabel: plan.resumeLabel || '' }
+      : { submitted: false, status: 'verification-needed', receipt, coverLetterFilled, resumeLabel: plan.resumeLabel || '', reason: 'The final employer action was already clicked, but submission could not be verified automatically.' };
     await vjaSiteStoreResult(plan, result);
     return result;
   }
@@ -305,7 +351,35 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
   const coverLetterRequired = vjaSiteIsHh() && Boolean(coverLetter);
   let startActionSubmitted = false;
   let container = vjaSiteApplicationContainer();
+  let preparedCoverField = null;
   let applicationUiFound = Boolean(container || (!vjaSiteIsHh() && document.querySelector('input[type="file"], textarea, [contenteditable="true"], input[required], select[required], [aria-required="true"]')));
+
+  const immediateLetterAction = coverLetterRequired ? vjaHhCoverLetterAction() : { found: false, ambiguous: false };
+  const explicitCoverLetterField = coverLetterRequired ? vjaSiteCoverLetterField(container || document) : null;
+  if (coverLetterRequired && !explicitCoverLetterField && (options.resumed || immediateLetterAction.found || immediateLetterAction.ambiguous)) {
+    const existingLetterAction = immediateLetterAction.found || immediateLetterAction.ambiguous
+      ? immediateLetterAction
+      : await vjaSiteWaitForHhCoverLetterAction();
+    if (existingLetterAction.found) {
+      startActionSubmitted = true;
+      existingLetterAction.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      existingLetterAction.candidate.el.click();
+      const letterUi = await vjaSiteWaitForCoverLetterField();
+      container = letterUi.container;
+      preparedCoverField = letterUi.field;
+      applicationUiFound = letterUi.found;
+    } else {
+      const result = {
+        submitted: false,
+        resumeSubmitted: vjaSiteReceipt().confirmed,
+        status: 'submitted-needs-letter',
+        reason: existingLetterAction.ambiguous ? 'hh-cover-letter-action-ambiguous' : 'hh-cover-letter-action-not-found'
+      };
+      await vjaSiteStoreResult(plan, result);
+      return result;
+    }
+  }
+
   if (!container && !applicationUiFound) {
     const startChoice = window.vjaSiteApply?.chooseStartAction?.(vjaSiteStartCandidates()) || { found: false };
     if (!startChoice.found) {
@@ -319,10 +393,12 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
     applicationUiFound = await vjaSiteWaitForApplicationUi(9000, { acceptReceipt: true });
 
     const postStartReceipt = vjaSiteReceipt();
+    const postStartLetterAction = vjaHhCoverLetterAction();
     const disposition = window.vjaSiteApply?.startReceiptDisposition?.({
       receiptConfirmed: !receiptBeforeStart.confirmed && postStartReceipt.confirmed,
       isHh: vjaSiteIsHh(),
-      coverLetterRequired
+      coverLetterRequired,
+      coverLetterActionFound: Boolean(postStartLetterAction.found)
     }) || 'continue';
     if (disposition === 'accept') {
       const result = { submitted: true, status: 'confirmed', receipt: postStartReceipt, startActionSubmitted: true };
@@ -331,10 +407,13 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
     }
     if (disposition === 'attach-cover-letter') {
       startActionSubmitted = true;
-      const letterAction = vjaHhCoverLetterAction();
+      const letterAction = postStartLetterAction.found
+        ? postStartLetterAction
+        : await vjaSiteWaitForHhCoverLetterAction();
       if (!letterAction.found) {
         const result = {
-          submitted: true,
+          submitted: false,
+          resumeSubmitted: true,
           status: 'submitted-needs-letter',
           receipt: postStartReceipt,
           startActionSubmitted: true,
@@ -345,13 +424,16 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
       }
       letterAction.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       letterAction.candidate.el.click();
-      applicationUiFound = await vjaSiteWaitForApplicationUi();
+      const letterUi = await vjaSiteWaitForCoverLetterField();
+      container = letterUi.container;
+      preparedCoverField = letterUi.field;
+      applicationUiFound = letterUi.found;
     }
-    container = vjaSiteApplicationContainer();
+    container = container || vjaSiteApplicationContainer();
   }
 
   const scope = container || document;
-  const coverField = vjaSiteCoverLetterField(scope);
+  const coverField = preparedCoverField || vjaSiteCoverLetterField(scope);
   let coverLetterFilled = false;
   if (coverField && coverLetter) {
     coverLetterFilled = await vjaSiteSetTextVerified(coverField, coverLetter);
@@ -424,30 +506,47 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
     return result;
   }
 
-  const pending = { ...plan, finalClicked: true, finalClickedAt: Date.now(), resumeLabel: hhResume.label || '' };
-  await chrome.storage.local.set({ vjaPendingSiteApply: pending });
+  const pending = {
+    ...plan,
+    finalClicked: true,
+    finalClickedAt: Date.now(),
+    coverLetterFilledBeforeFinal: coverLetterFilled,
+    resumeLabel: hhResume.label || ''
+  };
+  await vjaSiteStorageSet('vjaPendingSiteApply', pending);
+  const receiptBeforeFinal = vjaSiteReceipt();
   finalChoice.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   finalChoice.candidate.el.click();
-  await vjaSiteWait(2200);
+  const letterStepCompleted = coverLetterRequired
+    ? await vjaSiteWaitForCoverLetterSubmission(coverField)
+    : (await vjaSiteWait(2200), true);
 
   const receipt = vjaSiteReceipt();
-  const common = { coverLetterFilled, cvUploaded, cvResult, resumeLabel: hhResume.label || '', startActionSubmitted };
-  const result = receipt.confirmed
+  const common = { coverLetterFilled, cvUploaded, cvResult, resumeLabel: hhResume.label || '', startActionSubmitted, letterStepCompleted };
+  const receiptAdvanced = !receiptBeforeFinal.confirmed && receipt.confirmed;
+  const submissionConfirmed = window.vjaSiteApply?.finalSubmissionConfirmed?.({
+    isHh: vjaSiteIsHh(),
+    coverLetterRequired,
+    startActionSubmitted,
+    letterStepCompleted,
+    receiptConfirmed: receipt.confirmed,
+    receiptAdvanced
+  }) ?? false;
+  const result = submissionConfirmed
     ? { submitted: true, status: 'confirmed', receipt, ...common }
-    : { submitted: false, status: 'clicked-unverified', receipt, ...common, reason: 'Final employer action was clicked; reopen the extension if the site did not show a confirmation.' };
+    : { submitted: false, status: 'clicked-unverified', receipt, letterStepCompleted, ...common, reason: 'Final employer action was clicked; reopen the extension if the site did not show a confirmation.' };
 
   if (receipt.confirmed) await vjaSiteStoreResult(plan, result);
-  else await chrome.storage.local.set({ vjaSiteApplyResult: { id: plan?.id || '', trackedId: plan?.trackedId || '', sourceUrl: plan?.sourceUrl || '', result, createdAt: Date.now() } });
+  else await vjaSiteStorageSet('vjaSiteApplyResult', { id: plan?.id || '', trackedId: plan?.trackedId || '', sourceUrl: plan?.sourceUrl || '', coverLetter: String(plan?.coverLetter || ''), result, createdAt: Date.now() });
   return result;
 }
 
 async function vjaResumePendingSiteApply() {
-  const stored = await chrome.storage.local.get('vjaPendingSiteApply');
-  const pending = stored.vjaPendingSiteApply;
+  const pending = await vjaSiteStorageGet('vjaPendingSiteApply');
   if (!pending) return;
   const expiresAt = Number(pending.expiresAt || 0);
   if (expiresAt && Date.now() > expiresAt) {
-    await chrome.storage.local.remove('vjaPendingSiteApply');
+    await vjaSiteStorageRemove('vjaPendingSiteApply');
     return;
   }
   const continuation = window.vjaSiteApply?.canResume?.({
@@ -470,3 +569,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 vjaResumePendingSiteApply().catch(() => {});
+
+if (/^(?:localhost|127\.0\.0\.1)$/i.test(location.hostname)) {
+  const wakeBrowserAutopilot = () => chrome.runtime.sendMessage({ type: 'vjaBrowserAutopilotWake' }).catch(() => {});
+  wakeBrowserAutopilot();
+  setInterval(wakeBrowserAutopilot, 10000);
+}

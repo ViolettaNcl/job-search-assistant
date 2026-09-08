@@ -31,6 +31,9 @@ public sealed record ApplicationQueueItem(
 public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftService drafts)
 {
     public async Task<IReadOnlyList<ApplicationQueueItem>> GetAsync(int limit, int minimumScore, CancellationToken ct)
+        => await GetAsync(limit, minimumScore, null, ct);
+
+    public async Task<IReadOnlyList<ApplicationQueueItem>> GetAsync(int limit, int minimumScore, string? source, CancellationToken ct)
     {
         limit = Math.Clamp(limit, 1, 50);
         minimumScore = Math.Clamp(minimumScore, 50, 100);
@@ -44,8 +47,12 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
             .Include(x => x.Events)
             .Where(x => (x.Status == VacancyStatus.New || x.Status == VacancyStatus.Saved) &&
                         !x.Company.IsBlacklisted &&
+                        x.Application == null &&
+                        !x.HasExistingHhResponse &&
+                        x.IsRemote &&
                         x.MatchScore >= minimumScore &&
-                        x.EligibilityStatus != "Likely ineligible")
+                        x.EligibilityStatus != "Likely ineligible" &&
+                        (string.IsNullOrWhiteSpace(source) || x.Source == source))
             .OrderByDescending(x => x.MatchScore)
             .Take(300)
             .ToListAsync(ct);

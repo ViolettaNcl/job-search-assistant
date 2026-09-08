@@ -215,15 +215,35 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
         var text = $"{title}\n{description}".ToLowerInvariant();
         var selected = FocusSignals
             .Where(signal => signal.Terms.Any(text.Contains))
+            .OrderBy(signal => FocusPriority(roleKind, signal))
             .Select(signal => russian ? signal.Russian : signal.English)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(2)
+            .Take(1)
             .ToArray();
 
         if (selected.Length > 0)
             return russian ? HumanListRu(selected, FallbackFocus(roleKind, true)) : HumanListEn(selected, FallbackFocus(roleKind, false));
 
         return FallbackFocus(roleKind, russian);
+    }
+
+    private static int FocusPriority(string roleKind, FocusSignal signal)
+    {
+        var terms = string.Join(' ', signal.Terms);
+        var preferred = roleKind switch
+        {
+            "customer" => new[] { "customer", "client", "клиент", "пользоват", "support", "поддерж" },
+            "sales" => new[] { "sales", "продаж", "negotiat", "переговор", "customer", "клиент" },
+            "support" => new[] { "support", "поддерж", "incident", "обращени", "api", "sql" },
+            "qa" => new[] { "test", "qa", "quality", "тест", "качеств" },
+            "marketing" => new[] { "content", "marketing", "контент", "маркет", "соцсет" },
+            "operations" => new[] { "process", "operation", "coordinat", "процесс", "операц", "координ" },
+            "healthcare" => new[] { "medical", "health", "dental", "медиц", "стомат", "пациент" },
+            "data" => new[] { "analytics", "analysis", "аналит", "отчёт", "отчет", "database", "данных" },
+            "frontend" => new[] { "react", "frontend", "ui", "интерфейс" },
+            _ => Array.Empty<string>()
+        };
+        return preferred.Any(terms.Contains) ? 0 : 1;
     }
 
     private static string FallbackFocus(string roleKind, bool russian)
@@ -308,8 +328,9 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
         var titleText = title.ToLowerInvariant();
         var all = $"{title} {description}".ToLowerInvariant();
         if (Has(titleText, "qa", "tester", "testing", "тестиров")) return "qa";
-        if (Has(titleText, "technical support", "application support", "helpdesk", "service desk", "поддержк", "внедрен")) return "support";
-        if (Has(titleText, "customer support", "customer success", "client service", "оператор", "менеджер по работе с клиент")) return "customer";
+        if (Has(titleText, "customer support", "customer success", "client service", "written support", "оператор", "менеджер по работе с клиент", "письменн", "поддержк клиент", "клиентск поддерж", "чат-поддерж")) return "customer";
+        if (Has(titleText, "technical support", "application support", "helpdesk", "service desk", "техническ поддерж", "внедрен")) return "support";
+        if (Has(titleText, "поддержк")) return Has(all, "api", "sql", "incident", "инцидент", "техническ", "оборудован") ? "support" : "customer";
         if (Has(titleText, "sales", "account manager", "business development", "продаж", "аккаунт-менедж")) return "sales";
         if (Has(titleText, "marketing", "content", "smm", "маркет", "контент")) return "marketing";
         if (Has(titleText, "administrator", "coordinator", "operations", "office manager", "администратор", "координатор", "операцион")) return "operations";
