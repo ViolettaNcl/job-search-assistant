@@ -155,6 +155,7 @@ function render() {
       <div class="skills">${matched}${missing}</div>
       <div class="details">
         <div class="box"><strong>Positioning</strong>${esc(item.recommendedHeadline)}</div>
+        <div class="box"><strong>Why this priority</strong>${esc(item.priorityReason)}${item.learningBoost ? ` (${item.learningBoost > 0 ? '+' : ''}${item.learningBoost})` : ''}</div>
         <div class="box"><strong>Eligibility</strong>${esc(item.eligibilityReason || 'Verify employer location/payroll details.')}</div>
       </div>
       <div class="actions">

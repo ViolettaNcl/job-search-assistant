@@ -15,6 +15,8 @@ public sealed record ApplicationQueueItem(
     int MatchScore,
     int PriorityScore,
     string Priority,
+    int LearningBoost,
+    string PriorityReason,
     string EligibilityStatus,
     string EligibilityReason,
     string MatchLevel,
@@ -47,13 +49,18 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
             .OrderByDescending(x => x.MatchScore)
             .Take(300)
             .ToListAsync(ct);
+        var history = await db.Vacancies
+            .AsNoTracking()
+            .Where(x => x.Application != null)
+            .ToListAsync(ct);
 
         var now = DateTimeOffset.UtcNow;
         return rows
             .Where(v => QueueDeferralPolicy.ShouldAppearInQueue(v, now))
             .Select(v =>
             {
-                var priorityScore = CalculatePriorityScore(v, now);
+                var learningBoost = RecruitmentLearning.CalculateBoost(v, history);
+                var priorityScore = Math.Clamp(CalculatePriorityScore(v, now) + learningBoost, 0, 130);
                 var draft = drafts.Build(v);
                 return new ApplicationQueueItem(
                     v.Id,
@@ -66,6 +73,8 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
                     v.MatchScore,
                     priorityScore,
                     PriorityLabel(priorityScore, v.MatchScore),
+                    learningBoost,
+                    RecruitmentLearning.ExplainBoost(learningBoost),
                     v.EligibilityStatus,
                     v.EligibilityReason,
                     v.MatchLevel,

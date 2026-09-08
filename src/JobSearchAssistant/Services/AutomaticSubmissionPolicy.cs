@@ -30,11 +30,12 @@ public static partial class AutomaticSubmissionPolicy
         int minimumScore,
         int limit,
         DateTimeOffset now,
-        DateTimeOffset retryAfter)
+        DateTimeOffset retryAfter,
+        IReadOnlyCollection<Vacancy>? history = null)
         => vacancies
             .Where(v => CanSubmit(v, minimumScore))
             .Where(v => !v.Events.Any(e => e.Type == "AutoApplyFailed" && e.CreatedAt >= retryAfter))
-            .OrderByDescending(v => ApplicationQueueService.CalculatePriorityScore(v, now))
+            .OrderByDescending(v => ApplicationQueueService.CalculatePriorityScore(v, now) + RecruitmentLearning.CalculateBoost(v, history ?? Array.Empty<Vacancy>()))
             .ThenByDescending(v => v.MatchScore)
             .ThenByDescending(v => v.PublishedAt ?? v.FirstSeenAt)
             .ThenBy(v => v.Id)

@@ -427,8 +427,11 @@ public sealed class JobService(
             var candidateRows = await db.Vacancies.Include(x => x.Company).Include(x => x.Application).Include(x => x.Events)
                 .Where(x => x.Source == "hh" && x.Status == VacancyStatus.New && x.Application == null && !x.HasExistingHhResponse && !x.Company.IsBlacklisted && x.MatchScore >= state.AutoApplyMinimumScore && x.EligibilityStatus == "Eligible")
                 .ToListAsync(ct);
+            var outcomeHistory = await db.Vacancies.AsNoTracking()
+                .Where(x => x.Application != null)
+                .ToListAsync(ct);
             var candidates = AutomaticSubmissionPolicy.SelectCandidates(
-                candidateRows, state.AutoApplyMinimumScore, available, now, retryAfter);
+                candidateRows, state.AutoApplyMinimumScore, available, now, retryAfter, outcomeHistory);
 
             var submitted = 0;
             var failed = 0;
