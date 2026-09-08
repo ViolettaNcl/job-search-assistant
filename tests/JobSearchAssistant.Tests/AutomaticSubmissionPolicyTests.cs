@@ -12,12 +12,14 @@ public sealed class AutomaticSubmissionPolicyTests
     {
         var state = new AppState();
         var schedule = new AutomationOptions();
+        var search = new SearchOptions();
 
         Assert.IsFalse(state.AutoApplyEnabled);
         Assert.AreEqual(85, state.AutoApplyMinimumScore);
         Assert.AreEqual(25, state.DailyAutoApplyLimit);
         Assert.AreEqual(10, schedule.CycleMinutes);
         Assert.AreEqual(180, schedule.FailureCooldownMinutes);
+        Assert.AreEqual(30, search.IntervalMinutes);
     }
 
     [TestMethod]

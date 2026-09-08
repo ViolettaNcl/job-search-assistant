@@ -174,7 +174,7 @@ public sealed record SearchOptions
         "Graduate .NET Developer"
     ];
 
-    public int IntervalMinutes { get; init; } = 60;
+    public int IntervalMinutes { get; init; } = 30;
     public int MaxNewVacanciesPerRun { get; init; } = 80;
     public int MinimumTelegramScore { get; init; } = 65;
     public bool RemoteOnly { get; init; } = true;
