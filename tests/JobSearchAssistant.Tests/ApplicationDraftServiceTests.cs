@@ -24,7 +24,7 @@ public sealed class ApplicationDraftServiceTests
             []);
 
         Assert.AreEqual("ru", draft.Language);
-        Assert.AreEqual("Виолетта Николаевна", draft.CandidateName);
+        Assert.AreEqual("Виолетта Николау", draft.CandidateName);
         Assert.AreEqual("Violetta_Nicolaou_CV_RU_v2.pdf", draft.RecommendedCv);
         StringAssert.Contains(draft.CoverLetter, "API");
         StringAssert.Contains(draft.CoverLetter, "GitHub: https://github.com/ViolettaNcl");
@@ -68,7 +68,8 @@ public sealed class ApplicationDraftServiceTests
             []);
 
         StringAssert.Contains(draft.RecommendedHeadline, "QA");
-        StringAssert.Contains(draft.CoverLetter, "tested APIs");
+        StringAssert.Contains(draft.CoverLetter, "Testing");
+        StringAssert.Contains(draft.CoverLetter, "project");
         Assert.IsFalse(draft.CoverLetter.Contains("years of QA experience", StringComparison.OrdinalIgnoreCase));
     }
 

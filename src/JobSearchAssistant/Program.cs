@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddPrivateCandidateConfiguration();
 
 builder.Services.Configure<CandidateProfileOptions>(builder.Configuration.GetSection("Candidate"));
 builder.Services.Configure<SearchOptions>(builder.Configuration.GetSection("Search"));
@@ -34,7 +35,15 @@ builder.Services.AddHttpClient("remotive");
 builder.Services.AddHttpClient("adzuna");
 builder.Services.AddSingleton<SecretCipher>();
 builder.Services.AddSingleton<MatchScoringService>();
+builder.Services.AddSingleton<CandidateKnowledgeService>();
+builder.Services.AddSingleton<OpportunityScoringService>();
+builder.Services.AddSingleton<EvidenceRetrievalService>();
 builder.Services.AddSingleton<ApplicationDraftService>();
+builder.Services.Configure<ReasoningOptions>(builder.Configuration.GetSection("Reasoning"));
+builder.Services.AddHttpClient<IAiReasoningProvider, ChatReasoningProvider>().ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddSingleton<ApplicationWritingService>();
+builder.Services.AddTransient<OperatorPreparationService>();
+builder.Services.AddSingleton<RecruiterMessageService>();
 builder.Services.AddSingleton<AutoApplyRunTracker>();
 builder.Services.AddSingleton<BrowserAutopilotTracker>();
 builder.Services.AddSingleton<ApplicationQuestionService>();
@@ -76,6 +85,14 @@ app.MapGet("/health", () => Results.Ok(new
     appliedMigrations = databaseBootstrap.AppliedMigrations
 }));
 app.MapRuntimeHealth(storageMode, databaseBootstrap);
+app.MapOperatorEndpoints();
+app.MapGet("/api/operator/candidate", (CandidateKnowledgeService knowledge) => Results.Ok(knowledge.Get()));
+app.MapPost("/api/operator/assess", (ExtensionAnalyzeRequest request, OpportunityScoringService scoring, EvidenceRetrievalService evidence) =>
+{
+    var assessment = scoring.Assess(request.Title ?? "", request.Description ?? "", request.Remote,
+        request.Experience ?? "", request.Location ?? request.Country ?? "", request.RemoteScope ?? "");
+    return Results.Ok(new { assessment, strategy = evidence.Select(assessment) });
+});
 
 app.MapGet("/api/candidate", (IOptions<CandidateProfileOptions> options, CandidateProfileReadinessService readiness) =>
 {
@@ -112,7 +129,7 @@ app.MapGet("/api/dashboard", async (AppDbContext db, StatsService stats, Cancell
 {
     var state = await db.AppStates.SingleAsync(x => x.Id == 1, ct);
     var bestRows = await db.Vacancies.Include(x => x.Company)
-        .Where(x => x.Status == VacancyStatus.New && !x.Company.IsBlacklisted && x.IsRemote)
+        .Where(x => x.Status == VacancyStatus.New && !x.Company.IsBlacklisted)
         .RankedAsync(100, ct);
 
     var best = bestRows.Select(x => new
@@ -256,7 +273,6 @@ app.MapGet("/api/vacancies", async (AppDbContext db, string? status, int? minSco
     var q = db.Vacancies.Include(x => x.Company).AsQueryable();
     if (Enum.TryParse<VacancyStatus>(status, true, out var parsed)) q = q.Where(x => x.Status == parsed);
     if (minScore.HasValue) q = q.Where(x => x.MatchScore >= minScore.Value);
-    q = q.Where(x => x.IsRemote);
     var rows = await q.RecentAsync(300, ct, x =>
         (string.IsNullOrWhiteSpace(market) || VacancyClassifier.Market(x).Equals(market, StringComparison.OrdinalIgnoreCase)) &&
         (string.IsNullOrWhiteSpace(type) || VacancyClassifier.OpportunityType(x).Equals(type, StringComparison.OrdinalIgnoreCase)));
@@ -302,7 +318,7 @@ app.MapPost("/api/extension/analyze", (ExtensionAnalyzeRequest request, MatchSco
     return Results.Ok(new
     {
         match = result,
-        recommendation = result.Score >= 85 ? "Apply now" : result.Score >= 75 ? "Apply" : result.Score >= 65 ? "Review" : "Skip",
+        recommendation = result.Assessment?.Decision ?? "REVIEW",
         draft
     });
 });

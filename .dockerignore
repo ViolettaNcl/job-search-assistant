@@ -20,3 +20,10 @@ coverage/
 # Local user-specific files.
 *.user
 *.suo
+
+**/candidate.private.json
+**/appsettings.local.json
+**/user-settings.cmd
+**/*.db
+**/*.db-shm
+**/*.db-wal

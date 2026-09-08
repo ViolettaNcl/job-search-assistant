@@ -15,7 +15,7 @@ public sealed class EligibilityScoringTests
     }));
 
     [TestMethod]
-    public void EuRemoteRole_IsEligibleForCyprusEuCitizen()
+    public void EuRemoteRole_RequiresResidenceReviewForCyprusEuCitizenLivingInRussia()
     {
         var result = _sut.Score(
             "Junior .NET Developer",
@@ -25,7 +25,7 @@ public sealed class EligibilityScoringTests
             location: "European Union",
             remoteScope: "EU only");
 
-        Assert.AreEqual("Eligible", result.EligibilityStatus);
+        Assert.AreEqual("Verify", result.EligibilityStatus);
         Assert.IsTrue(result.Score >= 65);
     }
 

@@ -13,7 +13,11 @@ public sealed record ApplicationDraft(
     string CoverLetter,
     IReadOnlyDictionary<string, string> CommonAnswers,
     string[] Emphasize,
-    string[] VerifyBeforeSubmit);
+    string[] VerifyBeforeSubmit)
+{
+    public ApplicationStrategy? Strategy { get; init; }
+    public string ReasoningMode { get; init; } = "deterministic-fallback";
+}
 
 public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> candidate)
 {
@@ -95,13 +99,23 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
             ["requiresSponsorshipRussia"] = _candidate.RussiaWorkAuthorized ? "No" : "Yes",
             ["languages"] = string.Join(", ", _candidate.FluentLanguages),
             ["commercialExperience"] = russian
-                ? "Первая официальная работа разработчиком; есть самостоятельный клиентский проект, сделанный от начала до конца."
-                : "Seeking first formal developer role; has an independent real-client project delivered end-to-end.",
+                ? "Подтверждён опыт проектов. Точный коммерческий стаж необходимо уточнить у кандидата."
+                : "Verified project experience is available. Ask the candidate for exact commercial employment history.",
             ["availability"] = "Ask candidate if the form requires an exact start date.",
             ["salary"] = "Use the vacancy range/local market; ask candidate if a binding exact figure is required."
         };
 
         var verify = new List<string>();
+        var assessment = new OpportunityScoringService(candidate).Assess(title, description, true, location: country);
+        var strategy = new EvidenceRetrievalService(new CandidateKnowledgeService(candidate)).Select(assessment);
+        if (assessment.Understanding.CareerLane != "excluded" && strategy.Projects.Length > 0)
+        {
+            var grounded = new ApplicationWritingService(candidate).Write(strategy, russian);
+            coverLetter = grounded.Letter;
+            shortMessage = grounded.Letter;
+            emphasize = strategy.SkillsToEmphasize;
+            verify.AddRange(grounded.ReviewReasons);
+        }
         if (missingSkills.Length > 0) verify.Add($"Do not claim these skills unless independently verified: {string.Join(", ", missingSkills)}.");
         if (score < 75) verify.Add("Fit score is below the normal auto-apply threshold; review before applying.");
         verify.Add("Never invent years of commercial employment, certifications, relocation commitments or legal declarations.");
@@ -115,7 +129,7 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
             coverLetter,
             answers,
             emphasize,
-            verify.ToArray());
+            verify.ToArray()) { Strategy = strategy };
     }
 
     private string BuildRussianShort(string company, string title, string roleKind, string focus, string[] emphasize, int variant)

@@ -7,7 +7,8 @@ namespace JobSearchAssistant.Services;
 public sealed class TailoredHhApplyService(
     AppDbContext db,
     HhClient hh,
-    ApplicationDraftService drafts)
+    ApplicationDraftService drafts,
+    OpportunityScoringService scoring)
 {
     public async Task<HhApplyResult> ApplyAsync(Guid vacancyId, CancellationToken ct)
     {
@@ -22,6 +23,9 @@ public sealed class TailoredHhApplyService(
             return new HhApplyResult(false, "hh_only", "Tailored direct submission is only available for HH vacancies.");
         if (vacancy.Company.IsBlacklisted)
             return new HhApplyResult(false, "blacklisted", "Company is blacklisted.");
+        var assessment = scoring.Assess(vacancy.Title, vacancy.DescriptionText, vacancy.IsRemote, vacancy.Experience, vacancy.LocationText, vacancy.RemoteScope);
+        if (assessment.Decision != "APPLY")
+            return new HhApplyResult(false, "operator_review_required", string.Join(" ", assessment.ReviewReasons));
         if (vacancy.MatchScore < 75)
             return new HhApplyResult(false, "fit_below_threshold", $"Fit score {vacancy.MatchScore}/100 is below the 75-point one-click threshold. Review manually first.");
         if (!AutomaticSubmissionPolicy.IsVerifiedEligible(vacancy))
@@ -48,8 +52,8 @@ public sealed class TailoredHhApplyService(
                     {
                         VacancyId = vacancy.Id,
                         ResumeExternalId = state.HhResumeId,
-                        CoverLetter = draft.CoverLetter,
-                        LastError = result.ErrorText
+                        CoverLetter = "",
+                        LastError = "Existing HH response confirmed; this draft was not sent."
                     });
                 }
                 await db.SaveChangesAsync(ct);

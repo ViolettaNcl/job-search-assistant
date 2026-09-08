@@ -1,4 +1,10 @@
 .env
+**/appsettings.local.json
+**/candidate.private.json
+**/user-settings.cmd
+**/*.db
+**/*.db-shm
+**/*.db-wal
 **/bin/
 **/obj/
 .vs/

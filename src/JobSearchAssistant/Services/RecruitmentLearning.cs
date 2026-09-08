@@ -4,7 +4,7 @@ namespace JobSearchAssistant.Services;
 
 public static class RecruitmentLearning
 {
-    private const int MinimumSegmentApplications = 4;
+    public const int MinimumSegmentApplications = 20;
 
     public static int CalculateBoost(Vacancy candidate, IReadOnlyCollection<Vacancy> history)
     {
@@ -24,7 +24,7 @@ public static class RecruitmentLearning
     public static string ExplainBoost(int boost)
         => boost switch
         {
-            >= 4 => "История откликов показывает повышенный шанс ответа",
+            >= 4 => "В достаточной выборке похожих откликов больше положительных ответов; это не прогноз",
             > 0 => "Есть положительная история ответов по похожим вакансиям",
             <= -4 => "Похожие отклики пока редко приводили к ответу",
             < 0 => "История ответов немного снижает приоритет",
@@ -34,7 +34,7 @@ public static class RecruitmentLearning
     private static int SegmentBoost(IReadOnlyCollection<Vacancy> rows)
     {
         if (rows.Count < MinimumSegmentApplications) return 0;
-        var responses = rows.Count(v => OutcomeAnalyticsService.HasResponse(v.Status));
+        var responses = rows.Count(v => v.Status is VacancyStatus.HrContact or VacancyStatus.HrInterview or VacancyStatus.TechInterview or VacancyStatus.TestTask or VacancyStatus.Offer);
         var interviews = rows.Count(v => OutcomeAnalyticsService.HasInterview(v.Status));
 
         // Conservative Bayesian smoothing prevents a few early outcomes from dominating the queue.

@@ -2,7 +2,7 @@
 
 This extension is the browser companion for `job-search-assistant`.
 
-Version **2.6.5** supports two modes: a one-click browser application for the vacancy currently open, and the backend's optional all-day HH Apply Autopilot controlled from the redesigned local dashboard. Cover letters are short, human-sounding, and selected from the actual vacancy description instead of using one fixed developer template. On current HH pages, the extension waits for the post-response “Add cover letter” action, opens it, fills the letter prepared for that exact vacancy, and verifies the second Send step before recording the application as complete. Popup-to-page messages and local-server requests now have bounded timeouts, stale manual operations recover automatically, and the popup exposes a reset action instead of requiring extension removal.
+Version **2.7.0** supports two modes: a one-click browser application for the vacancy currently open, and the backend's optional all-day HH Apply Autopilot controlled from the redesigned local dashboard. Cover letters are short, human-sounding, and selected from the actual vacancy description instead of using one fixed developer template. On current HH pages, the extension waits for the post-response “Add cover letter” action, opens it, fills the letter prepared for that exact vacancy, and verifies the second Send step before recording the application as complete. Popup-to-page messages and local-server requests now have bounded timeouts, stale manual operations recover automatically, and the popup exposes a reset action instead of requiring extension removal.
 
 The main popup button **Отправить отклик + письмо** performs the current-vacancy flow in one action: analyze, tailor, choose the HH resume or CV Vault file, fill verified-safe fields and click the final employer action only when it is unambiguous. It stops for unknown required answers, CAPTCHA, legal declarations, a missing CV, or an unverified submission result.
 
@@ -191,3 +191,6 @@ Reusable answers and CV Vault files remain in the local Chrome profile. Multi-st
 - add a more flexible defer menu only if real usage shows 4 hours is too rigid;
 - optional company-specific writing provider with deterministic truthful fallback;
 - continue using outcome analytics to decide which sources, role families and CV variants deserve more applications.
+
+
+Operator 2.7.0 moves qualification and project selection into backend services. Scores are explained priority indices, not hiring probabilities. Optional AI suggestions are available in the local dashboard, clearly labeled and review-only; normal extension drafts use verified project evidence with deterministic fallback. The popup's HH API button observer now avoids redundant class writes that could starve the browser event loop. See `docs/JOB_OPERATOR_AUDIT.md` for measured checks and the remaining real HH pilot gates.

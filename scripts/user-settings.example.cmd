@@ -1,6 +1,8 @@
 @echo off
 rem Copy this file to user-settings.cmd inside the extracted bundle.
 rem Keep user-settings.cmd private and never commit/share it.
+rem Private contact override. Existing extension contact memory is also retained.
+rem set "Candidate__Phone=your verified number"
 
 rem Optional HH.ru applicant API credentials for direct HH submission:
 set "HH__ClientId="

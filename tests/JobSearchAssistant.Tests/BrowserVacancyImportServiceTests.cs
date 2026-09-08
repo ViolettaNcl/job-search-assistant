@@ -33,7 +33,8 @@ public sealed class BrowserVacancyImportServiceTests
         StringAssert.Contains(vacancy.DescriptionText, "ASP.NET Core");
         Assert.AreEqual("Poland", vacancy.Country);
         Assert.IsTrue(vacancy.MatchScore >= 75);
-        Assert.AreEqual("Eligible", vacancy.EligibilityStatus);
+        // Citizenship does not establish Polish residence or payroll eligibility.
+        Assert.AreEqual("Verify", vacancy.EligibilityStatus);
     }
 
     [TestMethod]
