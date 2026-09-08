@@ -82,7 +82,13 @@
   function canResume(input = {}) {
     const source = safeUrl(input.sourceUrl);
     const current = safeUrl(input.currentUrl);
-    if (!source || !current || !isApplicationLike(current)) return { ok: false, reason: "invalid-route" };
+    if (!source || !current) return { ok: false, reason: "invalid-route" };
+    if (isHhUrl(source.href) && isHhUrl(current.href) && sameJobUrl(source.href, current.href)) {
+      return titleMatches(input.jobTitle, input.pageText)
+        ? { ok: true, reason: "same-hh-vacancy" }
+        : { ok: false, reason: "different-job" };
+    }
+    if (!isApplicationLike(current)) return { ok: false, reason: "invalid-route" };
     const sourceFamily = hostFamily(source);
     const currentFamily = hostFamily(current);
     if (!sourceFamily || sourceFamily !== currentFamily) return { ok: false, reason: "different-host-family" };
@@ -155,7 +161,13 @@
       .map((item, index) => ({ ...item, index, label: clean(item?.label) }))
       .filter(item => /^(?:(?:приложить|добавить) сопроводительное письмо|add (?:a )?cover letter)(?:\s|$)/i.test(item.label));
     if (!matches.length) return { found: false, ambiguous: false, count: 0 };
-    if (matches.length > 1) return { found: false, ambiguous: true, count: matches.length };
+    if (matches.length > 1) {
+      const normalized = matches.map(item => clean(item.label).toLowerCase());
+      if (normalized.every(label => label === normalized[0])) {
+        return { found: true, ambiguous: false, count: matches.length, candidate: matches[0], equivalentDuplicates: true };
+      }
+      return { found: false, ambiguous: true, count: matches.length };
+    }
     return { found: true, ambiguous: false, count: 1, candidate: matches[0] };
   }
 
@@ -166,6 +178,7 @@
   }
 
   function startReceiptDisposition(input = {}) {
+    if (input.isHh && input.coverLetterRequired && input.coverLetterActionFound) return "attach-cover-letter";
     if (!input.receiptConfirmed) return "continue";
     if (input.isHh && input.coverLetterRequired) return "attach-cover-letter";
     return "accept";
@@ -251,5 +264,12 @@
     return { ok: true, reason: "ready" };
   }
 
-  return { clean, safeUrl, isHhUrl, sameJobUrl, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, chooseHhCoverLetterAction, isApplicationContainerText, startReceiptDisposition, scoreCoverLetterField, chooseCoverLetterField, chooseHhResumeChoice, unresolvedRequired, canSubmit };
+  function finalSubmissionConfirmed(input = {}) {
+    if (input.receiptAdvanced) return true;
+    if (!input.coverLetterRequired) return Boolean(input.receiptConfirmed);
+    if (input.isHh && input.startActionSubmitted && input.letterStepCompleted) return true;
+    return Boolean(input.receiptConfirmed && input.letterStepCompleted);
+  }
+
+  return { clean, safeUrl, isHhUrl, sameJobUrl, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, chooseHhCoverLetterAction, isApplicationContainerText, startReceiptDisposition, scoreCoverLetterField, chooseCoverLetterField, chooseHhResumeChoice, unresolvedRequired, canSubmit, finalSubmissionConfirmed };
 });

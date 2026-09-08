@@ -36,6 +36,7 @@ builder.Services.AddSingleton<SecretCipher>();
 builder.Services.AddSingleton<MatchScoringService>();
 builder.Services.AddSingleton<ApplicationDraftService>();
 builder.Services.AddSingleton<AutoApplyRunTracker>();
+builder.Services.AddSingleton<BrowserAutopilotTracker>();
 builder.Services.AddSingleton<ApplicationQuestionService>();
 builder.Services.AddSingleton<CandidateProfileReadinessService>();
 builder.Services.AddScoped<HhClient>();
@@ -163,8 +164,8 @@ app.MapGet("/api/dashboard", async (AppDbContext db, StatsService stats, Cancell
     });
 });
 
-app.MapGet("/api/application-queue", async (int? limit, int? minScore, ApplicationQueueService queue, CancellationToken ct)
-    => Results.Ok(await queue.GetAsync(limit ?? 20, minScore ?? 65, ct)));
+app.MapGet("/api/application-queue", async (int? limit, int? minScore, string? source, ApplicationQueueService queue, CancellationToken ct)
+    => Results.Ok(await queue.GetAsync(limit ?? 20, minScore ?? 65, source, ct)));
 
 app.MapGet("/api/followups", async (int? afterBusinessDays, int? limit, int? maxAttempts, FollowUpQueueService followUps, CancellationToken ct)
     => Results.Ok(await followUps.GetAsync(afterBusinessDays ?? 5, limit ?? 30, maxAttempts ?? 2, ct)));
@@ -201,7 +202,7 @@ app.MapGet("/api/applications/activity", async (int? limit, AppDbContext db, Can
     return Results.Ok(items);
 });
 
-app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobService jobs, AutoApplyRunTracker runs, IOptions<SecurityOptions> security, CancellationToken ct) =>
+app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobService jobs, AutoApplyRunTracker runs, BrowserAutopilotTracker browserAutopilot, IOptions<SecurityOptions> security, CancellationToken ct) =>
 {
     var state = await db.AppStates.AsNoTracking().SingleAsync(x => x.Id == 1, ct);
     var localNow = DateTimeOffset.Now;
@@ -215,7 +216,10 @@ app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobSer
     var hhConnected = false;
     try { hhConnected = await hh.IsConnectedAsync(ct); } catch { }
     var allowed = security.Value.EnableAutomaticSubmission;
-    var ready = state.AutoApplyEnabled && allowed && hhConnected && !string.IsNullOrWhiteSpace(state.HhResumeId);
+    var browser = browserAutopilot.Snapshot;
+    var apiReady = hhConfigured && hhConnected && !string.IsNullOrWhiteSpace(state.HhResumeId);
+    var browserReady = browser.Connected;
+    var ready = state.AutoApplyEnabled && allowed && (apiReady || browserReady);
     var diagnostics = await jobs.GetAutoApplyDiagnosticsAsync(state.AutoApplyMinimumScore, ct);
     var latestRun = runs.LastResult;
     return Results.Ok(new
@@ -226,13 +230,20 @@ app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobSer
         hhConfigured,
         hhConnected,
         resumeSelected = !string.IsNullOrWhiteSpace(state.HhResumeId),
+        apiReady,
+        browserConnected = browser.Connected,
+        browserRunning = browser.Running,
+        browserLastSeenAt = browser.LastSeenAt,
+        browserLastRunAt = browser.LastRunAt,
+        browserVacancyTitle = browser.VacancyTitle,
+        automationMode = apiReady ? "hh-api" : browserReady ? "browser-extension" : "setup-required",
         state.AutoApplyMinimumScore,
         state.DailyAutoApplyLimit,
         appliedToday,
         remainingToday = Math.Max(0, state.DailyAutoApplyLimit - appliedToday),
         state.LastCollectedAt,
-        lastRunAt = latestRun?.CheckedAt ?? last?.CreatedAt,
-        lastMessage = latestRun?.Message ?? last?.Note,
+        lastRunAt = browserReady ? browser.LastRunAt ?? browser.LastSeenAt : latestRun?.CheckedAt ?? last?.CreatedAt,
+        lastMessage = browserReady ? browser.LastMessage : latestRun?.Message ?? last?.Note,
         lastResult = latestRun is null
             ? (last is null ? null : new { type = last.Type, message = last.Note, attempted = 0, submitted = 0, failed = 0 })
             : new { type = latestRun.Ready ? "Cycle" : "Setup", message = latestRun.Message, attempted = latestRun.Attempted, submitted = latestRun.Submitted, failed = latestRun.Failed },
@@ -361,6 +372,25 @@ app.MapPost("/api/vacancies/{id:guid}/mark-applied", async (Guid id, JobService 
     return Results.Ok();
 });
 
+app.MapPost("/api/vacancies/{id:guid}/browser-auto-applied", async (Guid id, BrowserAutoAppliedRequest request, JobService jobs, BrowserAutopilotTracker browserAutopilot, CancellationToken ct) =>
+{
+    await jobs.MarkBrowserAppliedAsync(id, request.CoverLetter, request.ResumeLabel, true, ct);
+    browserAutopilot.RecordResult("Отклик и персональное письмо отправлены через расширение Chrome.", request.VacancyTitle);
+    return Results.Ok(new { status = "recorded" });
+});
+
+app.MapPost("/api/vacancies/{id:guid}/browser-applied", async (Guid id, BrowserAutoAppliedRequest request, JobService jobs, CancellationToken ct) =>
+{
+    await jobs.MarkBrowserAppliedAsync(id, request.CoverLetter, request.ResumeLabel, false, ct);
+    return Results.Ok(new { status = "recorded" });
+});
+
+app.MapPost("/api/browser-autopilot/heartbeat", (BrowserAutopilotHeartbeat request, BrowserAutopilotTracker browserAutopilot) =>
+{
+    var status = browserAutopilot.Heartbeat(request.Running, request.Message, request.VacancyTitle);
+    return Results.Ok(status);
+});
+
 app.MapPost("/api/vacancies/{id:guid}/cv-attribution", async (Guid id, string? resumeLabel, ApplicationAttributionService attribution, CancellationToken ct) =>
 {
     var recorded = await attribution.RecordExternalCvAsync(id, resumeLabel, ct);
@@ -417,6 +447,15 @@ app.MapPost("/api/settings/autoapply", async (AutoApplyRequest request, AppDbCon
     return Results.Ok(new { state.AutoApplyEnabled, state.AutoApplyMinimumScore, state.DailyAutoApplyLimit, collection, cycle });
 });
 
+app.MapPost("/api/settings/autoapply/preferences", async (AutoApplyPreferencesRequest request, AppDbContext db, CancellationToken ct) =>
+{
+    var state = await db.AppStates.SingleAsync(x => x.Id == 1, ct);
+    state.AutoApplyMinimumScore = Math.Clamp(request.MinimumScore, 75, 100);
+    state.DailyAutoApplyLimit = Math.Clamp(request.DailyLimit, 1, 50);
+    await db.SaveChangesAsync(ct);
+    return Results.Ok(new { state.AutoApplyMinimumScore, state.DailyAutoApplyLimit });
+});
+
 app.MapPost("/api/automation/run", async (JobService jobs, IOptions<SearchOptions> search, CancellationToken ct) =>
 {
     var collection = await jobs.CollectAsync(search.Value, ct);
@@ -433,7 +472,10 @@ public sealed record StatusRequest(string Status, string? Note);
 public sealed record FollowUpSentRequest(string? Note);
 public sealed record BoolRequest(bool Value);
 public sealed record ResumeRequest(string ResumeId);
+public sealed record BrowserAutoAppliedRequest(string? CoverLetter, string? ResumeLabel, string? VacancyTitle);
+public sealed record BrowserAutopilotHeartbeat(bool Running, string? Message, string? VacancyTitle);
 public sealed record AutoApplyRequest(bool Enabled, int MinimumScore, int DailyLimit);
+public sealed record AutoApplyPreferencesRequest(int MinimumScore, int DailyLimit);
 public sealed record ExtensionAnalyzeRequest(
     string? Title,
     string? Company,

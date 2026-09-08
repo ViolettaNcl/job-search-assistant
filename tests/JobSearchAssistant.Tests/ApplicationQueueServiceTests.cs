@@ -65,6 +65,27 @@ public sealed class ApplicationQueueServiceTests
     }
 
     [TestMethod]
+    public async Task Queue_CanFilterHhForBrowserAutopilotBeforeApplyingLimit()
+    {
+        await using var db = CreateDb();
+        var company = new Company { Name = "Mixed source", Source = "global", ExternalId = "mixed-source" };
+        db.Companies.Add(company);
+        var external = CreateVacancy(company, "External role", 99, "Eligible", DateTimeOffset.UtcNow);
+        external.Source = "remotive";
+        var hh = CreateVacancy(company, "Junior .NET on HH", 82, "Eligible", DateTimeOffset.UtcNow.AddMinutes(-5));
+        hh.Source = "hh";
+        db.Vacancies.AddRange(external, hh);
+        await db.SaveChangesAsync();
+
+        var drafts = new ApplicationDraftService(Options.Create(new CandidateProfileOptions()));
+        var sut = new ApplicationQueueService(db, drafts);
+        var queue = await sut.GetAsync(1, 75, "hh", CancellationToken.None);
+
+        Assert.AreEqual(1, queue.Count);
+        Assert.AreEqual(hh.Id, queue[0].VacancyId);
+    }
+
+    [TestMethod]
     public async Task Queue_HidesActiveDeferral_RestoresExpiredDeferral_AndDoesNotExposeOrdinarySavedJob()
     {
         await using var db = CreateDb();

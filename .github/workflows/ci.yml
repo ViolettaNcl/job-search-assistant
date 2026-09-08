@@ -18,6 +18,10 @@ jobs:
       - name: Validate extension JavaScript
         run: |
           node --check browser-extension/background.js
+          node --check browser-extension/browser-autopilot.js
+          node --check browser-extension/site-apply.js
+          node --check browser-extension/site-apply-content.js
+          node --check browser-extension/site-apply-popup.js
           node --check browser-extension/ats-structured.js
           node --check browser-extension/ats-controls.js
           node --check browser-extension/field-verification.js
@@ -78,6 +82,8 @@ jobs:
           node --check browser-extension/candidate-local-profile.test.js
           node --check browser-extension/setup-readiness.test.js
           node --check browser-extension/application-continuation.test.js
+          node --check browser-extension/browser-autopilot.test.js
+          node --check browser-extension/site-apply.test.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls
@@ -120,6 +126,10 @@ jobs:
         run: node browser-extension/setup-readiness.test.js
       - name: Test post-submission application continuation
         run: node browser-extension/application-continuation.test.js
+      - name: Test HH website Autopilot selection
+        run: node browser-extension/browser-autopilot.test.js
+      - name: Test one-click HH response and cover-letter continuation
+        run: node browser-extension/site-apply.test.js
       - name: Validate dashboard inline JavaScript
         run: |
           python3 - <<'PY'

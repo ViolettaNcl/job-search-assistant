@@ -45,6 +45,7 @@ public sealed class JobService(
     MatchScoringService scoring,
     ApplicationDraftService drafts,
     AutoApplyRunTracker autoApplyRuns,
+    BrowserAutopilotTracker browserAutopilot,
     IOptions<SecurityOptions> security,
     IOptions<HhOptions> hhOptions,
     IOptions<AutomationOptions> automation)
@@ -386,6 +387,44 @@ public sealed class JobService(
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task MarkBrowserAppliedAsync(Guid vacancyId, string? coverLetter, string? resumeLabel, bool automatic, CancellationToken ct)
+    {
+        var vacancy = await db.Vacancies.Include(x => x.Application).Include(x => x.Events).SingleAsync(x => x.Id == vacancyId, ct);
+        vacancy.Status = VacancyStatus.Applied;
+        vacancy.HasExistingHhResponse = vacancy.Source == "hh" || vacancy.HasExistingHhResponse;
+        vacancy.UpdatedAt = DateTimeOffset.UtcNow;
+
+        if (vacancy.Application is null)
+        {
+            db.Applications.Add(new Application
+            {
+                VacancyId = vacancy.Id,
+                ResumeExternalId = string.IsNullOrWhiteSpace(resumeLabel) ? "hh/browser" : $"hh/browser:{resumeLabel.Trim()}",
+                CoverLetter = coverLetter?.Trim() ?? "",
+                AppliedAt = DateTimeOffset.UtcNow
+            });
+        }
+        else if (string.IsNullOrWhiteSpace(vacancy.Application.CoverLetter) && !string.IsNullOrWhiteSpace(coverLetter))
+        {
+            vacancy.Application.CoverLetter = coverLetter.Trim();
+        }
+
+        var eventType = automatic ? "AutoApplied" : "Applied";
+        if (!vacancy.Events.Any(x => x.Type == eventType))
+        {
+            db.ApplicationEvents.Add(new ApplicationEvent
+            {
+                VacancyId = vacancy.Id,
+                Type = eventType,
+                Note = automatic
+                    ? "Submitted automatically on the HH website through the Chrome extension with a vacancy-specific cover letter"
+                    : "Submitted on the employer website through the Chrome extension with a vacancy-specific cover letter"
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task SetStatusAsync(Guid vacancyId, VacancyStatus status, string note, CancellationToken ct)
     {
         var vacancy = await db.Vacancies.Include(x => x.Application).SingleAsync(x => x.Id == vacancyId, ct);
@@ -448,11 +487,23 @@ public sealed class JobService(
             if (!security.Value.EnableAutomaticSubmission)
                 return Finish(new AutoApplyCycleResult(true, false, "Автоматическая отправка отключена в локальных настройках программы.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
             if (string.IsNullOrWhiteSpace(state.HhResumeId))
+            {
+                if (browserAutopilot.Snapshot.Connected)
+                    return Finish(new AutoApplyCycleResult(true, true, "Автопилот работает через расширение Chrome и выбранное на сайте HH резюме.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
                 return Finish(new AutoApplyCycleResult(true, false, "Выберите HH-резюме: без него отклик отправить нельзя.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
+            }
             if (!hh.IsOAuthConfigured)
+            {
+                if (browserAutopilot.Snapshot.Connected)
+                    return Finish(new AutoApplyCycleResult(true, true, "Автопилот работает через расширение Chrome; HH Client ID и Secret не требуются.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
                 return Finish(new AutoApplyCycleResult(true, false, "Сначала настройте доступ HH API в файле user-settings.cmd.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
+            }
             if (!await hh.IsConnectedAsync(ct))
+            {
+                if (browserAutopilot.Snapshot.Connected)
+                    return Finish(new AutoApplyCycleResult(true, true, "Автопилот работает через активное расширение Chrome.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
                 return Finish(new AutoApplyCycleResult(true, false, "Подключите аккаунт HH и снова запустите AI-ассистента.", 0, 0, 0, 0, state.DailyAutoApplyLimit, now, diagnostics));
+            }
 
             var localNow = DateTimeOffset.Now;
             var today = new DateTimeOffset(localNow.Date, localNow.Offset);

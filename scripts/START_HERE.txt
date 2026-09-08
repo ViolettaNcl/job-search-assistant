@@ -45,11 +45,14 @@ VIOLETTA APPLY ASSISTANT — WINDOWS QUICK START
 
    AUTONOMOUS HH MODE
    - Keep the backend window open for the whole working day
-   - Open the dashboard and connect HH once
-   - Load and select your HH resume
+   - Sign in to HH.ru in the same Chrome profile as the extension
+   - Keep Chrome open; the extension connects to the dashboard automatically
+   - Client ID and Client Secret are not required in this browser mode
+   - Select the desired resume on HH when the site offers more than one
    - Set the minimum fit and daily limit
    - Click "Запустить AI-ассистента"
-   - The program collects jobs hourly and checks the HH queue every 10 minutes
+   - The program collects jobs and the extension checks the HH queue every 30 seconds
+   - Each successful application includes the letter generated for that vacancy
    - Click "Остановить" whenever you want to pause it
 
    MANUAL EXTENSION MODE

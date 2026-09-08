@@ -12,7 +12,11 @@ set "DOTNET_ENVIRONMENT=Production"
 if not exist "%~dp0backend\JobSearchAssistant.exe" (
   echo [Violetta Apply Assistant] Backend executable was not found.
   echo Expected: %~dp0backend\JobSearchAssistant.exe
-  echo Re-download or re-extract the Windows bundle and try again.
+  echo.
+  echo The launcher was probably opened directly inside the ZIP archive.
+  echo Close this window, right-click the downloaded ZIP, choose "Extract All",
+  echo then run start-assistant.cmd from the extracted folder.
+  echo The backend folder must be next to start-assistant.cmd.
   pause
   exit /b 1
 )

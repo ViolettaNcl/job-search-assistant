@@ -86,10 +86,33 @@ public sealed class ApplicationDraftServiceTests
             []);
 
         StringAssert.Contains(draft.CoverLetter, "customers and users");
-        StringAssert.Contains(draft.CoverLetter, "support and practical problem-solving");
+        StringAssert.Contains(draft.CoverLetter, "clarify needs");
         StringAssert.Contains(draft.CoverLetter, "English, Russian and Greek");
         Assert.IsFalse(draft.CoverLetter.Contains("ASP.NET", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(draft.CoverLetter.Contains("SQL", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(draft.CoverLetter.Contains("diploma", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void RussianWrittenSupportRole_GetsShortSupportSpecificLetter()
+    {
+        var draft = _sut.Build(
+            "Специалист письменной поддержки клиентов каршеринга",
+            "Dream Job",
+            "Отвечать клиентам в чате, разбирать обращения, понятно объяснять решение и поддерживать высокое качество сервиса.",
+            "Россия",
+            "hh",
+            70,
+            [],
+            []);
+
+        Assert.AreEqual("ru", draft.Language);
+        StringAssert.Contains(draft.CoverLetter, "клиентами и пользователями");
+        StringAssert.Contains(draft.CoverLetter, "понятно объяснять сложные вещи");
+        Assert.IsFalse(draft.CoverLetter.Contains("ASP.NET", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(draft.CoverLetter.Contains("SQL", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(draft.CoverLetter.Contains("диплом", StringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(draft.CoverLetter.Length < 750);
     }
 
     [TestMethod]

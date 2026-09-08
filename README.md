@@ -14,7 +14,7 @@ The project is built around one principle: find fewer but stronger opportunities
 - Generates vacancy-specific Russian or English application drafts using verified candidate facts.
 - Repositions truthfully for .NET/backend/full-stack, QA and technical/implementation roles.
 - HH OAuth2 + encrypted tokens + resume selection + existing-application import.
-- Optional all-day HH Apply Autopilot through HH's official applicant-authorized API, with dashboard start/pause, fit threshold, daily limit, duplicate protection and an auditable activity history.
+- Optional all-day HH Apply Autopilot through the Chrome extension and the candidate's existing HH website session; official HH API access remains an optional alternative.
 - Chrome extension companion with HH, Greenhouse, Lever, Ashby and generic ATS detection.
 - Safe form resolver classifies fields as **fill / review / blocked**.
 - Browser-local Application Memory can reuse explicitly confirmed answers such as phone or LinkedIn.
@@ -35,7 +35,7 @@ The project is built around one principle: find fewer but stronger opportunities
 
 ## Two working modes
 
-1. **Autonomous HH mode:** start the Windows program, connect HH once, choose an HH resume, then press **Запустить AI-ассистента** on the dashboard. Starting or manually checking the assistant first refreshes the vacancy feed, then applies only to eligible non-senior HH jobs above the chosen score. The dashboard explains how many jobs passed each filter, attaches a short description-specific letter, respects the daily limit and records every result.
+1. **Autonomous HH mode:** start the Windows program, sign in to HH.ru in the Chrome profile containing the extension, then press **Запустить AI-ассистента** on the dashboard. The extension connects automatically, so Client ID and Client Secret are not required. It refreshes the vacancy feed, opens eligible non-senior HH jobs above the chosen score, selects the website resume, sends the short description-specific letter in HH's second cover-letter step, respects the daily limit and records every confirmed result.
 2. **Manual browser mode:** keep the backend running, open any vacancy in Chrome and press **Отправить отклик + письмо** in the extension. It analyzes the job, creates the letter, selects the HH resume or stored CV, fills safe fields and presses the unambiguous final action. It stops when a required answer, CAPTCHA, legal declaration or ambiguous button needs the candidate.
 
 The dashboard pipeline shows the employer, vacancy, source, application time, manual/autopilot origin, cover-letter status and later HR/interview/rejection/offer updates.
@@ -54,7 +54,7 @@ The verified phone number is configured in the local profile. `LinkedInUrl` rema
 
 There is no safe universal candidate API that can submit applications to every employer website.
 
-- **HH.ru:** the background autopilot uses the applicant-authorized official API when OAuth and resume selection are configured. It only submits verified eligible jobs and never sends duplicates.
+- **HH.ru:** the default background autopilot uses the logged-in Chrome session; applicant-authorized API submission is used only when it was configured explicitly. Both modes submit only verified eligible jobs and protect against duplicates.
 - **External ATS / company sites:** the extension can perform the final click from the explicit **Отправить отклик + письмо** action when the form, CV and confirmation signal are unambiguous. It stops for unknown mandatory answers or unclear site state.
 - CAPTCHA, 2FA and employer-specific legal declarations are never bypassed.
 
@@ -196,9 +196,9 @@ The generated follow-up is Russian for Russia/HH applications and English for in
 
 ## Automatic submission
 
-Apply Autopilot is off until the user starts it from the local dashboard. The start/pause choice persists in the local database, so an enabled autopilot resumes after restarting the program. New installations default to an 85% fit threshold and 25 applications per local calendar day; the dashboard supports 75–100% and 1–50 per day.
+Apply Autopilot is off until the user starts it from the local dashboard. The start/pause choice persists in the local database, so an enabled autopilot resumes after restarting the program. In the default browser mode, Chrome and the installed extension must stay open with an active HH login; no developer credentials are required. New installations default to an 85% fit threshold and 25 applications per local calendar day; the dashboard supports 75–100% and 1–50 per day.
 
-Background submission is deliberately HH-only. External employer forms need an open browser tab and the extension's explicit one-click action.
+Background submission is deliberately HH-only and never uses LinkedIn. External employer forms need an open browser tab and the extension's explicit one-click action.
 
 ## Tests
 

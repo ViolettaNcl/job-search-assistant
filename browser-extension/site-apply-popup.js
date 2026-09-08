@@ -17,11 +17,13 @@ async function vjaRecordConfirmedSiteApply(resultEnvelope, cvName = "") {
   if (!trackedId) return false;
   try {
     const api = await getApiBase();
-    const response = await fetch(`${api}/api/vacancies/${trackedId}/mark-applied`, { method: "POST" });
+    const coverLetter = String(resultEnvelope?.coverLetter || $("coverLetter")?.value || latest?.draft?.coverLetter || "").trim();
+    const response = await fetch(`${api}/api/vacancies/${trackedId}/browser-applied`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coverLetter, resumeLabel: cvName, vacancyTitle: latestPage?.title || "" })
+    });
     if (!response.ok) return false;
-    if (cvName) {
-      await fetch(`${api}/api/vacancies/${trackedId}/cv-attribution?resumeLabel=${encodeURIComponent(cvName)}`, { method: "POST" }).catch(() => null);
-    }
     return true;
   } catch {
     return false;
@@ -66,11 +68,10 @@ async function vjaHandleSiteApplyResult(envelope, cvName = "") {
     if (note) note.textContent = "The employer's final Send action was clicked, but the site did not expose a reliable confirmation signal. Check the page once before recording it as Applied.";
     return;
   }
-  if (result.submitted && result.status === "submitted-needs-letter") {
-    const recorded = await vjaRecordConfirmedSiteApply(envelope, result.resumeLabel || cvName || "");
-    if (note) note.textContent = `${vjaSiteApplyReason(result)}${recorded ? " The application itself was recorded as Applied." : ""}`;
+  if (result.status === "submitted-needs-letter") {
+    if (note) note.textContent = `${vjaSiteApplyReason(result)} Нажмите кнопку ещё раз — расширение продолжит с письма, не отправляя резюме повторно.`;
     const button = $("siteApplyNow");
-    if (button) button.textContent = "Applied — add letter";
+    if (button) button.textContent = "Добавить письмо";
     return;
   }
   if (result.status === "needs-review") {
@@ -93,7 +94,7 @@ async function vjaApplyNowOnSite() {
   const hhWebsite = Boolean(window.vjaSiteApply?.isHhUrl?.(latestPage.url)) || isHhVacancy(latestPage.url);
   const previous = await chrome.storage.local.get("vjaSiteApplyResult");
   const previousEnvelope = previous?.vjaSiteApplyResult;
-  if (previousEnvelope?.result?.submitted && window.vjaSiteApply?.sameJobUrl?.(previousEnvelope.sourceUrl, latestPage.url)) {
+  if (previousEnvelope?.result?.submitted && previousEnvelope?.result?.status === "confirmed" && window.vjaSiteApply?.sameJobUrl?.(previousEnvelope.sourceUrl, latestPage.url)) {
     const note = $("fillNote");
     if (note) note.textContent = "Этот отклик уже был подтверждён и сохранён. Повторная отправка заблокирована.";
     return;
@@ -147,7 +148,7 @@ async function vjaApplyNowOnSite() {
   try {
     const plan = fileData ? { ...pending, fileData } : pending;
     const result = await sendToPage({ type: "siteApplyNow", plan });
-    const envelope = { id: pending.id, trackedId, sourceUrl: pending.sourceUrl, result };
+    const envelope = { id: pending.id, trackedId, sourceUrl: pending.sourceUrl, coverLetter: pending.coverLetter, result };
     await vjaHandleSiteApplyResult(envelope, result?.resumeLabel || fileData?.name || "");
   } catch (error) {
     if (note) note.textContent = "Application flow started. If the employer site navigated to a new step, the extension will resume there automatically.";
