@@ -91,6 +91,13 @@ async function vjaApplyNowOnSite() {
   }
 
   const hhWebsite = Boolean(window.vjaSiteApply?.isHhUrl?.(latestPage.url)) || isHhVacancy(latestPage.url);
+  const previous = await chrome.storage.local.get("vjaSiteApplyResult");
+  const previousEnvelope = previous?.vjaSiteApplyResult;
+  if (previousEnvelope?.result?.submitted && window.vjaSiteApply?.sameJobUrl?.(previousEnvelope.sourceUrl, latestPage.url)) {
+    const note = $("fillNote");
+    if (note) note.textContent = "Этот отклик уже был подтверждён и сохранён. Повторная отправка заблокирована.";
+    return;
+  }
   const language = latest.draft?.language === "ru" ? "ru" : "en";
   const cvKey = hhWebsite ? "" : (language === "ru" ? "cvVaultRu" : "cvVaultEn");
   let fileData = null;

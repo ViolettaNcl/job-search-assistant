@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict");
 const prep = require("./prepare-application.js");
+const sessions = require("./application-session.js");
+const siteApply = require("./site-apply.js");
 
 let result = prep.summarize({
   analyzed: true,
@@ -58,5 +60,18 @@ result = prep.summarize({ analyzed: true, detectedFields: 0, hh: true });
 assert.equal(result.state, "prepared");
 assert.match(result.message, /HH application draft is ready/);
 assert.match(result.message, /separate confirmed action/);
+
+const cached = {
+  latest: { match: { score: 82 }, draft: { coverLetter: "Tailored" } },
+  latestPage: { url: "https://hh.ru/vacancy/130452758", title: "Программист .Net" },
+  currentUrl: "https://hh.ru/vacancy/130452758?from=search",
+  sessionApi: sessions,
+  siteApplyApi: siteApply,
+  now: 1_800_000_000_000
+};
+assert.equal(prep.canReuseAnalysis(cached), true, "same vacancy reuses its existing tailored analysis");
+assert.equal(prep.canReuseAnalysis({ ...cached, currentUrl: "https://hh.ru/vacancy/137044225" }), false,
+  "a different vacancy always gets a fresh analysis");
+assert.equal(prep.canReuseAnalysis({ ...cached, latest: null }), false);
 
 console.log("prepare-application tests passed");

@@ -62,5 +62,18 @@
     return "Prepare application";
   }
 
-  return { summarize, buttonLabel };
+  function canReuseAnalysis(input = {}) {
+    const latest = input.latest;
+    const latestPage = input.latestPage;
+    const currentUrl = String(input.currentUrl || "");
+    const sessions = input.sessionApi;
+    if (!latest || !latestPage?.url || !currentUrl) return false;
+    if (input.siteApplyApi?.sameJobUrl?.(latestPage.url, currentUrl)) return true;
+    if (!sessions?.create || !sessions?.canRestore) return false;
+    const now = Number(input.now || Date.now());
+    const session = sessions.create({ latest, latestPage }, now);
+    return Boolean(session && sessions.canRestore(session, currentUrl, now));
+  }
+
+  return { summarize, buttonLabel, canReuseAnalysis };
 });

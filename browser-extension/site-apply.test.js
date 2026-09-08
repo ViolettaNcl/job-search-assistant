@@ -33,6 +33,9 @@ assert.equal(start.ambiguous, true);
 assert.equal(apply.isHhUrl('https://hh.ru/vacancy/123'), true);
 assert.equal(apply.isHhUrl('https://spb.hh.ru/vacancy/123'), true);
 assert.equal(apply.isHhUrl('https://career.habr.com/vacancies/123'), false);
+assert.equal(apply.sameJobUrl('https://hh.ru/vacancy/130452758?from=search', 'https://spb.hh.ru/vacancy/130452758'), true);
+assert.equal(apply.sameJobUrl('https://hh.ru/vacancy/130452758', 'https://hh.ru/vacancy/137044225'), false);
+assert.equal(apply.sameJobUrl('https://jobs.example.com/apply/42?source=a', 'https://jobs.example.com/apply/42?source=b'), true);
 
 let letterAction = apply.chooseHhCoverLetterAction([
   { label: 'Задать вопрос' },

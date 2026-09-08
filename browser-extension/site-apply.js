@@ -18,6 +18,21 @@
     return host === "hh.ru" || host.endsWith(".hh.ru");
   }
 
+  function sameJobUrl(left, right) {
+    const a = safeUrl(left);
+    const b = safeUrl(right);
+    if (!a || !b) return false;
+    const aHh = isHhUrl(a.href);
+    const bHh = isHhUrl(b.href);
+    if (aHh || bHh) {
+      if (!aHh || !bHh) return false;
+      const aId = a.pathname.match(/\/vacancy\/(\d+)/i)?.[1] || a.searchParams.get("vacancyId") || "";
+      const bId = b.pathname.match(/\/vacancy\/(\d+)/i)?.[1] || b.searchParams.get("vacancyId") || "";
+      return Boolean(aId && aId === bId);
+    }
+    return a.origin === b.origin && a.pathname.replace(/\/$/, "") === b.pathname.replace(/\/$/, "");
+  }
+
   function hostFamily(value) {
     const parsed = safeUrl(value);
     const host = (parsed?.hostname || "").toLowerCase();
@@ -236,5 +251,5 @@
     return { ok: true, reason: "ready" };
   }
 
-  return { clean, safeUrl, isHhUrl, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, chooseHhCoverLetterAction, isApplicationContainerText, startReceiptDisposition, scoreCoverLetterField, chooseCoverLetterField, chooseHhResumeChoice, unresolvedRequired, canSubmit };
+  return { clean, safeUrl, isHhUrl, sameJobUrl, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, chooseHhCoverLetterAction, isApplicationContainerText, startReceiptDisposition, scoreCoverLetterField, chooseCoverLetterField, chooseHhResumeChoice, unresolvedRequired, canSubmit };
 });

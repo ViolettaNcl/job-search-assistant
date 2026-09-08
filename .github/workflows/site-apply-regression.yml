@@ -56,4 +56,6 @@ jobs:
           if (/Apply on this employer site now\?/.test(popup)) throw new Error('Apply + send still has a redundant second confirmation.');
           if (!popup.includes('Apply + send now')) throw new Error('Immediate-send button is missing.');
           if (!popup.includes('vjaOneClickApply')) throw new Error('Top-level one-click application handler is missing.');
+          const popupHtml = fs.readFileSync('browser-extension/popup.html', 'utf8');
+          if (!popupHtml.includes('<script src="site-apply.js"></script>')) throw new Error('Popup is missing the shared site-apply safeguards.');
           NODE
