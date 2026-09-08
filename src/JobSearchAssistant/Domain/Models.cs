@@ -153,7 +153,11 @@ public sealed record SearchOptions
         "Младший разработчик C#",
         "Стажер C# .NET",
         "Стажёр C# .NET",
-        "Стажировка .NET"
+        "Стажировка .NET",
+        "Junior QA Automation",
+        "Стажер тестировщик",
+        "Junior специалист по внедрению",
+        "Technical Support Engineer"
     ];
 
     public string[] InternationalQueries { get; init; } =
@@ -170,7 +174,7 @@ public sealed record SearchOptions
         "Graduate .NET Developer"
     ];
 
-    public int IntervalMinutes { get; init; } = 360;
+    public int IntervalMinutes { get; init; } = 60;
     public int MaxNewVacanciesPerRun { get; init; } = 80;
     public int MinimumTelegramScore { get; init; } = 65;
     public bool RemoteOnly { get; init; } = true;

@@ -81,6 +81,15 @@ public sealed class MatchScoringService(IOptions<CandidateProfileOptions> candid
         if (lowerTitle.Contains("senior") || lowerTitle.Contains("staff") || lowerTitle.Contains("principal") || lowerTitle.Contains("ведущ")) score -= 65;
         if (lowerTitle.Contains("lead") || lowerTitle.Contains("teamlead") || lowerTitle.Contains("architect")) score -= 100;
         if (Regex.IsMatch(haystack, @"\b([5-9]|1\d)\+?\s*(лет|years?)\b", RegexOptions.IgnoreCase)) score -= 50;
+        else if (Regex.IsMatch(haystack, @"\b4\+?\s*(года|лет|years?)\b", RegexOptions.IgnoreCase)) score -= 22;
+        else if (Regex.IsMatch(haystack, @"\b3\+?\s*(года|лет|years?)\b", RegexOptions.IgnoreCase)) score -= 12;
+        else if (Regex.IsMatch(haystack, @"\b2\+?\s*(года|лет|years?)\b", RegexOptions.IgnoreCase)) score -= 5;
+
+        var hardDegreeRequirement = Regex.IsMatch(haystack,
+            @"(?:bachelor(?:'s)?|university) degree.{0,30}(?:required|mandatory)|must have (?:a )?bachelor(?:'s)? degree|высшее образование.{0,24}(?:обязательно|требуется)",
+            RegexOptions.IgnoreCase);
+        var equivalentExperienceAccepted = Regex.IsMatch(haystack, @"degree.{0,20}(?:or|или).{0,24}(?:equivalent|опыт)", RegexOptions.IgnoreCase);
+        if (hardDegreeRequirement && !equivalentExperienceAccepted) score -= 12;
 
         var eligibility = EvaluateEligibility(haystack, remote, location, remoteScope);
         score += eligibility.Status switch

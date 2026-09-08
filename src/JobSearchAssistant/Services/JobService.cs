@@ -424,11 +424,11 @@ public sealed class JobService(
                 return Finish(new AutoApplyCycleResult(true, true, "Дневной лимит откликов уже достигнут.", 0, 0, 0, alreadyToday, 0, now, diagnostics));
 
             var retryAfter = now.AddMinutes(-Math.Clamp(automation.Value.FailureCooldownMinutes, 30, 1440));
-            var candidates = await db.Vacancies.Include(x => x.Company).Include(x => x.Application).Include(x => x.Events)
+            var candidateRows = await db.Vacancies.Include(x => x.Company).Include(x => x.Application).Include(x => x.Events)
                 .Where(x => x.Source == "hh" && x.Status == VacancyStatus.New && x.Application == null && !x.HasExistingHhResponse && !x.Company.IsBlacklisted && x.MatchScore >= state.AutoApplyMinimumScore && x.EligibilityStatus == "Eligible")
-                .RankedAsync(available, ct, filter: x =>
-                    AutomaticSubmissionPolicy.CanSubmit(x, state.AutoApplyMinimumScore) &&
-                    !x.Events.Any(e => e.Type == "AutoApplyFailed" && e.CreatedAt >= retryAfter));
+                .ToListAsync(ct);
+            var candidates = AutomaticSubmissionPolicy.SelectCandidates(
+                candidateRows, state.AutoApplyMinimumScore, available, now, retryAfter);
 
             var submitted = 0;
             var failed = 0;

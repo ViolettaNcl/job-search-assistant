@@ -89,14 +89,19 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
         var date = vacancy.PublishedAt ?? vacancy.FirstSeenAt;
         var age = now - date;
 
-        if (age <= TimeSpan.FromDays(1)) score += 10;
+        if (age <= TimeSpan.FromHours(12)) score += 12;
+        else if (age <= TimeSpan.FromDays(1)) score += 10;
         else if (age <= TimeSpan.FromDays(3)) score += 7;
         else if (age <= TimeSpan.FromDays(7)) score += 4;
-        else if (age > TimeSpan.FromDays(30)) score -= 5;
+        else if (age > TimeSpan.FromDays(30)) score -= 10;
+        else if (age > TimeSpan.FromDays(14)) score -= 4;
 
         if (vacancy.EligibilityStatus.Equals("Eligible", StringComparison.OrdinalIgnoreCase)) score += 6;
         if (vacancy.Company?.IsWatched == true) score += 4;
         if (vacancy.MatchScore >= 90) score += 3;
+        if (VacancyClassifier.OpportunityType(vacancy) == VacancyClassifier.TypeInternship) score += 5;
+        if (AutomaticSubmissionPolicy.IsEntryLevelTitle(vacancy.Title)) score += 3;
+        if (vacancy.Experience.Contains("noExperience", StringComparison.OrdinalIgnoreCase)) score += 4;
 
         return Math.Clamp(score, 0, 120);
     }
