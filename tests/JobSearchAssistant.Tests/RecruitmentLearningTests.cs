@@ -11,10 +11,10 @@ public sealed class RecruitmentLearningTests
     public void Learning_BoostsSegmentsWithRepeatedResponses_AndIgnoresTinySamples()
     {
         var candidate = Vacancy("Junior .NET Developer", "hh", "HeadHunter", VacancyStatus.New);
-        var positiveHistory = Enumerable.Range(0, 6)
-            .Select(i => Vacancy("Junior .NET Developer", "hh", "HeadHunter", i < 4 ? VacancyStatus.HrContact : VacancyStatus.Applied))
+        var positiveHistory = Enumerable.Range(0, 24)
+            .Select(i => Vacancy("Junior .NET Developer", "hh", "HeadHunter", i < 16 ? VacancyStatus.HrContact : VacancyStatus.Applied))
             .ToArray();
-        var tinyHistory = positiveHistory.Take(2).ToArray();
+        var tinyHistory = positiveHistory.Take(19).ToArray();
 
         Assert.IsTrue(RecruitmentLearning.CalculateBoost(candidate, positiveHistory) > 0);
         Assert.AreEqual(0, RecruitmentLearning.CalculateBoost(candidate, tinyHistory));
@@ -24,11 +24,19 @@ public sealed class RecruitmentLearningTests
     public void Learning_DoesNotTransferUnrelatedRoleHistory()
     {
         var candidate = Vacancy("Junior .NET Developer", "career", "Career site", VacancyStatus.New);
-        var unrelated = Enumerable.Range(0, 6)
+        var unrelated = Enumerable.Range(0, 24)
             .Select(_ => Vacancy("QA Internship", "hh", "HeadHunter", VacancyStatus.HrInterview))
             .ToArray();
 
         Assert.AreEqual(0, RecruitmentLearning.CalculateBoost(candidate, unrelated));
+    }
+
+    [TestMethod]
+    public void RejectionsDoNotCountAsPositiveRecruiterResponses()
+    {
+        var candidate = Vacancy("Junior .NET Developer", "hh", "HeadHunter", VacancyStatus.New);
+        var rejected = Enumerable.Range(0, 24).Select(_ => Vacancy("Junior .NET Developer", "hh", "HeadHunter", VacancyStatus.Rejected)).ToArray();
+        Assert.IsTrue(RecruitmentLearning.CalculateBoost(candidate, rejected) <= 0);
     }
 
     private static Vacancy Vacancy(string title, string source, string sourceLabel, VacancyStatus status)

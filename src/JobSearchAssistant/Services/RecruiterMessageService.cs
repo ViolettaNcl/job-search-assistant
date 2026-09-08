@@ -35,6 +35,7 @@ public sealed class RecruiterMessageService
         var stage = intents.Contains("offer") ? "Offer" : intents.Contains("rejection") ? "Rejected" : intents.Contains("test-assignment") ? "TestTask" : intents.Contains("interview") ? "HrInterview" : "HrContact";
         var next = intents.Contains("test-assignment") ? "Read the task and confirm its deadline before accepting." : intents.Contains("interview") ? "Confirm the interview time against your calendar." : unknown.Count > 0 ? "Answer the missing personal facts, then review the reply." : "Review the employer update.";
         var reply = unknown.Count > 0 ? "Здравствуйте! Спасибо за сообщение. Уточню детали и вернусь с ответом." : "Здравствуйте! Спасибо за информацию.";
+        if (!Has("[А-Яа-я]")) reply = unknown.Count > 0 ? "Hello, thank you for your message. I will check the details and get back to you." : "Hello, thank you for the update.";
         return new(intents.ToArray(), urgency, stage, next, risk, true, unknown.ToArray(), reply, "deterministic-fallback");
     }
 }

@@ -52,7 +52,6 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
                         (scoring != null || (x.MatchScore >= minimumScore && x.EligibilityStatus != "Likely ineligible")) &&
                         (string.IsNullOrWhiteSpace(source) || x.Source == source))
             .OrderByDescending(x => x.MatchScore)
-            .Take(300)
             .ToListAsync(ct);
         var history = await db.Vacancies
             .AsNoTracking()
@@ -67,6 +66,7 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
                 var match = scoring.Score(v.Title, v.DescriptionText, v.IsRemote, v.Experience, v.LocationText, v.RemoteScope);
                 v.MatchScore = match.Score;
                 v.WhyMatch = match.Why;
+                v.MatchLevel = match.Level;
                 v.EligibilityStatus = match.Assessment?.Decision == "APPLY" ? match.EligibilityStatus
                     : match.EligibilityStatus == "Likely ineligible" ? "Likely ineligible" : "Verify";
                 v.EligibilityReason = match.Why;

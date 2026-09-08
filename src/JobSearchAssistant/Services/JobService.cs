@@ -358,7 +358,7 @@ public sealed class JobService(
                 vacancy.Status = VacancyStatus.Applied;
                 vacancy.HasExistingHhResponse = true;
                 if (vacancy.Application is null)
-                    db.Applications.Add(new Application { VacancyId = vacancy.Id, ResumeExternalId = state.HhResumeId, CoverLetter = letter, LastError = result.ErrorText });
+                    db.Applications.Add(new Application { VacancyId = vacancy.Id, ResumeExternalId = state.HhResumeId, CoverLetter = "", LastError = "Existing HH response confirmed; this draft was not sent." });
                 await db.SaveChangesAsync(ct);
             }
             return result;

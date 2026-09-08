@@ -52,8 +52,8 @@ public sealed class TailoredHhApplyService(
                     {
                         VacancyId = vacancy.Id,
                         ResumeExternalId = state.HhResumeId,
-                        CoverLetter = draft.CoverLetter,
-                        LastError = result.ErrorText
+                        CoverLetter = "",
+                        LastError = "Existing HH response confirmed; this draft was not sent."
                     });
                 }
                 await db.SaveChangesAsync(ct);

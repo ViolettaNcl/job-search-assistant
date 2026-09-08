@@ -58,6 +58,44 @@ public sealed class OperatorWritingTests
         Assert.AreEqual("Likely ineligible", scoring.Assess("Junior .NET Developer", "C#, SQL. Worldwide except Russia.", true).EligibilityStatus);
         Assert.AreNotEqual("APPLY", scoring.Assess("Junior C# SQL Developer", "", true, location: "Worldwide").Decision);
     }
+    private sealed class JsonHandler(string response) : HttpMessageHandler
+    {
+        public int Calls { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Calls++;
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(response) });
+        }
+    }
+    [TestMethod]
+    public async Task ConfiguredProviderParsesFakeTransportAndRejectsMalformedStructure()
+    {
+        var knowledge = new CandidateKnowledgeService(Profile);
+        var assessment = new OpportunityScoringService(Profile).Assess("Junior .NET Developer", "C#, SQL", true, location: "Worldwide");
+        var input = new ReasoningInput("Junior .NET", "C#, SQL", new EvidenceRetrievalService(knowledge).Select(assessment), false);
+        var fixture = System.Text.Json.JsonSerializer.Serialize(new { choices = new[] { new { message = new { content = "{\"employerNeed\":\"APIs\",\"evidenceIds\":[\"dental\"],\"letter\":\"My project uses C#.\",\"unknowns\":[]}" } } } });
+        var handler = new JsonHandler(fixture);
+        var configured = Options.Create(new ReasoningOptions { Enabled = true, Endpoint = "https://provider.invalid/v1/chat/completions", Model = "test-fixture", ApiKey = "test-fixture" });
+        var provider = new ChatReasoningProvider(new HttpClient(handler), configured);
+        Assert.AreEqual("APIs", (await provider.SuggestAsync(input, CancellationToken.None))!.EmployerNeed);
+        Assert.AreEqual(1, handler.Calls);
+        var disabledHandler = new JsonHandler("{}");
+        Assert.IsNull(await new ChatReasoningProvider(new HttpClient(disabledHandler), Options.Create(new ReasoningOptions())).SuggestAsync(input, CancellationToken.None));
+        Assert.AreEqual(0, disabledHandler.Calls);
+        var malformed = new ChatReasoningProvider(new HttpClient(new JsonHandler("{}")), configured);
+        var service = new OperatorPreparationService(new(Profile), new(knowledge), knowledge, new(Profile), malformed);
+        var result = await service.PrepareAsync(input.Title, input.Description, true, "", "Worldwide", "", false, CancellationToken.None);
+        Assert.AreEqual("provider-unavailable-fallback", result.ProviderStatus);
+    }
+
+    [TestMethod]
+    public void MandatoryEducationLanguageAndSeniorExperienceCannotPassSilently()
+    {
+        var scoring = new OpportunityScoringService(Profile);
+        foreach (var text in new[] { "Requirements: C#, SQL. Bachelor's degree.", "Requirements: C#, SQL. German B2." })
+            Assert.AreEqual("REVIEW", scoring.Assess("Junior .NET Developer", text, true, location: "Worldwide").Decision);
+        Assert.AreEqual("SKIP", scoring.Assess(".NET Developer", "C#, SQL", true, "moreThan6", "Worldwide").Decision);
+    }
     [TestMethod]
     public void RecruiterInvitationAndTaskDeadlinesTakePriority()
     {

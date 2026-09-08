@@ -24,7 +24,7 @@ def verify():
         env = dict(os.environ, ConnectionStrings__Postgres="",
                    ConnectionStrings__Sqlite=f"Data Source={directory}/pilot.db",
                    HH__Enabled="false", Remotive__Enabled="false", Adzuna__Enabled="false",
-                   Telegram__BotToken="", Security__EnableAutomaticSubmission="false")
+                   Telegram__BotToken="", Security__EnableAutomaticSubmission="false", Reasoning__Enabled="false")
 
         def request(path, data=None):
             req = urllib.request.Request(base + path,
@@ -67,6 +67,18 @@ def verify():
                     request("/api/application-queue")
                     request("/api/followups")
                     request("/api/analytics/outcomes")
+                    knowledge = request("/api/operator/candidate")
+                    assert knowledge["identity"]["russian"] == "Виолетта Николау"
+                    assessment = request(f"/api/operator/vacancies/{vacancy_id}")
+                    assert assessment["assessment"]["reasoningMode"] == "deterministic-fallback"
+                    assert assessment["strategy"]["projects"][0]["id"] == "dental"
+                    prepared = request(f"/api/operator/vacancies/{vacancy_id}/prepare", {})
+                    assert prepared["application"]["reasoningMode"] == "deterministic-fallback"
+                    assert "DentalClinic" in prepared["application"]["letter"]
+                    today = request("/api/operator/today")
+                    assert today["pilot"]["confirmedSuccessRate"] is None
+                    triage = request("/api/operator/recruiter/triage", {"text": "Приглашаем на собеседование завтра."})
+                    assert triage["urgency"] == "CRITICAL" and triage["requiresApproval"]
                     if restart == 0:
                         # A CRM status only; no employer API or application submission.
                         request(f"/api/vacancies/{vacancy_id}/status", {"status": "HrContact", "note": "Synthetic CI fixture"})

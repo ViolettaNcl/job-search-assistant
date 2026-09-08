@@ -40,7 +40,7 @@ public sealed class VacancyUnderstandingService
         if (requirements.Count == 0)
             requirements.AddRange(SkillCatalog.Extract(title).Select(s => new Requirement(s, SkillCatalog.Family(s), "Unspecified", title)));
         var unique = requirements.GroupBy(r => r.Skill).Select(g => g.OrderBy(r => r.Importance == "Required" ? 0 : r.Importance == "Unspecified" ? 1 : 2).First()).ToArray();
-        var senior = !AutomaticSubmissionPolicy.HasSafeSeniority(title) ? "Senior"
+        var senior = !AutomaticSubmissionPolicy.HasSafeSeniority(title) || experience == "moreThan6" ? "Senior"
             : AutomaticSubmissionPolicy.IsEntryLevelTitle(title) ? "Junior" : "Unknown";
         var role = Has(title, @"\bQA\b|тестиров|quality|automation") ? "QA automation"
             : Has(title, @"implementation|внедрен") ? "Implementation"
@@ -52,10 +52,12 @@ public sealed class VacancyUnderstandingService
             : role == "Technical support" && unique.Any(r => r.Skill is "SQL" or "SQL Server" or "REST" or "C#") ? "experimental" : "excluded";
         var degree = Has(all, @"(?:bachelor(?:'s)?|university) degree.{0,30}(?:required|mandatory)|must have (?:a )?bachelor|высшее образование.{0,24}(?:обязательно|требуется)")
             && !Has(all, @"degree.{0,20}(?:or|или).{0,24}(?:equivalent|опыт)");
+        if (Has(all, @"(?:requirements|must.have|требования)[\s\S]{0,500}(?:bachelor|university degree|высшее образование)")
+            && !Has(all, @"degree.{0,30}(?:preferred|equivalent|optional)|образование.{0,20}(?:желател|не обязател)")) degree = true;
         return new(role, senior, lane, unique, segments.Where(s => Has(s, @"build|develop|implement|разраб|поддерж|созда" )).Take(8).ToArray(),
             requiredYears, preferredYears, degree, experience, location,
             remote ? "Remote" : Has(all, @"hybrid|гибрид") ? "Hybrid" : "Onsite",
-            new[] { "English", "Russian", "Greek", "German", "Polish" }.Where(l => Has(all, l)).ToArray(),
+            new[] { "English", "Russian", "Greek", "German", "Polish", "French", "Spanish" }.Where(l => Has(all, l)).ToArray(),
             "Requires location/authorization review", Has(all, @"no sponsorship|cannot sponsor") ? "Unavailable" : Has(all, @"visa sponsorship") ? "Mentioned; verify" : "Unknown",
             "Unknown", "Unknown", "Unknown",
             (senior == "Senior" ? new[] { "Senior role" } : Array.Empty<string>()).Concat(degree ? new[] { "Mandatory degree not evidenced" } : []).ToArray(),

@@ -28,6 +28,9 @@ public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> 
         if (u.RequiredYears > 0) review.Add($"Requires {u.RequiredYears}+ years; verified salaried experience is unknown. Project work is not employment.");
         if (experience == "between1And3" && u.RequiredYears is null && u.PreferredYears is null)
             review.Add("HH lists 1–3 years; mandatory versus preferred experience needs review.");
+        if (experience == "between3And6") review.Add("HH lists 3–6 years; verified employment history is insufficient for unattended application.");
+        foreach (var language in u.Languages)
+            if (!k.Languages.Any(l => l.Contains(language, StringComparison.OrdinalIgnoreCase))) review.Add($"Language requirement needs review: {language} is not verified.");
         if (u.MandatoryDegree) review.Add("Mandatory university degree is not evidenced by the programming diploma.");
         if (eligibility.Status != "Eligible") review.Add(eligibility.Reason);
         if (string.IsNullOrWhiteSpace(text)) review.Add("Vacancy description is missing; title alone cannot qualify an application.");
