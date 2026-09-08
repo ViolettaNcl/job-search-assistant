@@ -54,7 +54,9 @@ jobs:
           node - <<'NODE'
           const fs = require('fs');
           const manifest = JSON.parse(fs.readFileSync('browser-extension/manifest.json', 'utf8'));
-          if (manifest.version !== '2.6.5') throw new Error(`Unexpected extension version ${manifest.version}`);
+          const project = fs.readFileSync('src/JobSearchAssistant/JobSearchAssistant.csproj', 'utf8');
+          const version = project.match(/<Version>([^<]+)<\/Version>/)?.[1];
+          if (!version || manifest.version !== version) throw new Error(`Extension ${manifest.version} and backend ${version} release versions differ`);
           const scripts = manifest.content_scripts.flatMap(x => x.js || []);
           for (const required of ['site-apply.js', 'site-apply-content.js', 'cv-upload.js', 'final-submit-control.js', 'submission-receipt.js']) {
             if (!scripts.includes(required)) throw new Error(`Manifest is missing ${required}`);
