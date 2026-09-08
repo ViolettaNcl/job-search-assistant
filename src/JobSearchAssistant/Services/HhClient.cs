@@ -21,7 +21,10 @@ public sealed record HhVacancyDto(
     string Experience,
     bool Remote,
     DateTimeOffset? PublishedAt,
-    bool GotResponse);
+    bool GotResponse)
+{
+    public string Location { get; init; } = "";
+}
 
 public sealed record HhResumeDto(string Id, string Title, string Url);
 public sealed record HhApplyResult(bool Success, string ErrorCode, string ErrorText);
@@ -38,10 +41,10 @@ public sealed class HhClient(
         !string.IsNullOrWhiteSpace(_options.ClientId) &&
         !string.IsNullOrWhiteSpace(_options.ClientSecret);
 
-    public async Task<IReadOnlyList<string>> SearchIdsAsync(string query, string experience, CancellationToken ct)
+    public async Task<IReadOnlyList<string>> SearchIdsAsync(string query, string experience, CancellationToken ct, bool remoteOnly = true)
     {
         var client = CreateClient(await TryGetAccessTokenAsync(ct));
-        var url = $"/vacancies?text={Uri.EscapeDataString(query)}&schedule=remote&experience={experience}&per_page=50&page=0&order_by=publication_time";
+        var url = $"/vacancies?text={Uri.EscapeDataString(query)}{(remoteOnly ? "&schedule=remote" : "")}&experience={experience}&per_page=50&page=0&order_by=publication_time";
         using var response = await client.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
@@ -93,7 +96,7 @@ public sealed class HhClient(
             schedule.Contains("удален", StringComparison.OrdinalIgnoreCase) ||
             schedule.Contains("remote", StringComparison.OrdinalIgnoreCase),
             root.TryGetProperty("published_at", out var p) && DateTimeOffset.TryParse(p.GetString(), out var published) ? published : null,
-            relations.Contains("got_response", StringComparer.OrdinalIgnoreCase));
+            relations.Contains("got_response", StringComparer.OrdinalIgnoreCase)) { Location = ReadNestedName(root, "area") };
     }
 
     public async Task<string> BeginOAuthAsync(CancellationToken ct)

@@ -71,7 +71,7 @@ public sealed class JobService(
                 {
                     try
                     {
-                        foreach (var id in await hh.SearchIdsAsync(query, exp, ct))
+                        foreach (var id in await hh.SearchIdsAsync(query, exp, ct, options.RemoteOnly))
                         {
                             if (seenIds.Add(id)) ids.Add(id);
                         }
@@ -90,10 +90,10 @@ public sealed class JobService(
                 var dto = await hh.GetVacancyAsync(id, ct);
                 if (dto is null) continue;
                 if (!AutomaticSubmissionPolicy.HasSafeSeniority(dto.Title)) continue;
-                if (!dto.Remote) continue;
+                if (options.RemoteOnly && !dto.Remote) continue;
                 var vacancy = await AddExternalAsync(new ExternalVacancyDto(
                     "hh", "HeadHunter", dto.Id, dto.Title, dto.Url, dto.Url, dto.EmployerId, dto.EmployerName,
-                    dto.Description, dto.Salary, dto.Schedule, dto.Experience, dto.Remote, "Russia", "Россия", dto.Remote ? "Remote Russia" : dto.Schedule, dto.PublishedAt),
+                    dto.Description, dto.Salary, dto.Schedule, dto.Experience, dto.Remote, "Russia", dto.Location, dto.Remote ? "Remote Russia" : dto.Schedule, dto.PublishedAt),
                     dto.GotResponse, ct);
                 if (vacancy is null) continue;
                 added++;
@@ -617,7 +617,7 @@ public sealed class JobService(
     }
     private static bool ShouldConsider(ExternalVacancyDto dto, SearchOptions options)
     {
-        // The product is intentionally Remote Only. On-site and hybrid roles are not collected.
+        // Remote is preferred by default; explicit RemoteOnly remains a hard preference.
         if (!options.RemoteOnly) return true;
         return dto.Remote;
     }

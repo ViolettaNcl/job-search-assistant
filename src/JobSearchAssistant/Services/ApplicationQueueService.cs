@@ -28,7 +28,7 @@ public sealed record ApplicationQueueItem(
     DateTimeOffset? PublishedAt,
     DateTimeOffset FirstSeenAt);
 
-public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftService drafts)
+public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftService drafts, MatchScoringService? scoring = null)
 {
     public async Task<IReadOnlyList<ApplicationQueueItem>> GetAsync(int limit, int minimumScore, CancellationToken ct)
         => await GetAsync(limit, minimumScore, null, ct);
@@ -49,9 +49,7 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
                         !x.Company.IsBlacklisted &&
                         x.Application == null &&
                         !x.HasExistingHhResponse &&
-                        x.IsRemote &&
-                        x.MatchScore >= minimumScore &&
-                        x.EligibilityStatus != "Likely ineligible" &&
+                        (scoring != null || (x.MatchScore >= minimumScore && x.EligibilityStatus != "Likely ineligible")) &&
                         (string.IsNullOrWhiteSpace(source) || x.Source == source))
             .OrderByDescending(x => x.MatchScore)
             .Take(300)
@@ -62,7 +60,22 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
             .ToListAsync(ct);
 
         var now = DateTimeOffset.UtcNow;
+        if (scoring is not null)
+        {
+            foreach (var v in rows)
+            {
+                var match = scoring.Score(v.Title, v.DescriptionText, v.IsRemote, v.Experience, v.LocationText, v.RemoteScope);
+                v.MatchScore = match.Score;
+                v.WhyMatch = match.Why;
+                v.EligibilityStatus = match.Assessment?.Decision == "APPLY" ? match.EligibilityStatus
+                    : match.EligibilityStatus == "Likely ineligible" ? "Likely ineligible" : "Verify";
+                v.EligibilityReason = match.Why;
+                v.MatchedSkills = string.Join(", ", match.Matched);
+                v.MissingSkills = string.Join(", ", match.Missing);
+            }
+        }
         return rows
+            .Where(v => v.MatchScore >= minimumScore && v.EligibilityStatus != "Likely ineligible")
             .Where(v => QueueDeferralPolicy.ShouldAppearInQueue(v, now))
             .Select(v =>
             {

@@ -106,7 +106,10 @@ public sealed class AppState
 public sealed record CandidateProfileOptions
 {
     public string Name { get; init; } = "Violetta Nicolaou";
-    public string RussianName { get; init; } = "Виолетта Николаевна";
+    public string RussianName { get; init; } = "Виолетта Николау";
+    public string? Patronymic { get; init; }
+    public string PatronymicVerification { get; init; } = "Unknown";
+    public LocationPreferences LocationPreferences { get; init; } = new();
     public string GreekName { get; init; } = "Βιολέττα Νικολάου";
     public string Email { get; init; } = "violettanicolaou@gmail.com";
     public string Phone { get; init; } = "";
@@ -177,7 +180,7 @@ public sealed record SearchOptions
     public int IntervalMinutes { get; init; } = 30;
     public int MaxNewVacanciesPerRun { get; init; } = 80;
     public int MinimumTelegramScore { get; init; } = 65;
-    public bool RemoteOnly { get; init; } = true;
+    public bool RemoteOnly { get; init; } = false;
     public bool IncludeRelocationWithVisa { get; init; } = false;
 }
 
