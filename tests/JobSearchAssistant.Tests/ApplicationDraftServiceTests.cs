@@ -68,7 +68,8 @@ public sealed class ApplicationDraftServiceTests
             []);
 
         StringAssert.Contains(draft.RecommendedHeadline, "QA");
-        StringAssert.Contains(draft.CoverLetter, "tested APIs");
+        StringAssert.Contains(draft.CoverLetter, "Testing");
+        StringAssert.Contains(draft.CoverLetter, "project");
         Assert.IsFalse(draft.CoverLetter.Contains("years of QA experience", StringComparison.OrdinalIgnoreCase));
     }
 

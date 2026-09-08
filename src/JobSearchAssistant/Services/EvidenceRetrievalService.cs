@@ -24,6 +24,6 @@ public sealed class EvidenceRetrievalService(CandidateKnowledgeService knowledge
             assessment.Matches.Where(m => m.ProjectIds.Length > 0).Select(m => m.Requirement.Skill).ToArray(),
             assessment.Matches.Where(m => m.ProjectIds.Length == 0).Select(m => m.Requirement.Skill).ToArray(),
             "Project work does not establish salaried commercial experience.",
-            "I can walk through the relevant project and code. I am seeking my first formal developer role.");
+            "I can walk through the relevant project and code. Exact salaried employment history requires my confirmation.");
     }
 }

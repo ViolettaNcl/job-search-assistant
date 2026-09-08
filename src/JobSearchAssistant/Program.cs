@@ -39,6 +39,11 @@ builder.Services.AddSingleton<CandidateKnowledgeService>();
 builder.Services.AddSingleton<OpportunityScoringService>();
 builder.Services.AddSingleton<EvidenceRetrievalService>();
 builder.Services.AddSingleton<ApplicationDraftService>();
+builder.Services.Configure<ReasoningOptions>(builder.Configuration.GetSection("Reasoning"));
+builder.Services.AddHttpClient<IAiReasoningProvider, ChatReasoningProvider>().ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddSingleton<ApplicationWritingService>();
+builder.Services.AddTransient<OperatorPreparationService>();
+builder.Services.AddSingleton<RecruiterMessageService>();
 builder.Services.AddSingleton<AutoApplyRunTracker>();
 builder.Services.AddSingleton<BrowserAutopilotTracker>();
 builder.Services.AddSingleton<ApplicationQuestionService>();
@@ -80,6 +85,7 @@ app.MapGet("/health", () => Results.Ok(new
     appliedMigrations = databaseBootstrap.AppliedMigrations
 }));
 app.MapRuntimeHealth(storageMode, databaseBootstrap);
+app.MapOperatorEndpoints();
 app.MapGet("/api/operator/candidate", (CandidateKnowledgeService knowledge) => Results.Ok(knowledge.Get()));
 app.MapPost("/api/operator/assess", (ExtensionAnalyzeRequest request, OpportunityScoringService scoring, EvidenceRetrievalService evidence) =>
 {

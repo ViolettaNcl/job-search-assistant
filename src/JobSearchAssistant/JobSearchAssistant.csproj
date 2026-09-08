@@ -6,6 +6,10 @@
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
   <ItemGroup>
+    <Content Remove="candidate.private.json;appsettings.local.json" />
+    <None Remove="candidate.private.json;appsettings.local.json" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.3" />
     <!-- Override the vulnerable 2.1.11 native SQLite dependency (CVE-2025-6965). -->

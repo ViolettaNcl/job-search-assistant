@@ -30,6 +30,7 @@ public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> 
             review.Add("HH lists 1–3 years; mandatory versus preferred experience needs review.");
         if (u.MandatoryDegree) review.Add("Mandatory university degree is not evidenced by the programming diploma.");
         if (eligibility.Status != "Eligible") review.Add(eligibility.Reason);
+        if (string.IsNullOrWhiteSpace(text)) review.Add("Vacancy description is missing; title alone cannot qualify an application.");
         if (families.Length < 2) review.Add("Insufficient distinct requirements for a confident recommendation.");
         if (matches.Any(m => m.Requirement.Importance == "Required" && m.ProjectIds.Length == 0)) review.Add("Missing must-have evidence.");
         if (u.CareerLane == "excluded") review.Add("Outside the configured technical career lanes.");
@@ -59,6 +60,8 @@ public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> 
     {
         var all = text + " " + location;
         bool Has(string p) => VacancyUnderstandingService.Has(all, p);
+        if (Has(@"(?:except|excluding|not available in|outside|кроме|исключая)\s+(?:Russia|России|Россию)|Russia.{0,20}(?:excluded|not eligible)"))
+            return ("Likely ineligible", "Current country is explicitly excluded.");
         if (!remote)
         {
             if (search?.Value.RemoteOnly == true) return ("Likely ineligible", "Explicit remote-only preference.");

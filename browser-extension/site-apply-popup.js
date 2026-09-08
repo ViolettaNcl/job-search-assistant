@@ -221,7 +221,9 @@ setTimeout(() => vjaRestoreSiteApplyResult().catch(() => {}), 500);
 function vjaPreferWebsiteApplyForHh() {
   const button = $("applyHh");
   if (!button) return;
-  button.classList.add("hidden");
+  // DOMTokenList.add can emit an attribute mutation even when the token exists.
+  // This function observes that same attribute: writes must be idempotent.
+  if (!button.classList.contains("hidden")) button.classList.add("hidden");
   button.title = "Normal HH.ru applications use Apply + send now. Official HH API OAuth is not required.";
 }
 

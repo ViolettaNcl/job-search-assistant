@@ -340,6 +340,9 @@ public sealed class JobService(
         if (vacancy.Application is not null || vacancy.HasExistingHhResponse || vacancy.Status == VacancyStatus.Applied)
             return new HhApplyResult(false, "already_applied_local", "This vacancy is already marked as applied.");
         if (vacancy.Source != "hh") return new HhApplyResult(false, "external_apply_required", "Open the official application page, submit there, then mark the vacancy as applied in Job Assistant.");
+        var fresh = scoring.Score(vacancy.Title, vacancy.DescriptionText, vacancy.IsRemote, vacancy.Experience, vacancy.LocationText, vacancy.RemoteScope);
+        if (fresh.Assessment?.Decision != "APPLY")
+            return new HhApplyResult(false, "operator_review_required", fresh.Why);
         if (!AutomaticSubmissionPolicy.IsVerifiedEligible(vacancy))
             return new HhApplyResult(false, "eligibility_not_verified", "This vacancy requires a location/work-authorization review before submission.");
 
