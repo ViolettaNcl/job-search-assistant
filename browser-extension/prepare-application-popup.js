@@ -42,15 +42,25 @@ async function vjaPrepareCurrentApplication() {
   vjaSetPreparationStatus("Reading the vacancy and building a tailored application…", "working");
 
   try {
-    // Prevent a failed fresh analysis from accidentally falling back to an older vacancy context.
-    latest = null;
-    latestPage = null;
-    latestScan = null;
-    latestPlan = null;
-    latestTrackedId = null;
-    window.vjaCurrentStepHistory = [];
+    const tab = await activeTab();
+    const canReuse = window.vjaPrepareApplication?.canReuseAnalysis?.({
+      latest,
+      latestPage,
+      currentUrl: tab?.url || "",
+      sessionApi: window.vjaApplicationSession,
+      siteApplyApi: window.vjaSiteApply
+    });
 
-    await analyze();
+    if (!canReuse) {
+      // Prevent a failed fresh analysis from accidentally falling back to an older vacancy context.
+      latest = null;
+      latestPage = null;
+      latestScan = null;
+      latestPlan = null;
+      latestTrackedId = null;
+      window.vjaCurrentStepHistory = [];
+      await analyze();
+    }
     if (!latest || !latestPage?.url) {
       throw new Error("The vacancy could not be analyzed. Check the backend connection and try again.");
     }
@@ -59,7 +69,7 @@ async function vjaPrepareCurrentApplication() {
     setBusy(true);
     if (button) button.disabled = true;
 
-    await refreshFieldPlan();
+    if (!latestScan || !latestPlan) await refreshFieldPlan();
     const detectedFields = Number(latestScan?.fields?.length || 0);
     let fillResult = { filled: 0, failed: 0, review: 0, blocked: 0 };
 
@@ -68,14 +78,13 @@ async function vjaPrepareCurrentApplication() {
       const result = await sendToPage({ type: "applyFieldPlan", resolutions: latestPlan.fields || [] });
       if (result?.error) throw new Error(result.error);
       fillResult = { ...fillResult, ...(result || {}) };
-      await refreshFieldPlan();
     }
 
     vjaSetPreparationStatus("Checking the recommended CV and final form state…", "working");
     const cvResult = await vjaTryPrepareCv(detectedFields);
 
-    // Re-read the form after both safe fills and a possible CV insertion.
-    await refreshFieldPlan();
+    // Re-read once after all form mutations. HH vacancy pages with no open form need no extra scan.
+    if (detectedFields || cvResult.state === "uploaded") await refreshFieldPlan();
     window.vjaRenderSubmissionReadiness?.();
     await window.vjaCaptureApplicationStep?.();
     await window.vjaSaveApplicationSession?.();

@@ -95,4 +95,40 @@ public sealed class MatchScoringServiceTests
         Assert.AreEqual("Likely ineligible", result.EligibilityStatus);
         Assert.AreEqual("Skip", result.Level);
     }
+
+    [TestMethod]
+    public void MultiYearAndMandatoryDegreeRequirements_LowerRecruitmentPriority()
+    {
+        var realisticJunior = _sut.Score(
+            "Junior .NET Developer",
+            "C#, .NET, ASP.NET Core, SQL. Remote worldwide.",
+            remote: true,
+            experience: "between1And3",
+            location: "Worldwide",
+            remoteScope: "Worldwide");
+        var fourYears = _sut.Score(
+            "Junior .NET Developer",
+            "C#, .NET, ASP.NET Core, SQL. Remote worldwide. 4+ years required.",
+            remote: true,
+            experience: "between1And3",
+            location: "Worldwide",
+            remoteScope: "Worldwide");
+        var mandatoryDegree = _sut.Score(
+            "Junior .NET Developer",
+            "C#, .NET, ASP.NET Core, SQL. Remote worldwide. Bachelor's degree is required.",
+            remote: true,
+            experience: "between1And3",
+            location: "Worldwide",
+            remoteScope: "Worldwide");
+        var equivalentExperience = _sut.Score(
+            "Junior .NET Developer",
+            "C#, .NET, ASP.NET Core, SQL. Remote worldwide. Bachelor's degree or equivalent experience.",
+            remote: true,
+            experience: "between1And3",
+            location: "Worldwide",
+            remoteScope: "Worldwide");
+
+        Assert.IsTrue(fourYears.Score < realisticJunior.Score);
+        Assert.IsTrue(mandatoryDegree.Score < equivalentExperience.Score);
+    }
 }

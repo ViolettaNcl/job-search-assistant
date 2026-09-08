@@ -15,6 +15,8 @@ public sealed record ApplicationQueueItem(
     int MatchScore,
     int PriorityScore,
     string Priority,
+    int LearningBoost,
+    string PriorityReason,
     string EligibilityStatus,
     string EligibilityReason,
     string MatchLevel,
@@ -47,13 +49,18 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
             .OrderByDescending(x => x.MatchScore)
             .Take(300)
             .ToListAsync(ct);
+        var history = await db.Vacancies
+            .AsNoTracking()
+            .Where(x => x.Application != null)
+            .ToListAsync(ct);
 
         var now = DateTimeOffset.UtcNow;
         return rows
             .Where(v => QueueDeferralPolicy.ShouldAppearInQueue(v, now))
             .Select(v =>
             {
-                var priorityScore = CalculatePriorityScore(v, now);
+                var learningBoost = RecruitmentLearning.CalculateBoost(v, history);
+                var priorityScore = Math.Clamp(CalculatePriorityScore(v, now) + learningBoost, 0, 130);
                 var draft = drafts.Build(v);
                 return new ApplicationQueueItem(
                     v.Id,
@@ -66,6 +73,8 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
                     v.MatchScore,
                     priorityScore,
                     PriorityLabel(priorityScore, v.MatchScore),
+                    learningBoost,
+                    RecruitmentLearning.ExplainBoost(learningBoost),
                     v.EligibilityStatus,
                     v.EligibilityReason,
                     v.MatchLevel,
@@ -89,14 +98,19 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
         var date = vacancy.PublishedAt ?? vacancy.FirstSeenAt;
         var age = now - date;
 
-        if (age <= TimeSpan.FromDays(1)) score += 10;
+        if (age <= TimeSpan.FromHours(12)) score += 12;
+        else if (age <= TimeSpan.FromDays(1)) score += 10;
         else if (age <= TimeSpan.FromDays(3)) score += 7;
         else if (age <= TimeSpan.FromDays(7)) score += 4;
-        else if (age > TimeSpan.FromDays(30)) score -= 5;
+        else if (age > TimeSpan.FromDays(30)) score -= 10;
+        else if (age > TimeSpan.FromDays(14)) score -= 4;
 
         if (vacancy.EligibilityStatus.Equals("Eligible", StringComparison.OrdinalIgnoreCase)) score += 6;
         if (vacancy.Company?.IsWatched == true) score += 4;
         if (vacancy.MatchScore >= 90) score += 3;
+        if (VacancyClassifier.OpportunityType(vacancy) == VacancyClassifier.TypeInternship) score += 5;
+        if (AutomaticSubmissionPolicy.IsEntryLevelTitle(vacancy.Title)) score += 3;
+        if (vacancy.Experience.Contains("noExperience", StringComparison.OrdinalIgnoreCase)) score += 4;
 
         return Math.Clamp(score, 0, 120);
     }

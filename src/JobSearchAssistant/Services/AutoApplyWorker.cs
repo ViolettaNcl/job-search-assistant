@@ -18,6 +18,7 @@ public sealed class AutoApplyWorker(
             {
                 using var scope = scopeFactory.CreateScope();
                 var jobs = scope.ServiceProvider.GetRequiredService<JobService>();
+                await jobs.SyncExistingApplicationsAsync(stoppingToken);
                 var result = await jobs.RunAutoApplyCycleAsync(stoppingToken);
                 if (result.Enabled)
                 {
