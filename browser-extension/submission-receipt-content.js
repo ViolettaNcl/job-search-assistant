@@ -21,5 +21,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } catch (error) {
     sendResponse({ confirmed: false, score: 0, signal: "error", error: error?.message || String(error) });
   }
-  return true;
+  return false;
 });

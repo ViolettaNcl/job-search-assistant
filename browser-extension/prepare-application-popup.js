@@ -1,4 +1,5 @@
 let vjaPreparationRunning = false;
+let vjaPreparationPromise = null;
 
 function vjaSetPreparationStatus(message, state = "") {
   const node = $("prepareStatus");
@@ -30,8 +31,7 @@ async function vjaTryPrepareCv(detectedFields) {
   return { state: "failed", filename: null, error: message || "CV insertion failed." };
 }
 
-async function vjaPrepareCurrentApplication() {
-  if (vjaPreparationRunning) return;
+async function vjaPrepareCurrentApplicationOnce() {
   const button = $("prepareApplication");
   vjaPreparationRunning = true;
   clearError();
@@ -118,6 +118,19 @@ async function vjaPrepareCurrentApplication() {
     if (button) button.disabled = false;
   }
 }
+
+function vjaPrepareCurrentApplication() {
+  if (vjaPreparationPromise) return vjaPreparationPromise;
+  vjaPreparationPromise = vjaPrepareCurrentApplicationOnce().finally(() => {
+    vjaPreparationPromise = null;
+  });
+  return vjaPreparationPromise;
+}
+
+window.vjaResetPreparationState = () => {
+  vjaPreparationRunning = false;
+  vjaPreparationPromise = null;
+};
 
 $("prepareApplication")?.addEventListener("click", vjaPrepareCurrentApplication);
 window.vjaPrepareCurrentApplication = vjaPrepareCurrentApplication;
