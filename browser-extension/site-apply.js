@@ -100,6 +100,7 @@
     if (metadata.inForm || metadata.inDialog) score -= 5;
     const href = clean(metadata.href).toLowerCase();
     if (/apply|response|respond|negotiation|vacancy/.test(href)) score += 2;
+    if (metadata.currentJob) score += 5;
     if (metadata.primary) score += 1;
     return score;
   }
@@ -112,8 +113,47 @@
     if (!ranked.length) return { found: false, ambiguous: false, count: 0 };
     const bestScore = ranked[0].score;
     const ties = ranked.filter(item => item.score === bestScore);
-    if (ties.length !== 1) return { found: false, ambiguous: true, count: ties.length, labels: ties.slice(0, 4).map(x => clean(x.label)) };
+    if (ties.length !== 1) {
+      const fingerprints = ties.map(item => {
+        const label = clean(item.label).toLowerCase();
+        const href = clean(item.metadata?.href);
+        if (!href) return "";
+        try {
+          const parsed = new URL(href, "https://placeholder.invalid");
+          parsed.hash = "";
+          return `${label}|${parsed.pathname}${parsed.search}`;
+        } catch {
+          return `${label}|${href}`;
+        }
+      });
+      const equivalent = fingerprints[0] && fingerprints.every(value => value === fingerprints[0]);
+      if (equivalent) {
+        return { found: true, ambiguous: false, count: ties.length, candidate: ties[0], equivalentDuplicates: true };
+      }
+      return { found: false, ambiguous: true, count: ties.length, labels: ties.slice(0, 4).map(x => clean(x.label)) };
+    }
     return { found: true, ambiguous: false, count: 1, candidate: ties[0] };
+  }
+
+  function chooseHhCoverLetterAction(candidates = []) {
+    const matches = candidates
+      .map((item, index) => ({ ...item, index, label: clean(item?.label) }))
+      .filter(item => /^(?:(?:приложить|добавить) сопроводительное письмо|add (?:a )?cover letter)(?:\s|$)/i.test(item.label));
+    if (!matches.length) return { found: false, ambiguous: false, count: 0 };
+    if (matches.length > 1) return { found: false, ambiguous: true, count: matches.length };
+    return { found: true, ambiguous: false, count: 1, candidate: matches[0] };
+  }
+
+  function isApplicationContainerText(value, isHh = false) {
+    const text = clean(value);
+    if (isHh) return /выберите резюме|резюме для отклика|сопроводительное письмо|отправить отклик|откликнуться/i.test(text);
+    return /apply|application|resume|cv|cover letter|отклик|резюме|сопровод|отправить/i.test(text);
+  }
+
+  function startReceiptDisposition(input = {}) {
+    if (!input.receiptConfirmed) return "continue";
+    if (input.isHh && input.coverLetterRequired) return "attach-cover-letter";
+    return "accept";
   }
 
   function scoreCoverLetterField(label, metadata = {}) {
@@ -196,5 +236,5 @@
     return { ok: true, reason: "ready" };
   }
 
-  return { clean, safeUrl, isHhUrl, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, scoreCoverLetterField, chooseCoverLetterField, chooseHhResumeChoice, unresolvedRequired, canSubmit };
+  return { clean, safeUrl, isHhUrl, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, chooseHhCoverLetterAction, isApplicationContainerText, startReceiptDisposition, scoreCoverLetterField, chooseCoverLetterField, chooseHhResumeChoice, unresolvedRequired, canSubmit };
 });

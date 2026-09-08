@@ -5,8 +5,8 @@ function vjaEnsureSiteApplyButton() {
   if (!anchor) return null;
   button = document.createElement("button");
   button.id = "siteApplyNow";
-  button.className = "primary full";
-  button.textContent = "Apply + send now";
+  button.className = $("oneClickApply") ? "hidden" : "primary full";
+  button.textContent = "Отправить сейчас";
   button.title = "Clicking this button is the confirmation to open the employer response, fill the tailored letter, select/attach the resume and submit when the form is clear.";
   anchor.insertAdjacentElement("beforebegin", button);
   return button;
@@ -38,6 +38,8 @@ function vjaSiteApplyReason(result) {
   if (reason === "cover-letter-not-persisted") return "The tailored cover letter did not stay in the employer form, so the assistant stopped before Send.";
   if (reason === "hh-resume-choice-required") return "HH.ru shows several resumes and none is selected. Select the resume once, then press Apply + send now again.";
   if (reason === "hh-resume-selection-not-persisted") return "HH.ru did not keep the selected resume. Select the resume once, then press Apply + send now again.";
+  if (reason === "hh-cover-letter-action-not-found") return "HH.ru submitted the response, but its Add cover letter action was not available. Open the response and attach the prepared letter manually.";
+  if (reason === "hh-cover-letter-action-ambiguous") return "HH.ru submitted the response, but showed several possible cover-letter actions. The assistant stopped instead of clicking the wrong one.";
   if (reason === "application-ui-not-found") return "The Apply action did not open a recognizable application form. The assistant stopped before any final click.";
   if (reason === "final-action-not-found") return "The application was filled, but no safe final Send/Submit/Откликнуться action was found.";
   if (reason === "final-action-ambiguous") return "Several possible final submission buttons were found. The assistant stopped instead of clicking the wrong one.";
@@ -62,6 +64,13 @@ async function vjaHandleSiteApplyResult(envelope, cvName = "") {
   }
   if (result.status === "clicked-unverified" || result.status === "verification-needed") {
     if (note) note.textContent = "The employer's final Send action was clicked, but the site did not expose a reliable confirmation signal. Check the page once before recording it as Applied.";
+    return;
+  }
+  if (result.submitted && result.status === "submitted-needs-letter") {
+    const recorded = await vjaRecordConfirmedSiteApply(envelope, result.resumeLabel || cvName || "");
+    if (note) note.textContent = `${vjaSiteApplyReason(result)}${recorded ? " The application itself was recorded as Applied." : ""}`;
+    const button = $("siteApplyNow");
+    if (button) button.textContent = "Applied — add letter";
     return;
   }
   if (result.status === "needs-review") {
@@ -138,7 +147,7 @@ async function vjaApplyNowOnSite() {
   } finally {
     if (button && !button.textContent.includes("Applied")) {
       button.disabled = false;
-      button.textContent = "Apply + send now";
+      button.textContent = "Отправить сейчас";
     }
   }
 }

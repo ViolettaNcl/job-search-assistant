@@ -15,9 +15,39 @@ start = apply.chooseStartAction([
 assert.equal(start.found, true);
 assert.equal(start.candidate.label, 'Apply now');
 
+start = apply.chooseStartAction([
+  { label: 'Откликнуться', metadata: { href: '/applicant/vacancy_response?vacancyId=130452758', currentJob: true } },
+  { label: 'Откликнуться', metadata: { href: '/applicant/vacancy_response?vacancyId=130452758', currentJob: true } },
+  { label: 'Откликнуться', metadata: { href: '/applicant/vacancy_response?vacancyId=137044225', currentJob: false } }
+]);
+assert.equal(start.found, true, 'identical HH top and bottom response links are one safe action');
+assert.equal(start.equivalentDuplicates, true);
+
+start = apply.chooseStartAction([
+  { label: 'Откликнуться', metadata: { href: '/applicant/vacancy_response?vacancyId=111' } },
+  { label: 'Откликнуться', metadata: { href: '/applicant/vacancy_response?vacancyId=222' } }
+]);
+assert.equal(start.found, false, 'different response targets remain ambiguous');
+assert.equal(start.ambiguous, true);
+
 assert.equal(apply.isHhUrl('https://hh.ru/vacancy/123'), true);
 assert.equal(apply.isHhUrl('https://spb.hh.ru/vacancy/123'), true);
 assert.equal(apply.isHhUrl('https://career.habr.com/vacancies/123'), false);
+
+let letterAction = apply.chooseHhCoverLetterAction([
+  { label: 'Задать вопрос' },
+  { label: 'Приложить сопроводительное письмо Работодатель увидит его вместе с откликом' }
+]);
+assert.equal(letterAction.found, true);
+assert.match(letterAction.candidate.label, /^Приложить сопроводительное письмо/);
+assert.equal(apply.chooseHhCoverLetterAction([{ label: 'Отправить' }]).found, false);
+assert.equal(apply.isApplicationContainerText('Задайте вопрос работодателю. Он получит его с откликом.', true), false,
+  'an unrelated HH employer-question form is not an application form');
+assert.equal(apply.isApplicationContainerText('Выберите резюме для отклика', true), true);
+
+assert.equal(apply.startReceiptDisposition({ receiptConfirmed: true, isHh: true, coverLetterRequired: true }), 'attach-cover-letter');
+assert.equal(apply.startReceiptDisposition({ receiptConfirmed: true, isHh: true, coverLetterRequired: false }), 'accept');
+assert.equal(apply.startReceiptDisposition({ receiptConfirmed: false, isHh: true, coverLetterRequired: true }), 'continue');
 
 let hhResume = apply.chooseHhResumeChoice([
   { label: 'Java Developer', metadata: { selected: false } },
