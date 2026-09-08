@@ -47,7 +47,7 @@ jobs:
           node - <<'NODE'
           const fs = require('fs');
           const manifest = JSON.parse(fs.readFileSync('browser-extension/manifest.json', 'utf8'));
-          if (manifest.version !== '2.6.2') throw new Error(`Unexpected extension version ${manifest.version}`);
+          if (manifest.version !== '2.6.3') throw new Error(`Unexpected extension version ${manifest.version}`);
           const scripts = manifest.content_scripts.flatMap(x => x.js || []);
           for (const required of ['site-apply.js', 'site-apply-content.js', 'cv-upload.js', 'final-submit-control.js', 'submission-receipt.js']) {
             if (!scripts.includes(required)) throw new Error(`Manifest is missing ${required}`);
