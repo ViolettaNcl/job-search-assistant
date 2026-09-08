@@ -127,16 +127,21 @@ app.MapGet("/api/dashboard", async (AppDbContext db, StatsService stats, Cancell
     var pipelineRows = await db.Vacancies.Include(x => x.Company).Include(x => x.Application).Include(x => x.Events)
         .Where(x => x.Status == VacancyStatus.Applied || x.Status == VacancyStatus.HrContact || x.Status == VacancyStatus.HrInterview || x.Status == VacancyStatus.TechInterview || x.Status == VacancyStatus.TestTask || x.Status == VacancyStatus.Rejected || x.Status == VacancyStatus.Offer)
         .RecentAsync(50, ct);
-    var pipeline = pipelineRows.Select(x => new
+    var pipeline = pipelineRows.Select(x =>
     {
-        x.Id, x.Title, company = x.Company.Name, x.Url, status = x.Status.ToString(), x.UpdatedAt,
-        appliedAt = x.Application?.AppliedAt,
-        resume = x.Application?.ResumeExternalId,
-        coverLetterIncluded = x.Application != null && !string.IsNullOrWhiteSpace(x.Application.CoverLetter),
-        automatic = x.Events.Any(e => e.Type == "AutoApplied"),
-        latestEvent = x.Events.OrderByDescending(e => e.CreatedAt).Select(e => new { e.Type, e.Note, e.CreatedAt }).FirstOrDefault(),
-        market = VacancyClassifier.Market(x), marketLabel = VacancyClassifier.MarketLabel(VacancyClassifier.Market(x)),
-        opportunityType = VacancyClassifier.OpportunityType(x), opportunityTypeLabel = VacancyClassifier.TypeLabel(VacancyClassifier.OpportunityType(x))
+        var latestHhSync = x.Events.Where(e => e.Type.StartsWith(HhNegotiationStatusMapper.EventTypePrefix, StringComparison.Ordinal)).OrderByDescending(e => e.CreatedAt).FirstOrDefault();
+        return new
+        {
+            x.Id, x.Title, company = x.Company.Name, x.Url, status = x.Status.ToString(), x.UpdatedAt,
+            appliedAt = x.Application?.AppliedAt,
+            resume = x.Application?.ResumeExternalId,
+            coverLetterIncluded = x.Application != null && !string.IsNullOrWhiteSpace(x.Application.CoverLetter),
+            automatic = x.Events.Any(e => e.Type == "AutoApplied"),
+            hhHasUpdates = latestHhSync?.Note.Contains("непрочитанное сообщение", StringComparison.OrdinalIgnoreCase) == true,
+            latestEvent = x.Events.OrderByDescending(e => e.CreatedAt).Select(e => new { e.Type, e.Note, e.CreatedAt }).FirstOrDefault(),
+            market = VacancyClassifier.Market(x), marketLabel = VacancyClassifier.MarketLabel(VacancyClassifier.Market(x)),
+            opportunityType = VacancyClassifier.OpportunityType(x), opportunityTypeLabel = VacancyClassifier.TypeLabel(VacancyClassifier.OpportunityType(x))
+        };
     }).ToList();
 
     var allRows = await db.Vacancies.AsNoTracking().ToListAsync(ct);

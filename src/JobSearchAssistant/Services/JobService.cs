@@ -267,25 +267,63 @@ public sealed class JobService(
     public async Task<int> SyncExistingApplicationsAsync(CancellationToken ct)
     {
         if (!await hh.HasOAuthAsync(ct)) return 0;
-        IReadOnlyList<string> ids;
-        try { ids = await hh.GetAppliedVacancyIdsAsync(ct); }
+        IReadOnlyList<HhNegotiationDto> negotiations;
+        try { negotiations = await hh.GetNegotiationsAsync(ct); }
         catch { return 0; }
 
         var imported = 0;
-        foreach (var externalId in ids)
+        foreach (var negotiation in negotiations
+                     .GroupBy(x => x.VacancyId, StringComparer.OrdinalIgnoreCase)
+                     .Select(group => group.OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt).First()))
         {
-            var vacancy = await db.Vacancies.Include(x => x.Application).SingleOrDefaultAsync(x => x.Source == "hh" && x.ExternalId == externalId, ct);
+            var externalId = negotiation.VacancyId;
+            var vacancy = await db.Vacancies
+                .Include(x => x.Application)
+                .Include(x => x.Events)
+                .SingleOrDefaultAsync(x => x.Source == "hh" && x.ExternalId == externalId, ct);
             if (vacancy is null)
             {
                 vacancy = await ImportHhUrlAsync($"https://hh.ru/vacancy/{externalId}", ct);
                 if (vacancy is null) continue;
+                vacancy = await db.Vacancies
+                    .Include(x => x.Application)
+                    .Include(x => x.Events)
+                    .SingleAsync(x => x.Id == vacancy.Id, ct);
             }
-            if (vacancy.Application is not null) continue;
-            vacancy.Status = VacancyStatus.Applied;
+
             vacancy.HasExistingHhResponse = true;
-            db.Applications.Add(new Application { VacancyId = vacancy.Id, ResumeExternalId = "imported-hh", AppliedAt = DateTimeOffset.UtcNow });
-            db.ApplicationEvents.Add(new ApplicationEvent { VacancyId = vacancy.Id, Type = "Applied", Note = "Imported from HH negotiations" });
-            imported++;
+            if (vacancy.Application is null)
+            {
+                vacancy.Application = new Application
+                {
+                    VacancyId = vacancy.Id,
+                    ResumeExternalId = "imported-hh",
+                    AppliedAt = negotiation.CreatedAt ?? DateTimeOffset.UtcNow,
+                    ExternalNegotiationId = negotiation.Id
+                };
+                db.Applications.Add(vacancy.Application);
+                imported++;
+            }
+            else if (!string.IsNullOrWhiteSpace(negotiation.Id))
+            {
+                vacancy.Application.ExternalNegotiationId = negotiation.Id;
+            }
+
+            var mapped = HhNegotiationStatusMapper.Map(negotiation, vacancy.Status);
+            var note = HhNegotiationStatusMapper.Describe(negotiation, mapped);
+            var eventType = HhNegotiationStatusMapper.EventType(negotiation);
+            var alreadySynced = vacancy.Events.Any(x => x.Type == eventType);
+            if (alreadySynced) continue;
+
+            vacancy.Status = mapped;
+            vacancy.UpdatedAt = DateTimeOffset.UtcNow;
+            db.ApplicationEvents.Add(new ApplicationEvent
+            {
+                VacancyId = vacancy.Id,
+                Type = eventType,
+                Note = note,
+                CreatedAt = DateTimeOffset.UtcNow
+            });
         }
         await db.SaveChangesAsync(ct);
         return imported;

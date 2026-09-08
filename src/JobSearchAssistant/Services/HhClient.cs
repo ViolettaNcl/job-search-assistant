@@ -160,29 +160,29 @@ public sealed class HhClient(
     }
 
     public async Task<IReadOnlyList<string>> GetAppliedVacancyIdsAsync(CancellationToken ct)
+        => (await GetNegotiationsAsync(ct))
+            .Select(x => x.VacancyId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    public async Task<IReadOnlyList<HhNegotiationDto>> GetNegotiationsAsync(CancellationToken ct)
     {
         var token = await GetAccessTokenAsync(ct);
         var client = CreateClient(token);
-        var ids = new HashSet<string>();
-        for (var page = 0; page < 10; page++)
+        var negotiations = new Dictionary<string, HhNegotiationDto>(StringComparer.OrdinalIgnoreCase);
+        for (var page = 0; page < 20; page++)
         {
-            using var response = await client.GetAsync($"/negotiations?per_page=50&page={page}", ct);
+            using var response = await client.GetAsync($"/negotiations?per_page=50&page={page}&order_by=updated_at&order=desc", ct);
             if (!response.IsSuccessStatusCode) break;
-            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
-            if (!json.RootElement.TryGetProperty("items", out var items)) break;
-            var count = 0;
-            foreach (var item in items.EnumerateArray())
+            var pageItems = HhNegotiationParser.ParseList(await response.Content.ReadAsStringAsync(ct));
+            foreach (var item in pageItems)
             {
-                count++;
-                if (item.TryGetProperty("vacancy", out var v) && v.ValueKind == JsonValueKind.Object && v.TryGetProperty("id", out var vid))
-                {
-                    var id = vid.GetString();
-                    if (!string.IsNullOrWhiteSpace(id)) ids.Add(id);
-                }
+                var key = string.IsNullOrWhiteSpace(item.Id) ? $"vacancy:{item.VacancyId}" : item.Id;
+                negotiations[key] = item;
             }
-            if (count < 50) break;
+            if (pageItems.Count < 50) break;
         }
-        return ids.ToArray();
+        return negotiations.Values.ToArray();
     }
 
     public async Task<HhApplyResult> ApplyAsync(string vacancyId, string resumeId, string message, CancellationToken ct)
