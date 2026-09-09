@@ -132,6 +132,8 @@ jobs:
         run: node browser-extension/browser-autopilot.test.js
       - name: Test one-click HH response and cover-letter continuation
         run: node browser-extension/site-apply.test.js
+      - name: Test floating panel policy
+        run: node browser-extension/floating-panel.test.js
       - name: Test popup timeout and recovery behavior
         run: node browser-extension/runtime-guard.test.js
       - name: Validate dashboard inline JavaScript

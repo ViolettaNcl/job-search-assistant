@@ -1,3 +1,7 @@
+// Bind an embedded panel to its containing tab, even while another tab is active.
+const vjaEmbedded = window.top !== window;
+const vjaEmbeddedContext = vjaEmbedded ? chrome.runtime.sendMessage({ type: "vjaPanelContext" }) : null;
+if (vjaEmbedded) document.documentElement.classList.add('floating');
 const $ = (id) => document.getElementById(id);
 let latest = null;
 let latestPage = null;
@@ -70,6 +74,11 @@ function setBusy(busy) {
 }
 
 async function activeTab() {
+  if (vjaEmbedded) {
+    const context = await vjaEmbeddedContext;
+    if (!context?.tab?.id) throw new Error("Could not identify the panel's vacancy tab.");
+    return context.tab;
+  }
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error("No active tab found.");
   return tab;
@@ -443,3 +452,8 @@ async function applyOnHh() {
   }
   await refreshCandidateProfile();
 })();
+
+$("pinPanel")?.addEventListener("click", async () => {
+  try { const tab=await activeTab();await chrome.tabs.sendMessage(tab.id,{type:"vjaToggleFloatingPanel"},{frameId:0});if(!vjaEmbedded)window.close(); }
+  catch(error){showError(error.message);}
+});

@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="followup-desk.css" />
 </head>
 <body>
-  <main>
+  <main><button id="pinPanel" class="secondary full">Показать панель на странице ↗</button>
     <header><div><h1>Violetta Apply Assistant</h1><p>Персональное письмо, нужное резюме и отправка отклика.</p></div><span id="statusDot" class="dot"></span></header>
     <section class="quickApplyCard"><span class="modeBadge">Текущая вакансия</span><button id="oneClickApply" class="primary full prepareButton">Отправить отклик + письмо</button><p id="oneClickStatus" class="prepareStatus">Кнопка анализирует описание, создаёт короткое письмо, выбирает резюме/CV и отправляет. Если обязательный вопрос нельзя заполнить достоверно, расширение остановится.</p><button id="prepareApplication" class="secondary full prepareButton safePreview">Проверить без отправки</button><p id="prepareStatus" class="prepareStatus">Заполнит безопасные поля и подготовит CV, но не нажмёт финальную кнопку работодателя.</p></section>
     <details class="toolPanel"><summary>Подключение и профиль</summary><div class="toolPanelBody"><label class="small" for="apiBase">Адрес запущенной программы</label><div class="row"><input id="apiBase" value="http://localhost:8080" /><button id="saveApi" class="secondary">Сохранить</button></div><p id="profileStatus" class="note">Проверяю профиль…</p><button id="openSetup" class="secondary full compactFull">Настройка и готовность</button></div></details>

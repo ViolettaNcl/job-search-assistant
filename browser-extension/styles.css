@@ -91,3 +91,8 @@ button:disabled { opacity: .55; cursor: default; }
 .dot.bad { background: #dc2626; }
 .error { margin-top: 10px; padding: 9px; border-radius: 8px; color: #9f1239; background: #fff1f2; font-size: 12px; line-height: 1.4; }
 .hidden { display: none; }
+
+/* The same popup UI can live in a movable frame on a vacancy page. */
+html.floating, html.floating body { width:100%; min-width:0; background:rgba(249,250,255,.86); }
+html.floating main { width:100%; max-width:100%; }
+html.floating #pinPanel { display:none; }

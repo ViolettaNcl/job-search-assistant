@@ -152,10 +152,12 @@ async function runSystemCheck() {
     $("apiBase").value = api;
     const local = await chrome.storage.local.get([keys.en, keys.ru, applicationMemoryKey]);
 
+    const status = await safeFetchJson(`${api}/api/automation/status`);
+    const minimumScore = status.data?.autoApplyMinimumScore ?? 75;
     const [health, candidate, queue] = await Promise.all([
       safeFetchJson(`${api}/health/ready`),
       safeFetchJson(`${api}/api/candidate`),
-      safeFetchJson(`${api}/api/application-queue?limit=20&minScore=75`)
+      safeFetchJson(`${api}/api/application-queue?limit=20&minScore=${minimumScore}`)
     ]);
 
     const contactState = window.vjaLocalContactProfile.resolve({
@@ -168,7 +170,7 @@ async function runSystemCheck() {
       candidate: { coreReady: candidate.ok && candidate.data?.readiness?.coreReady === true },
       contacts: { phone: contactState.phoneReady },
       cv: { english: Boolean(local[keys.en]?.base64), russian: Boolean(local[keys.ru]?.base64) },
-      queue: { strongCount: queue.ok && Array.isArray(queue.data) ? queue.data.length : 0 }
+      queue: { minimumScore, strongCount: queue.ok && Array.isArray(queue.data) ? queue.data.length : 0 }
     });
     renderReadiness(result);
   } catch (error) {

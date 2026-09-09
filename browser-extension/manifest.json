@@ -1,10 +1,20 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "description": "One-click vacancy analysis, tailored letter, CV/resume selection and verified submission, plus an optional all-day HH Apply Autopilot controlled from the local dashboard.",
-  "permissions": ["activeTab", "storage", "unlimitedStorage", "clipboardWrite", "alarms"],
-  "host_permissions": ["http://localhost:8080/*", "https://*/*", "http://*/*"],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "unlimitedStorage",
+    "clipboardWrite",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://localhost:8080/*",
+    "https://*/*",
+    "http://*/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -15,9 +25,38 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*/*", "http://*/*"],
-      "js": ["ats-structured.js", "ats-controls.js", "field-verification.js", "content.js", "cv-upload.js", "review-navigator-content.js", "final-submit-control.js", "final-submit-locator.js", "submission-receipt.js", "submission-receipt-content.js", "site-apply.js", "site-apply-content.js"],
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": [
+        "ats-structured.js",
+        "ats-controls.js",
+        "field-verification.js",
+        "content.js",
+        "cv-upload.js",
+        "review-navigator-content.js",
+        "final-submit-control.js",
+        "final-submit-locator.js",
+        "submission-receipt.js",
+        "submission-receipt-content.js",
+        "site-apply.js",
+        "site-apply-content.js",
+        "floating-panel.js",
+        "floating-panel-content.js"
+      ],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "popup.html"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
     }
   ]
 }

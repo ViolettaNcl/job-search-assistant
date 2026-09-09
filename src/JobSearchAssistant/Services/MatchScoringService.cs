@@ -11,9 +11,9 @@ public sealed record MatchResult(int Score, string Level, string[] Matched, stri
 
 public sealed class MatchScoringService(IOptions<CandidateProfileOptions> candidate, IOptions<SearchOptions>? search = null)
 {
-    public MatchResult Score(string title, string text, bool remote, string experience, string location = "", string remoteScope = "")
+    public MatchResult Score(string title, string text, bool remote, string experience, string location = "", string remoteScope = "", int minimumScore = 75)
     {
-        var a = new OpportunityScoringService(candidate, search).Assess(title, text, remote, experience, location, remoteScope);
+        var a = new OpportunityScoringService(candidate, search).Assess(title, text, remote, experience, location, remoteScope, minimumScore);
         var matched = a.Matches.Where(m => m.ProjectIds.Length > 0).Select(m => m.Requirement.Skill).ToArray();
         var missing = a.Matches.Where(m => m.ProjectIds.Length == 0).Select(m => m.Requirement.Skill).ToArray();
         return new(a.OverallScore, a.OverallScore >= 85 ? "Strong Match" : a.OverallScore >= 65 ? "Apply" : a.OverallScore >= 50 ? "Stretch" : "Skip",

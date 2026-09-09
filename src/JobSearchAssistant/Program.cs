@@ -59,6 +59,8 @@ builder.Services.AddScoped<FollowUpQueueService>();
 builder.Services.AddScoped<ApplicationAttributionService>();
 builder.Services.AddScoped<OutcomeAnalyticsService>();
 builder.Services.AddScoped<StatsService>();
+builder.Services.AddSingleton<CollectionCoordinator>();
+builder.Services.AddHostedService<CollectionCoordinator>(sp => sp.GetRequiredService<CollectionCoordinator>());
 builder.Services.AddHostedService<VacancyCollectorWorker>();
 builder.Services.AddHostedService<AutoApplyWorker>();
 builder.Services.AddHostedService<TelegramBotWorker>();
@@ -219,7 +221,7 @@ app.MapGet("/api/applications/activity", async (int? limit, AppDbContext db, Can
     return Results.Ok(items);
 });
 
-app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobService jobs, AutoApplyRunTracker runs, BrowserAutopilotTracker browserAutopilot, IOptions<SecurityOptions> security, CancellationToken ct) =>
+app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobService jobs, AutoApplyRunTracker runs, BrowserAutopilotTracker browserAutopilot, IOptions<SecurityOptions> security, CollectionCoordinator collector, CancellationToken ct) =>
 {
     var state = await db.AppStates.AsNoTracking().SingleAsync(x => x.Id == 1, ct);
     var localNow = DateTimeOffset.Now;
@@ -264,7 +266,8 @@ app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobSer
         lastResult = latestRun is null
             ? (last is null ? null : new { type = last.Type, message = last.Note, attempted = 0, submitted = 0, failed = 0 })
             : new { type = latestRun.Ready ? "Cycle" : "Setup", message = latestRun.Message, attempted = latestRun.Attempted, submitted = latestRun.Submitted, failed = latestRun.Failed },
-        diagnostics
+        diagnostics,
+        collection = collector.Snapshot
     });
 });
 
@@ -446,38 +449,28 @@ app.MapPost("/api/settings/resume", async (ResumeRequest request, AppDbContext d
 {
     var state = await db.AppStates.SingleAsync(x => x.Id == 1, ct); state.HhResumeId = request.ResumeId; await db.SaveChangesAsync(ct); return Results.Ok();
 });
-app.MapPost("/api/settings/autoapply", async (AutoApplyRequest request, AppDbContext db, JobService jobs, IOptions<SearchOptions> search, CancellationToken ct) =>
+app.MapPost("/api/settings/autoapply", async (AutoApplyRequest request, AppDbContext db, CollectionCoordinator collector, CancellationToken ct) =>
 {
     var state = await db.AppStates.SingleAsync(x => x.Id == 1, ct);
     state.AutoApplyEnabled = request.Enabled;
-    state.AutoApplyMinimumScore = Math.Clamp(request.MinimumScore, 75, 100);
-    state.DailyAutoApplyLimit = Math.Clamp(request.DailyLimit, 1, 50);
+    state.AutoApplyMinimumScore = Math.Clamp(request.MinimumScore, 50, 100);
+    state.DailyAutoApplyLimit = Math.Clamp(request.DailyLimit, 1, 200);
     await db.SaveChangesAsync(ct);
-    CollectResult? collection = null;
-    AutoApplyCycleResult? cycle = null;
-    if (request.Enabled)
-    {
-        collection = await jobs.CollectAsync(search.Value, ct);
-        cycle = await jobs.RunAutoApplyCycleAsync(ct);
-    }
-    return Results.Ok(new { state.AutoApplyEnabled, state.AutoApplyMinimumScore, state.DailyAutoApplyLimit, collection, cycle });
+    if (request.Enabled) collector.Start();
+    return Results.Ok(new { state.AutoApplyEnabled, state.AutoApplyMinimumScore, state.DailyAutoApplyLimit, collection = collector.Snapshot });
 });
 
 app.MapPost("/api/settings/autoapply/preferences", async (AutoApplyPreferencesRequest request, AppDbContext db, CancellationToken ct) =>
 {
     var state = await db.AppStates.SingleAsync(x => x.Id == 1, ct);
-    state.AutoApplyMinimumScore = Math.Clamp(request.MinimumScore, 75, 100);
-    state.DailyAutoApplyLimit = Math.Clamp(request.DailyLimit, 1, 50);
+    state.AutoApplyMinimumScore = Math.Clamp(request.MinimumScore, 50, 100);
+    state.DailyAutoApplyLimit = Math.Clamp(request.DailyLimit, 1, 200);
     await db.SaveChangesAsync(ct);
     return Results.Ok(new { state.AutoApplyMinimumScore, state.DailyAutoApplyLimit });
 });
 
-app.MapPost("/api/automation/run", async (JobService jobs, IOptions<SearchOptions> search, CancellationToken ct) =>
-{
-    var collection = await jobs.CollectAsync(search.Value, ct);
-    var cycle = await jobs.RunAutoApplyCycleAsync(ct);
-    return Results.Ok(new { collection, cycle });
-});
+app.MapPost("/api/automation/run", (CollectionCoordinator collector) => Results.Accepted("/api/automation/status", new { collection = collector.Start() }));
+app.MapPost("/api/collect/start", (CollectionCoordinator collector) => Results.Accepted("/api/automation/status", collector.Start()));
 
 app.MapFallbackToFile("index.html");
 app.Run();

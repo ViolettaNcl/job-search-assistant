@@ -1,0 +1,10 @@
+const assert = require('node:assert/strict');
+const panel = require('./floating-panel.js');
+assert.equal(panel.automatic('https://volgograd.hh.ru/vacancy/123'), true);
+assert.equal(panel.automatic('https://hh.ru/search/vacancy'), false);
+assert.equal(panel.automatic('https://hh.ru.attacker.invalid/vacancy/123'), false);
+assert.equal(panel.allowed('https://www.linkedin.com/jobs/123'), false);
+assert.equal(panel.allowed('chrome://settings'), false);
+assert.deepEqual(panel.position(-30, 900, 800, 600), {x:0,y:60});
+assert.deepEqual(panel.position(400, 500, 320, 400), {x:0,y:0});
+console.log('floating panel policy and viewport bounds passed');
