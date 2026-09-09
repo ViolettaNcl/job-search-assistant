@@ -90,6 +90,7 @@ jobs:
           node --check browser-extension/autopilot-popup.js
           node --check browser-extension/hh-discovery-content.js
           node --check browser-extension/hh-discovery-background.js
+          node --check browser-extension/hh-discovery-navigation.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls

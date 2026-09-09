@@ -73,3 +73,10 @@ Private resume text stays in the loopback process with no persistence/provider c
 References: [HH response filters](https://feedback.hh.ru/knowledge-base/article/1287), [Greenhouse resume parsing limitations](https://support.greenhouse.io/hc/en-us/articles/200989175-Unsuccessful-resume-parse).
 
 2.7.2 continuation: HH read errors now distinguish authorization, CAPTCHA, rate limits and unknown denial using documented error codes without displaying raw payloads. An existing broken OAuth connection no longer silently falls back to anonymous requests. Rocket control reuses saved backend settings. Opt-in browser discovery reads normal HH pages, stops at access challenges, observes pause/quota between pages and imports via the canonical HH vacancy ID. No claim that an unknown HTTP 403 can be removed locally; valid HH access remains required. Search is bounded to one configured query/ten pages per 30 minutes. Added HH read-error, browser-import identity and browser-discovery fixtures.
+
+
+## Follow-up 2.7.3 — HH redirect recovery and contact footer
+
+Inspected main `7f6597a22d6d4aeafe0b1d89dbf4b04865d1664e`, no active PRs. Branch `fix/hh-discovery-redirect-recovery`. The reported 2.7.2 stop comes from strict full-URL equality: a benign regional/tracking redirect became a persisted failure. Discovery now checks HH HTTPS host and task identity (same vacancy ID or search text and explicit filters), then verifies the returned document URL and current tab before import. Exact legacy generic-redirect stops retry with the corrected reader; real login/CAPTCHA/access stops remain. Dashboard duplicate error text is deduplicated.
+
+Regression covers regional hosts, encoding, tracking parameters, trailing slash, wrong vacancy/query/host, missing filters, stale document response, legacy recovery, and CAPTCHA persistence. A Chromium fixture intercepts HH URLs, executes real redirects/content scripts and imports into a local mock API. It is not a live employer submission. New generated letters and short messages append the configured email once, including AI suggestions, using the email the user explicitly requested. Private local overrides are preserved.

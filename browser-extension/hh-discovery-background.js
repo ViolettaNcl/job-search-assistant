@@ -1,5 +1,10 @@
 async function discoverHhInBrowser(api, status) {
   const settings = await chrome.storage.local.get(['vjaHhDiscoveryAt','vjaHhDiscoveryQuery','vjaHhDiscoveryBlocked','vjaHhDiscoveryMessage']);
+  // One-time recovery of 2.7.2's exact-string redirect bug. Real challenge errors are retained.
+  if (settings.vjaHhDiscoveryBlocked===self.vjaHhNavigation.legacyRedirect) {
+    await chrome.storage.local.remove(['vjaHhDiscoveryBlocked','vjaHhDiscoveryAt']);
+    settings.vjaHhDiscoveryBlocked='';settings.vjaHhDiscoveryAt=0;
+  }
   if (settings.vjaHhDiscoveryBlocked) return settings.vjaHhDiscoveryBlocked;
   if (Date.now()-(settings.vjaHhDiscoveryAt||0)<30*60*1000) return settings.vjaHhDiscoveryMessage||'';
   const queries = status.browserSearchQueries?.length ? status.browserSearchQueries : ['Junior C# .NET'];
@@ -18,20 +23,23 @@ async function discoverHhInBrowser(api, status) {
       const started=Date.now();
       while(Date.now()-started<30000) {
         const current=await chrome.tabs.get(tab.id);
-        if(current.status==='complete' && current.url===expectedUrl)break;
-        if(current.status==='complete' && current.url!==expectedUrl && Date.now()-started>2000)throw new Error('HH перенаправил страницу. Проверьте вход и доступ во вкладке.');
+        if(current.status==='complete' && self.vjaHhNavigation.sameTask(expectedUrl,current.url))break;
+        if(current.status==='complete' && !self.vjaHhNavigation.sameTask(expectedUrl,current.url) && Date.now()-started>2000)throw new Error('HH открыл страницу входа, проверки или другой задачи. Проверьте открытую вкладку.');
         await browserAutopilotWait(400);
       }
       const current=await chrome.tabs.get(tab.id);
-      if(current.status!=='complete'||current.url!==expectedUrl)throw new Error('Страница HH не загрузилась за 30 секунд.');
+      if(current.status!=='complete'||!self.vjaHhNavigation.sameTask(expectedUrl,current.url))throw new Error('Страница HH не загрузилась за 30 секунд.');
       await browserAutopilotWait(1000);
       let timer,r;
-      try {r=await Promise.race([chrome.tabs.sendMessage(tab.id,{type:'vjaReadHhDiscovery'},{frameId:0}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Страница HH не ответила за 10 секунд.')),10000);})]);}
+      try {r=await Promise.race([chrome.tabs.sendMessage(tab.id,{type:'vjaReadHhDiscovery',expectedUrl},{frameId:0}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Страница HH не ответила за 10 секунд.')),10000);})]);}
       finally {clearTimeout(timer);}
       if(r?.blocked)throw new Error(r.blocked);
+      const after=await chrome.tabs.get(tab.id);
+      if(!self.vjaHhNavigation.sameTask(expectedUrl,after.url)||!self.vjaHhNavigation.sameTask(expectedUrl,r?.pageUrl))throw new Error('Страница изменилась во время чтения. Поиск остановлен без импорта.');
       return r;
     };
     const results=await read(search.href);
+    if(results?.emptyConfirmed){const message='По этому запросу HH не нашёл вакансий. Следующий запрос будет проверен по расписанию.';await chrome.storage.local.set({vjaHhDiscoveryMessage:message});return message;}
     if(!results?.links?.length)throw new Error('В выдаче HH нет доступных карточек, либо изменилась страница. Проверьте вкладку поиска.');
     for(const url of results.links.slice(0,10)) {
       const live=await browserAutopilotJson(`${api}/api/automation/status`);

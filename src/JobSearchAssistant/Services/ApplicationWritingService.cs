@@ -7,6 +7,8 @@ public sealed record GroundedApplication(string Letter, string ReasoningMode, st
 
 public sealed class ApplicationWritingService(IOptions<CandidateProfileOptions> candidate)
 {
+    public string AddContact(string letter, bool russian) => ApplicationContactFooter.Append(letter, candidate.Value.Email, russian);
+
     public GroundedApplication Write(ApplicationStrategy strategy, bool russian)
     {
         var c = candidate.Value;
@@ -25,7 +27,7 @@ public sealed class ApplicationWritingService(IOptions<CandidateProfileOptions> 
             ? $"Здравствуйте! Меня заинтересовали задачи по направлению {strategy.CvVariant}. В проекте {project.Name} есть близкая работа: {contribution}. Использованные технологии: {evidence}. Буду рада показать код и обсудить, как этот опыт пригодится вашей команде.\n\nGitHub: {c.GitHubUrl}\n{c.RussianName}"
             : $"Hello! The {strategy.CvVariant} work interests me. My {project.Name} project includes relevant work on {contribution}, using {evidence}. I would be happy to walk through the code and discuss how this project experience could help your team.\n\nGitHub: {c.GitHubUrl}\n{c.Name}";
         var conflicts = new CandidateKnowledgeService(candidate).Get().Identity.Conflicts;
-        return new(letter, "deterministic-fallback", [project.Id], conflicts.Length > 0, conflicts);
+        return new(AddContact(letter, russian), "deterministic-fallback", [project.Id], conflicts.Length > 0, conflicts);
     }
 }
 

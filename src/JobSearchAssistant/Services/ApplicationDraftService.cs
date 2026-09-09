@@ -120,6 +120,9 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
         if (score < 75) verify.Add("Fit score is below the normal auto-apply threshold; review before applying.");
         verify.Add("Never invent years of commercial employment, certifications, relocation commitments or legal declarations.");
 
+        coverLetter = ApplicationContactFooter.Append(coverLetter, _candidate.Email, russian);
+        shortMessage = ApplicationContactFooter.Append(shortMessage, _candidate.Email, russian);
+
         return new ApplicationDraft(
             russian ? "ru" : "en",
             candidateName,
