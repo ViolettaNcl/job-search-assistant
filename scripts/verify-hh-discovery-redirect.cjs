@@ -14,11 +14,18 @@ const assert=require('node:assert/strict'),http=require('node:http'),path=requir
   const context=await chromium.launchPersistentContext('',{channel:'chromium',headless:true,args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]});
   let challenge=false,searchLoads=0;
   try{
+    // Abort unexpected traffic; this test must never depend on live job listings.
+    await context.route('**/*', route => {
+      const u=new URL(route.request().url());
+      return u.origin===base || u.protocol==='chrome-extension:' ? route.continue() : route.abort();
+    });
     await context.route(/^https:\/\/(?:[^/]+\.)?hh\.ru\//,async route=>{
       const u=new URL(route.request().url());
       if(u.hostname==='hh.ru'){
         u.hostname='volgograd.hh.ru';u.pathname=u.pathname.replace(/\/$/,'')+'/';u.searchParams.set('hhtmFrom','fixture');
-        await route.fulfill({status:302,headers:{location:u.href},body:''});return;
+        // A fresh navigation is intercepted separately (Playwright routes only the first
+        // request of an HTTP redirect chain). Exercise the same final-URL validation.
+        await route.fulfill({contentType:'text/html',body:`<script>location.replace(${JSON.stringify(u.href)})</script>`});return;
       }
       if(u.pathname.startsWith('/search/')){
         searchLoads++;
@@ -31,6 +38,7 @@ const assert=require('node:assert/strict'),http=require('node:http'),path=requir
     const run=()=>worker.evaluate(async({base,status})=>await discoverHhInBrowser(base,status),{base,status});
     const result=await run();
     assert.equal(imported.length,1,`regional redirect must reach one import: ${result}; ${imported.map(v=>v.url).join(', ')}`);
+    assert.equal(new URL(imported[0].url).pathname,'/vacancy/123/');
     assert.equal(imported[0].title,'Junior C# Developer');assert.equal(new URL(imported[0].url).hostname,'volgograd.hh.ru');
     assert(result.includes('сохранено 1'));
     challenge=true;await worker.evaluate(async()=>{await chrome.storage.local.remove('vjaHhDiscoveryAt');});
