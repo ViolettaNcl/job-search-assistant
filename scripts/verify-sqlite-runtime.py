@@ -72,10 +72,13 @@ def verify():
                     settings = request('/api/automation/status')
                     assert settings['autoApplyMinimumScore'] == 50 and settings['dailyAutoApplyLimit'] == 90, 'Settings must survive restart'
                     rows = request("/api/vacancies?market=International&type=Internship")
+                    if restart == 0: first_seen = next(row["firstSeenAt"] for row in rows if row["id"] == vacancy_id)
+                    assert next(row["firstSeenAt"] for row in rows if row["id"] == vacancy_id) == first_seen, "Discovery date must survive restart"
                     assert any(row["id"] == vacancy_id for row in rows), "Imported job must survive restart"
                     dashboard = request("/api/dashboard")
                     assert dashboard["best"] if restart == 0 else dashboard["pipeline"]
                     request("/api/application-queue")
+                    request("/api/application-queue?source=hh&automaticOnly=true")
                     request("/api/followups")
                     request("/api/analytics/outcomes")
                     screening_vacancy = {"title": "Junior C# Developer", "description": "Required: C#, SQL Server, Azure.", "remote": True, "location": "Russia"}
@@ -102,6 +105,9 @@ def verify():
                         request(f"/api/vacancies/{vacancy_id}/status", {"status": "HrContact", "note": "Synthetic CI fixture"})
                     else:
                         assert rows[0]["status"] == "HrContact"
+                        recorded = next(row for row in dashboard["pipeline"] if row["id"] == vacancy_id)
+                        assert recorded["firstSeenAt"] == first_seen
+                        assert recorded["appliedAt"] is None, "CRM update must not invent an application timestamp"
                 except Exception:
                     log.flush()
                     log.seek(0)

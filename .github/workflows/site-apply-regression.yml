@@ -4,11 +4,15 @@ on:
   pull_request:
     paths:
       - 'browser-extension/**'
+      - 'src/JobSearchAssistant/wwwroot/**'
+      - 'scripts/verify-*.cjs'
       - '.github/workflows/site-apply-regression.yml'
   push:
     branches: [main]
     paths:
       - 'browser-extension/**'
+      - 'src/JobSearchAssistant/wwwroot/**'
+      - 'scripts/verify-*.cjs'
       - '.github/workflows/site-apply-regression.yml'
 
 permissions:
@@ -93,3 +97,14 @@ jobs:
         env:
           NODE_PATH: /tmp/vja-browser-tests/node_modules
         run: node scripts/verify-hh-discovery-redirect.cjs
+
+      - name: Verify operator dashboard dates, review list and live refresh
+        env:
+          NODE_PATH: /tmp/vja-browser-tests/node_modules
+        run: node scripts/verify-operator-dashboard.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: operator-dashboard-previews
+          path: artifacts/operator-*.png
+          if-no-files-found: ignore
