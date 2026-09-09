@@ -30,7 +30,7 @@ function vjaRenderNextJob(item, message = "") {
 
   if (!item) {
     nodes.title.textContent = "No strong unapplied job ready";
-    nodes.company.textContent = "The 75+ queue is currently empty after excluding this vacancy.";
+    nodes.company.textContent = "The queue at your configured threshold is empty after excluding this vacancy.";
     nodes.score.textContent = "—";
     nodes.meta.textContent = "Open the full queue or collect fresh vacancies from the dashboard.";
     nodes.open.disabled = true;
@@ -71,14 +71,18 @@ async function vjaLoadNextStrongJob({ quiet = false } = {}) {
 
   try {
     const [api, tab] = await Promise.all([getApiBase(), activeTab()]);
-    const response = await vjaFetch(`${api}/api/application-queue?limit=20&minScore=75`);
+    const settingsResponse = await vjaFetch(`${api}/api/automation/status`);
+    if (!settingsResponse.ok) throw new Error("Could not load your queue threshold.");
+    const settings = await settingsResponse.json();
+    const minimumScore = settings.autoApplyMinimumScore ?? 75;
+    const response = await vjaFetch(`${api}/api/application-queue?limit=20&minScore=${minimumScore}`);
     if (!response.ok) throw new Error(`Queue returned ${response.status}.`);
     const queue = await response.json();
     const next = window.vjaDailyQueue.selectNext(queue, {
-      minScore: 75,
+      minScore: minimumScore,
       excludeUrls: vjaQueueExclusions(tab?.url || "")
     });
-    vjaRenderNextJob(next, next ? `${Array.isArray(queue) ? queue.length : 0} strong queue item${Array.isArray(queue) && queue.length === 1 ? "" : "s"} checked.` : "No other 75+ unapplied vacancy is ready right now.");
+    vjaRenderNextJob(next, next ? `${Array.isArray(queue) ? queue.length : 0} strong queue item${Array.isArray(queue) && queue.length === 1 ? "" : "s"} checked.` : `No other unapplied vacancy above ${minimumScore}/100 is ready right now.`);
     return next;
   } catch (error) {
     vjaNextQueueJob = null;

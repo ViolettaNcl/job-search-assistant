@@ -30,6 +30,9 @@ const http = require('node:http');
     await page.mouse.move(width-400,85);await page.mouse.down();await page.mouse.move(100,130,{steps:5});await page.mouse.up();
     const pos=await worker.evaluate(async()=> (await chrome.storage.sync.get('vjaFloatingPosition')).vjaFloatingPosition);
     assert(pos && pos.x>=0 && pos.x<200,'drag must update saved layout');
+    const toggle = async () => worker.evaluate(async () => {const tabs=await chrome.tabs.query({});const tab=tabs.find(t=>t.url?.includes('/vacancy/1'));await chrome.tabs.sendMessage(tab.id,{type:'vjaToggleFloatingPanel'},{frameId:0});});
+    await toggle();assert.equal(await (await popup.frameElement()).boundingBox(),null,'panel can be hidden');
+    await toggle();assert(await (await popup.frameElement()).boundingBox(),'panel can be reopened without reinstall');
     await context.close();console.log('Real Chromium extension iframe, popup load, tab binding and drag passed');
   } finally {await context.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

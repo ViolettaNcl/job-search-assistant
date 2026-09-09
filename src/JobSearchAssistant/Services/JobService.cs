@@ -469,6 +469,7 @@ public sealed class JobService(
     {
         var retryAfter = DateTimeOffset.UtcNow.AddMinutes(-Math.Clamp(automation.Value.FailureCooldownMinutes, 30, 1440));
         var rows = await db.Vacancies
+            .AsNoTracking()
             .Include(x => x.Company)
             .Include(x => x.Application)
             .Include(x => x.Events)
