@@ -16,12 +16,9 @@ public sealed class VacancyCollectorWorker(
             try
             {
                 using var scope = scopeFactory.CreateScope();
-                var service = scope.ServiceProvider.GetRequiredService<JobService>();
-                var result = await service.CollectAsync(options.Value, stoppingToken);
-                logger.LogInformation("Global collection: found {Found}, added {Added}, strong {Strong}, imported {Imported}; HH {HH}, Remotive {Remotive}, Adzuna {Adzuna}", result.Found, result.Added, result.Strong, result.AppliedImported, result.HhFound, result.RemotiveFound, result.AdzunaFound);
-                var apply = await service.RunAutoApplyCycleAsync(stoppingToken);
-                if (apply.Enabled)
-                    logger.LogInformation("Post-collection Apply Autopilot: attempted {Attempted}, submitted {Submitted}, failed {Failed}", apply.Attempted, apply.Submitted, apply.Failed);
+                var coordinator = scope.ServiceProvider.GetRequiredService<CollectionCoordinator>();
+                coordinator.Start();
+                logger.LogInformation("Scheduled vacancy collection requested");
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex) { logger.LogError(ex, "Vacancy collection failed"); }

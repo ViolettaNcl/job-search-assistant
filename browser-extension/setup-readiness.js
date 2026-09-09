@@ -22,7 +22,7 @@
       item("contacts", "Reusable phone", contactsReady, "recommended", contactsReady ? "Phone is available from the verified backend profile or this browser's local contact profile." : "Add your phone once so common contact fields do not need repeated manual entry.", "contacts"),
       item("english-cv", "English CV Vault", enCv, "recommended", enCv ? "English CV is stored locally for employer sites that upload a PDF." : "Store the English PDF once for European/international employer forms that require an upload.", "cv"),
       item("russian-cv", "Russian CV Vault", ruCv, "recommended", ruCv ? "Russian CV is stored locally for Russian employer sites that upload a PDF." : "Store the Russian PDF once for Russian employer forms that require an upload. HH.ru itself uses the resume selected in your HH account.", "cv"),
-      item("queue", "Strong-job queue", queueOk, "recommended", queueOk ? `${queueCount} strong unapplied job${queueCount === 1 ? "" : "s"} currently available.` : "No 75+ unapplied jobs are currently available; refresh collection or search/import more jobs.", "queue")
+      item("queue", "Strong-job queue", queueOk, "recommended", queueOk ? `${queueCount} strong unapplied job${queueCount === 1 ? "" : "s"} currently available.` : `No unapplied jobs above your ${input.queue?.minimumScore ?? 75}/100 threshold are currently available; check collection status on the dashboard.`, "queue")
     ];
 
     let state = "ready";

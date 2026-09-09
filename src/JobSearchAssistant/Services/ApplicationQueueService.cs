@@ -63,7 +63,7 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
         {
             foreach (var v in rows)
             {
-                var match = scoring.Score(v.Title, v.DescriptionText, v.IsRemote, v.Experience, v.LocationText, v.RemoteScope);
+                var match = scoring.Score(v.Title, v.DescriptionText, v.IsRemote, v.Experience, v.LocationText, v.RemoteScope, minimumScore);
                 v.MatchScore = match.Score;
                 v.WhyMatch = match.Why;
                 v.MatchLevel = match.Level;

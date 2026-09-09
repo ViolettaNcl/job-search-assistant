@@ -55,11 +55,22 @@ def verify():
                     assert health["database"] == "sqlite" and health["persistent"]
                     request("/health/ready")
                     if restart == 0:
+                        settings = request('/api/settings/autoapply/preferences', {'minimumScore': 50, 'dailyLimit': 90})
+                        assert settings['autoApplyMinimumScore'] == 50 and settings['dailyAutoApplyLimit'] == 90
+                        started = request('/api/collect/start', {})
+                        assert started['running']
+                        for _ in range(50):
+                            collection = request('/api/automation/status')['collection']
+                            if not collection['running']: break
+                            time.sleep(.1)
+                        assert not collection['running'] and collection['result']['errors'], 'Disabled HH must be reported, not silently look successful'
                         vacancy = request("/api/import/browser", {
                             "url": "https://example.com/jobs/sqlite-pilot", "title": "Junior C# internship",
                             "company": "SQLite Pilot", "description": "C# .NET ASP.NET Core EF Core SQL REST Git. Junior paid internship. Remote Europe.",
                             "country": "Poland", "location": "Europe", "remoteScope": "Europe", "remote": True})
                         vacancy_id = vacancy["id"]
+                    settings = request('/api/automation/status')
+                    assert settings['autoApplyMinimumScore'] == 50 and settings['dailyAutoApplyLimit'] == 90, 'Settings must survive restart'
                     rows = request("/api/vacancies?market=International&type=Internship")
                     assert any(row["id"] == vacancy_id for row in rows), "Imported job must survive restart"
                     dashboard = request("/api/dashboard")

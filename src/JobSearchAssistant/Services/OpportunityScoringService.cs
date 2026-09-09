@@ -11,7 +11,7 @@ public sealed record OpportunityAssessment(string Version, string ReasoningMode,
 
 public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> options, IOptions<SearchOptions>? search = null)
 {
-    public OpportunityAssessment Assess(string title, string text, bool remote, string experience = "", string location = "", string scope = "")
+    public OpportunityAssessment Assess(string title, string text, bool remote, string experience = "", string location = "", string scope = "", int minimumScore = 75)
     {
         var k = new CandidateKnowledgeService(options).Get();
         var u = new VacancyUnderstandingService().Understand(title, text, remote, experience, location);
@@ -45,7 +45,7 @@ public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> 
         if (eligibility.Status == "Likely ineligible" || u.Seniority == "Senior" || u.CareerLane == "excluded") overall = Math.Min(overall, 39);
         if (u.RequiredYears > 0 || u.MandatoryDegree) overall = Math.Min(overall, 64);
         if (families.Length < 2) overall = Math.Min(overall, 64);
-        var decision = overall < 50 ? "SKIP" : review.Count > 0 || overall < 75 ? "REVIEW" : "APPLY";
+        var decision = overall < 50 ? "SKIP" : review.Count > 0 || overall < Math.Clamp(minimumScore, 50, 100) ? "REVIEW" : "APPLY";
         return new("operator-v1", "deterministic-fallback", u, overall,
             "Uncalibrated opportunity priority index, not percentage of requirements met or probability of being hired.",
             decision, eligibility.Status, eligibility.Reason,

@@ -14,7 +14,10 @@ public sealed record CollectResult(
     int AppliedImported,
     int HhFound,
     int RemotiveFound,
-    int AdzunaFound);
+    int AdzunaFound)
+{
+    public string[] Errors { get; init; } = [];
+}
 
 public sealed record AutoApplyCycleResult(
     bool Enabled,
@@ -54,6 +57,8 @@ public sealed class JobService(
 
     public async Task<CollectResult> CollectAsync(SearchOptions options, CancellationToken ct)
     {
+        var errors = new List<string>();
+        if (!hhOptions.Value.Enabled) errors.Add("Поиск HH отключён в настройках программы.");
         var added = 0;
         var strong = 0;
         var hhFound = 0;
@@ -65,24 +70,34 @@ public sealed class JobService(
         {
             var ids = new List<string>();
             var seenIds = new HashSet<string>();
+            var hhSearchFailed = false;
             foreach (var query in options.RussiaQueries)
             {
                 foreach (var exp in new[] { "noExperience", "between1And3" })
                 {
                     try
                     {
-                        foreach (var id in await hh.SearchIdsAsync(query, exp, ct, options.RemoteOnly))
+                        using var queryTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                        queryTimeout.CancelAfter(TimeSpan.FromSeconds(15));
+                        foreach (var id in await hh.SearchIdsAsync(query, exp, queryTimeout.Token, options.RemoteOnly))
                         {
                             if (seenIds.Add(id)) ids.Add(id);
                         }
                     }
-                    catch { }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                    catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
+                    {
+                        errors.Add(ex is HttpRequestException http ? $"Поиск HH недоступен (HTTP {http.StatusCode})." : "HH не ответил на поисковый запрос за 15 секунд.");
+                        hhSearchFailed = true;
+                        break;
+                    }
                 }
+                if (hhSearchFailed) break;
             }
             hhFound = ids.Count;
             var existingIds = await db.Vacancies.Where(x => x.Source == "hh").Select(x => x.ExternalId).ToHashSetAsync(ct);
             // Reserve at least half of each collection cycle for international sources.
-            var hhBudget = Math.Min(remaining, Math.Max(10, options.MaxNewVacanciesPerRun / 2));
+            var hhBudget = remotive.Enabled || adzuna.Enabled ? Math.Min(remaining, Math.Max(10, options.MaxNewVacanciesPerRun / 2)) : remaining;
             // Inspect more search results than the final storage budget so senior/lead
             // vacancies cannot crowd junior roles out of the daily candidate pool.
             foreach (var id in ids.Where(id => !existingIds.Contains(id)).Take(hhBudget * 4))
@@ -160,7 +175,7 @@ public sealed class JobService(
         await db.SaveChangesAsync(ct);
         var imported = await SyncExistingApplicationsAsync(ct);
 
-        return new CollectResult(hhFound + remotiveFound + adzunaFound, added, strong, imported, hhFound, remotiveFound, adzunaFound);
+        return new CollectResult(hhFound + remotiveFound + adzunaFound, added, strong, imported, hhFound, remotiveFound, adzunaFound) { Errors = errors.ToArray() };
     }
 
     private async Task<Vacancy?> AddExternalAsync(ExternalVacancyDto dto, bool existingHhResponse, CancellationToken ct)
@@ -340,13 +355,13 @@ public sealed class JobService(
         if (vacancy.Application is not null || vacancy.HasExistingHhResponse || vacancy.Status == VacancyStatus.Applied)
             return new HhApplyResult(false, "already_applied_local", "This vacancy is already marked as applied.");
         if (vacancy.Source != "hh") return new HhApplyResult(false, "external_apply_required", "Open the official application page, submit there, then mark the vacancy as applied in Job Assistant.");
-        var fresh = scoring.Score(vacancy.Title, vacancy.DescriptionText, vacancy.IsRemote, vacancy.Experience, vacancy.LocationText, vacancy.RemoteScope);
+        var state = await GetStateAsync(ct);
+        var fresh = scoring.Score(vacancy.Title, vacancy.DescriptionText, vacancy.IsRemote, vacancy.Experience, vacancy.LocationText, vacancy.RemoteScope, automatic ? state.AutoApplyMinimumScore : 75);
         if (fresh.Assessment?.Decision != "APPLY")
             return new HhApplyResult(false, "operator_review_required", fresh.Why);
-        if (!AutomaticSubmissionPolicy.IsVerifiedEligible(vacancy))
-            return new HhApplyResult(false, "eligibility_not_verified", "This vacancy requires a location/work-authorization review before submission.");
+        vacancy.EligibilityStatus = fresh.EligibilityStatus;
+        vacancy.MatchScore = fresh.Score;
 
-        var state = await GetStateAsync(ct);
         if (string.IsNullOrWhiteSpace(state.HhResumeId)) return new HhApplyResult(false, "resume_not_selected", "Select an HH resume first.");
 
         var letter = BuildCoverLetter(vacancy);
@@ -454,12 +469,14 @@ public sealed class JobService(
     {
         var retryAfter = DateTimeOffset.UtcNow.AddMinutes(-Math.Clamp(automation.Value.FailureCooldownMinutes, 30, 1440));
         var rows = await db.Vacancies
+            .AsNoTracking()
             .Include(x => x.Company)
             .Include(x => x.Application)
             .Include(x => x.Events)
             .Where(x => x.Source == "hh" && x.Status == VacancyStatus.New && x.Application == null && !x.HasExistingHhResponse && !x.Company.IsBlacklisted)
             .ToListAsync(ct);
 
+        foreach (var v in rows) RefreshQualification(v, minimumScore);
         var eligible = rows.Where(AutomaticSubmissionPolicy.IsVerifiedEligible).ToArray();
         var safe = eligible.Where(x => AutomaticSubmissionPolicy.HasSafeSeniority(x.Title)).ToArray();
         var aboveScore = safe.Where(x => x.MatchScore >= minimumScore).ToArray();
@@ -517,8 +534,9 @@ public sealed class JobService(
 
             var retryAfter = now.AddMinutes(-Math.Clamp(automation.Value.FailureCooldownMinutes, 30, 1440));
             var candidateRows = await db.Vacancies.Include(x => x.Company).Include(x => x.Application).Include(x => x.Events)
-                .Where(x => x.Source == "hh" && x.Status == VacancyStatus.New && x.Application == null && !x.HasExistingHhResponse && !x.Company.IsBlacklisted && x.MatchScore >= state.AutoApplyMinimumScore && x.EligibilityStatus == "Eligible")
+                .Where(x => x.Source == "hh" && x.Status == VacancyStatus.New && x.Application == null && !x.HasExistingHhResponse && !x.Company.IsBlacklisted )
                 .ToListAsync(ct);
+            foreach (var v in candidateRows) RefreshQualification(v, state.AutoApplyMinimumScore);
             var outcomeHistory = await db.Vacancies.AsNoTracking()
                 .Where(x => x.Application != null)
                 .ToListAsync(ct);
@@ -569,6 +587,14 @@ public sealed class JobService(
         }
     }
 
+    private void RefreshQualification(Vacancy v, int minimumScore)
+    {
+        var m = scoring.Score(v.Title, v.DescriptionText, v.IsRemote, v.Experience, v.LocationText, v.RemoteScope, minimumScore);
+        v.MatchScore = m.Score;
+        v.EligibilityStatus = m.Assessment?.Decision == "APPLY" ? m.EligibilityStatus : "Verify";
+        v.EligibilityReason = m.Why;
+    }
+
     private static string ExplainEmptyQueue(AutoApplyDiagnostics diagnostics)
     {
         if (diagnostics.NewHhVacancies == 0)
@@ -578,7 +604,7 @@ public sealed class JobService(
         if (diagnostics.SafeSeniority == 0)
             return $"Подходящих по стране вакансий: {diagnostics.Eligible}, но все они относятся к senior/lead уровню.";
         if (diagnostics.AboveMinimumScore == 0)
-            return $"Безопасных вакансий: {diagnostics.SafeSeniority}, но ни одна не достигла порога {diagnostics.MinimumScore}%. Можно снизить порог до 75%.";
+            return $"Безопасных вакансий: {diagnostics.SafeSeniority}, но ни одна не достигла порога {diagnostics.MinimumScore}/100. Порог можно изменить от 50 до 100.";
         if (diagnostics.CoolingDown > 0)
             return $"Подходящих вакансий: {diagnostics.AboveMinimumScore}, но после предыдущей ошибки они временно ожидают повторной попытки.";
         return "Новых вакансий для отправки сейчас нет.";

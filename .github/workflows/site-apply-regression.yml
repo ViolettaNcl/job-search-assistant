@@ -71,3 +71,20 @@ jobs:
           const content = fs.readFileSync('browser-extension/content.js', 'utf8');
           if (!content.includes('if (!handled.has(message?.type)) return false;')) throw new Error('Content listener still claims unrelated message channels.');
           NODE
+
+  floating-panel-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated browser test runtime
+        run: npm install --prefix /tmp/vja-browser-tests playwright@1.58.2
+      - name: Install Chromium
+        run: /tmp/vja-browser-tests/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify floating extension in Chromium with a local fixture
+        env:
+          NODE_PATH: /tmp/vja-browser-tests/node_modules
+        run: node scripts/verify-floating-panel.cjs

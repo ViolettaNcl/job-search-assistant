@@ -71,20 +71,16 @@ async function browserAutopilotApiBase() {
 async function browserAutopilotJson(url, options) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
-  let response;
   try {
-    response = await fetch(url, { ...(options || {}), signal: controller.signal });
+    const response = await fetch(url, { ...(options || {}), signal: controller.signal });
+    const text = await response.text();
+    let data;try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (!response.ok) throw new Error(typeof data === "string" ? data : data?.message || `Request failed (${response.status}).`);
+    return data;
   } catch (error) {
     if (controller.signal.aborted) throw new Error("The local Job Search Assistant did not answer within 15 seconds.");
     throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-  const text = await response.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  if (!response.ok) throw new Error(typeof data === "string" ? data : data?.message || `Request failed (${response.status}).`);
-  return data;
+  } finally { clearTimeout(timer); }
 }
 
 async function browserAutopilotHeartbeat(api, running, message, vacancyTitle = "") {
@@ -207,14 +203,17 @@ async function runBrowserAutopilot() {
     }
 
     const lastCollected = status.lastCollectedAt ? Date.parse(status.lastCollectedAt) : 0;
-    if (!lastCollected || Date.now() - lastCollected > 30 * 60 * 1000) {
-      await browserAutopilotJson(`${api}/api/collect`, { method: "POST" });
+    if (!status.collection?.running && (!lastCollected || Date.now() - lastCollected > 30 * 60 * 1000) && (!status.collection?.startedAt || Date.now() - Date.parse(status.collection.startedAt) > 60000)) {
+      await browserAutopilotJson(`${api}/api/collect/start`, { method: "POST" });
     }
 
     const queue = await browserAutopilotJson(`${api}/api/application-queue?limit=50&source=hh&minScore=${encodeURIComponent(status.autoApplyMinimumScore || 75)}`);
     const candidate = self.vjaBrowserAutopilot?.selectCandidate?.(queue, status.autoApplyMinimumScore || 75);
     if (!candidate) {
-      await browserAutopilotHeartbeat(api, false, "Автопилот работает. Сейчас нет новых подходящих HH-вакансий выше выбранного порога.");
+      const issue = status.collection?.error || status.collection?.result?.errors?.join(" ");
+      const message = status.collection?.running ? "Ищу вакансии. Очередь обновится после завершения поиска."
+        : issue || `Ожидание: в очереди нет подходящих вакансий от ${status.autoApplyMinimumScore}/100. Найдено HH: ${status.collection?.result?.hhFound ?? status.diagnostics?.newHhVacancies ?? 0}.`;
+      await browserAutopilotHeartbeat(api, false, message);
       return;
     }
 
@@ -262,3 +261,11 @@ chrome.runtime.onStartup.addListener(() => {
 
 void ensureBrowserAutopilotAlarm();
 void runBrowserAutopilot();
+
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message?.type !== "vjaPanelContext") return false;
+  if (!sender.tab?.id || !String(sender.url || "").startsWith(chrome.runtime.getURL("popup.html"))) {
+    respond({error:"invalid-panel-context"});return false;
+  }
+  respond({tab:{id:sender.tab.id,url:sender.tab.url}});return false;
+});

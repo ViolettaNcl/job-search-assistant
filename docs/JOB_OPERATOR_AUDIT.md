@@ -54,3 +54,9 @@ Private JSON and local settings are excluded from Git, Docker context and .NET p
 8. No additional job platform work; HH reliability comes first. No LinkedIn or Vercel deployment added.
 
 Official protocol references: [Chat Completions API](https://developers.openai.com/api/reference/resources/chat) and [CodeQL workflow configuration](https://docs.github.com/en/code-security/reference/code-scanning/workflow-configuration-options).
+
+## Follow-up 2.7.1 — autopilot settings and floating execution panel
+
+Root causes addressed: server/UI clamped thresholds to 75; dashboard polling overwrote unsaved input; qualification used a separate fixed 75 gate; background collection awaited an HTTP request with a 15-second extension timeout; HH search failures were swallowed. Threshold is now configurable 50–100 and daily quota 1–200. Lower scores do not bypass missing mandatory evidence, seniority or eligibility review. CollectionCoordinator owns one coalesced collection job independently of the requesting browser, exposes errors/results, and starts the existing apply cycle afterward. An empty queue is shown as waiting, not active submission. HH API blocks/timeouts still require a working source connection; zero opportunities cannot produce applications.
+
+HH vacancy pages automatically mount a movable, collapsible translucent panel containing the existing popup UI. Other ordinary websites can toggle the same panel via the popup. LinkedIn is excluded. Position persists; actions bind to the containing tab, not whichever tab is active later. Added isolated Chromium integration validation with synthetic local pages; no employer submissions occur in these tests. Real HH account and live post-response letter verification remain pilot gates.
