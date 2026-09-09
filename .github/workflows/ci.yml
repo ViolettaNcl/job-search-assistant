@@ -86,6 +86,7 @@ jobs:
           node --check browser-extension/browser-autopilot.test.js
           node --check browser-extension/site-apply.test.js
           node --check browser-extension/runtime-guard.test.js
+          node --check browser-extension/screening-popup.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls

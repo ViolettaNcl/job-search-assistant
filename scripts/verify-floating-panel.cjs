@@ -21,6 +21,15 @@ const http = require('node:http');
     assert(popup,'floating extension iframe must load');
     await popup.locator('#oneClickApply').waitFor();
     assert.equal(await popup.locator('#pinPanel').isVisible(),false);
+    await popup.evaluate(() => {
+      window.vjaRenderScreening({notice:'Причина отказа неизвестна', suggestedResumeExcerpt:'Projects: C# SQL', requirements:[{skill:'<img src=x onerror=alert(1)>', importance:'Required', projectIds:['dental'], resumeState:'Not mentioned'}], unsupportedRequirements:['Azure'], reviewReasons:[], resumeTextChecked:true, verifiedTermsToAdd:['SQL']});
+    });
+    assert.equal(await popup.locator('#screeningTerms img').count(),0,'vacancy content must render as text');
+    assert((await popup.locator('#screeningTerms').textContent()).includes('<img'));
+    assert((await popup.locator('#screeningResult').textContent()).includes('SQL'));
+    assert.equal(await popup.locator('#screeningExcerpt').inputValue(),'Projects: C# SQL');
+    await popup.evaluate(() => window.vjaRenderScreening(null));
+    assert.equal(await popup.locator('#screeningResult').textContent(),'','clear stale resume result for another vacancy');
     const tabId=await popup.evaluate(async()=> (await activeTab()).id);
     const another=await context.newPage();await another.goto(base+'/other');await another.bringToFront();
     assert.equal(await popup.evaluate(async()=> (await activeTab()).id),tabId,'panel must stay bound to original tab');

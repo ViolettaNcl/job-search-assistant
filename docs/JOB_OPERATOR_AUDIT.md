@@ -60,3 +60,14 @@ Official protocol references: [Chat Completions API](https://developers.openai.c
 Root causes addressed: server/UI clamped thresholds to 75; dashboard polling overwrote unsaved input; qualification used a separate fixed 75 gate; background collection awaited an HTTP request with a 15-second extension timeout; HH search failures were swallowed. Threshold is now configurable 50–100 and daily quota 1–200. Lower scores do not bypass missing mandatory evidence, seniority or eligibility review. CollectionCoordinator owns one coalesced collection job independently of the requesting browser, exposes errors/results, and starts the existing apply cycle afterward. An empty queue is shown as waiting, not active submission. HH API blocks/timeouts still require a working source connection; zero opportunities cannot produce applications.
 
 HH vacancy pages automatically mount a movable, collapsible translucent panel containing the existing popup UI. Other ordinary websites can toggle the same panel via the popup. LinkedIn is excluded. Position persists; actions bind to the containing tab, not whichever tab is active later. Added isolated Chromium integration validation with synthetic local pages; no employer submissions occur in these tests. Real HH account and live post-response letter verification remain pilot gates.
+
+
+## Follow-up 2.7.2 — evidence-based screening preparation
+
+Inspected main `8099c9721881aa07f809cd8c5d827a99506e5f3b`; no active PRs. Branch `feat/screening-evidence-review` preserves the 2.7.1 collection/panel fixes. Existing 98 .NET tests and 25 JS suites were green on this exact base.
+
+New ScreeningReviewService compares existing requirement assessments with verified project evidence and, optionally, the user's actual resume text. The extension displays matched evidence, unknown mandatory requirements, and a copyable plain-text project excerpt; it recommends adding only relevant verified terms missing from that text. Aliases normalize to skills, generic SQL does not stand in for SQL Server. Text mentions cannot establish paid employment or missing skills. A pasted resume cannot authorize an application. There is no new scoring percentage, fake ATS mode, hidden keywords or invented employer rejection reason. The report explicitly says the selected HH resume and file parsing are not inspected.
+
+Private resume text stays in the loopback process with no persistence/provider calls. Added seven deterministic .NET tests, real Chromium text-injection/stale-result fixture checks, and endpoint checks in SQLite/Windows restart smoke. Real recruiter outcomes and actual rejection reasons remain unknown until supplied by the employer. No LinkedIn or Vercel changes.
+
+References: [HH response filters](https://feedback.hh.ru/knowledge-base/article/1287), [Greenhouse resume parsing limitations](https://support.greenhouse.io/hc/en-us/articles/200989175-Unsuccessful-resume-parse).

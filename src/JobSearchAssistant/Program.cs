@@ -39,6 +39,7 @@ builder.Services.AddSingleton<CandidateKnowledgeService>();
 builder.Services.AddSingleton<OpportunityScoringService>();
 builder.Services.AddSingleton<EvidenceRetrievalService>();
 builder.Services.AddSingleton<ApplicationDraftService>();
+builder.Services.AddSingleton<ScreeningReviewService>();
 builder.Services.Configure<ReasoningOptions>(builder.Configuration.GetSection("Reasoning"));
 builder.Services.AddHttpClient<IAiReasoningProvider, ChatReasoningProvider>().ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddSingleton<ApplicationWritingService>();
@@ -298,7 +299,7 @@ app.MapGet("/api/vacancies/{id:guid}/application-draft", async (Guid id, AppDbCo
     return vacancy is null ? Results.NotFound() : Results.Ok(drafts.Build(vacancy));
 });
 
-app.MapPost("/api/extension/analyze", (ExtensionAnalyzeRequest request, MatchScoringService scoring, ApplicationDraftService drafts) =>
+app.MapPost("/api/extension/analyze", (ExtensionAnalyzeRequest request, MatchScoringService scoring, ApplicationDraftService drafts, ScreeningReviewService screening) =>
 {
     var result = scoring.Score(
         request.Title ?? "",
@@ -322,6 +323,7 @@ app.MapPost("/api/extension/analyze", (ExtensionAnalyzeRequest request, MatchSco
     {
         match = result,
         recommendation = result.Assessment?.Decision ?? "REVIEW",
+        screening = result.Assessment is null ? null : screening.Review(result.Assessment),
         draft
     });
 });

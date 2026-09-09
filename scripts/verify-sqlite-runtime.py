@@ -78,6 +78,13 @@ def verify():
                     request("/api/application-queue")
                     request("/api/followups")
                     request("/api/analytics/outcomes")
+                    screening_vacancy = {"title": "Junior C# Developer", "description": "Required: C#, SQL Server, Azure.", "remote": True, "location": "Russia"}
+                    screening = request("/api/operator/screening", {"vacancy": screening_vacancy, "resumeText": "C# projects"})
+                    assert screening["employerDecisionReason"] == "Unknown"
+                    assert "SQL Server" in screening["verifiedTermsToAdd"] and "Azure" not in screening["verifiedTermsToAdd"]
+                    assert "Azure" in screening["unsupportedRequirements"]
+                    analyze = request("/api/extension/analyze", screening_vacancy)
+                    assert not analyze["screening"]["resumeTextChecked"], "Private resume text must not be retained between calls"
                     knowledge = request("/api/operator/candidate")
                     assert knowledge["identity"]["russian"] == "Виолетта Николау"
                     assessment = request(f"/api/operator/vacancies/{vacancy_id}")
