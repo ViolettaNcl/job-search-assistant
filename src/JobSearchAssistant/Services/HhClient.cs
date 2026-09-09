@@ -46,7 +46,7 @@ public sealed class HhClient(
         var client = CreateClient(await TryGetAccessTokenAsync(ct));
         var url = $"/vacancies?text={Uri.EscapeDataString(query)}{(remoteOnly ? "&schedule=remote" : "")}&experience={experience}&per_page=50&page=0&order_by=publication_time";
         using var response = await client.GetAsync(url, ct);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode) throw HhReadException.FromResponse(response.StatusCode, await response.Content.ReadAsStringAsync(ct));
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
         return json.RootElement.GetProperty("items")
             .EnumerateArray()
@@ -59,7 +59,8 @@ public sealed class HhClient(
     {
         var client = CreateClient(await TryGetAccessTokenAsync(ct));
         using var response = await client.GetAsync($"/vacancies/{Uri.EscapeDataString(id)}", ct);
-        if (!response.IsSuccessStatusCode) return null;
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        if (!response.IsSuccessStatusCode) throw HhReadException.FromResponse(response.StatusCode, await response.Content.ReadAsStringAsync(ct));
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
         var root = json.RootElement;
 
@@ -238,8 +239,11 @@ public sealed class HhClient(
 
     private async Task<string?> TryGetAccessTokenAsync(CancellationToken ct)
     {
+        if (!await HasOAuthAsync(ct)) return null;
+        // An invalid existing connection must not silently become anonymous search.
         try { return await GetAccessTokenAsync(ct); }
-        catch { return null; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch { throw new HhReadException(System.Net.HttpStatusCode.Forbidden, "oauth", "Не удалось обновить подключение HH API. Выполните авторизацию заново в настройках."); }
     }
 
     private async Task<string> GetAccessTokenAsync(CancellationToken ct)

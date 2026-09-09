@@ -57,6 +57,19 @@ public sealed class BrowserVacancyImportServiceTests
         StringAssert.Contains(second.DescriptionText, "Docker");
     }
 
+    [TestMethod]
+    public async Task HhBrowserImportSharesApiIdentityAndPreservesApplicationState()
+    {
+        await using var db = CreateDb();
+        var sut = new BrowserVacancyImportService(db, new MatchScoringService(Options.Create(new CandidateProfileOptions())));
+        var first = await sut.ImportAsync(new BrowserVacancyImportRequest("https://hh.ru/vacancy/123?query=a", "Junior C#", "Employer", "C# SQL remote Russia", "Russia", "Russia", "", "", "hh.ru"), CancellationToken.None);
+        first.Status = VacancyStatus.Applied; first.HasExistingHhResponse = true; await db.SaveChangesAsync();
+        var second = await sut.ImportAsync(new BrowserVacancyImportRequest("https://volgograd.hh.ru/vacancy/123?query=b", "Junior C#", "Employer", "C# SQL remote Russia", "Russia", "Russia", "", "", "volgograd.hh.ru"), CancellationToken.None);
+        Assert.AreEqual(first.Id, second.Id); Assert.AreEqual("hh", second.Source); Assert.AreEqual("123", second.ExternalId);
+        Assert.AreEqual(VacancyStatus.Applied, second.Status); Assert.IsTrue(second.HasExistingHhResponse);
+        Assert.AreEqual(1, await db.Vacancies.CountAsync());
+    }
+
     private static AppDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()

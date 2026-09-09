@@ -34,6 +34,7 @@
         "ats-controls.js",
         "field-verification.js",
         "content.js",
+        "hh-discovery-content.js",
         "cv-upload.js",
         "review-navigator-content.js",
         "final-submit-control.js",

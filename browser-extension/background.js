@@ -1,4 +1,4 @@
-importScripts("browser-autopilot.js");
+importScripts("browser-autopilot.js", "hh-discovery-background.js");
 
 async function restrictLocalStorageAccess() {
   try {
@@ -184,7 +184,7 @@ async function runBrowserAutopilot() {
   try {
     api = await browserAutopilotApiBase();
     await browserAutopilotHeartbeat(api, false, "Расширение Chrome подключено и готово к браузерному автопилоту.");
-    const status = await browserAutopilotJson(`${api}/api/automation/status`);
+    let status = await browserAutopilotJson(`${api}/api/automation/status`);
     if (!self.vjaBrowserAutopilot?.shouldRun?.(status)) return;
 
     const active = await chrome.storage.local.get(["vjaBrowserAutopilotActivePlan", "vjaBrowserAutopilotTabId"]);
@@ -202,8 +202,17 @@ async function runBrowserAutopilot() {
       }
     }
 
+    const discoverySettings = await chrome.storage.sync.get('vjaHhBrowserSearch');
+    let discoveryMessage = '';
+    if (discoverySettings.vjaHhBrowserSearch) {
+      discoveryMessage = await discoverHhInBrowser(api, status);
+      if ((await chrome.storage.local.get('vjaHhDiscoveryBlocked')).vjaHhDiscoveryBlocked) {await browserAutopilotHeartbeat(api,false,discoveryMessage);return;}
+    }
+    const refreshed = await browserAutopilotJson(`${api}/api/automation/status`);
+    if (!self.vjaBrowserAutopilot.shouldRun(refreshed)) return;
+    status = refreshed;
     const lastCollected = status.lastCollectedAt ? Date.parse(status.lastCollectedAt) : 0;
-    if (!status.collection?.running && (!lastCollected || Date.now() - lastCollected > 30 * 60 * 1000) && (!status.collection?.startedAt || Date.now() - Date.parse(status.collection.startedAt) > 60000)) {
+    if (!discoverySettings.vjaHhBrowserSearch && !status.collection?.running && (!lastCollected || Date.now() - lastCollected > 30 * 60 * 1000) && (!status.collection?.startedAt || Date.now() - Date.parse(status.collection.startedAt) > 60000)) {
       await browserAutopilotJson(`${api}/api/collect/start`, { method: "POST" });
     }
 
@@ -211,8 +220,8 @@ async function runBrowserAutopilot() {
     const candidate = self.vjaBrowserAutopilot?.selectCandidate?.(queue, status.autoApplyMinimumScore || 75);
     if (!candidate) {
       const issue = status.collection?.error || status.collection?.result?.errors?.join(" ");
-      const message = status.collection?.running ? "Ищу вакансии. Очередь обновится после завершения поиска."
-        : issue || `Ожидание: в очереди нет подходящих вакансий от ${status.autoApplyMinimumScore}/100. Найдено HH: ${status.collection?.result?.hhFound ?? status.diagnostics?.newHhVacancies ?? 0}.`;
+      const message = discoveryMessage || (status.collection?.running ? "Ищу вакансии. Очередь обновится после завершения поиска."
+        : issue || `Ожидание: в очереди нет подходящих вакансий от ${status.autoApplyMinimumScore}/100. Найдено HH: ${status.collection?.result?.hhFound ?? status.diagnostics?.newHhVacancies ?? 0}.`);
       await browserAutopilotHeartbeat(api, false, message);
       return;
     }
@@ -268,4 +277,9 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     respond({error:"invalid-panel-context"});return false;
   }
   respond({tab:{id:sender.tab.id,url:sender.tab.url}});return false;
+});
+
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if(message?.type !== 'vjaAutopilotControlWake' || !sender.url?.startsWith(chrome.runtime.getURL('popup.html')))return false;
+  void runBrowserAutopilot();respond({ok:true});return false;
 });

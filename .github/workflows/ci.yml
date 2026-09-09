@@ -87,6 +87,9 @@ jobs:
           node --check browser-extension/site-apply.test.js
           node --check browser-extension/runtime-guard.test.js
           node --check browser-extension/screening-popup.js
+          node --check browser-extension/autopilot-popup.js
+          node --check browser-extension/hh-discovery-content.js
+          node --check browser-extension/hh-discovery-background.js
       - name: Test ATS structured extraction
         run: node browser-extension/ats-structured.test.js
       - name: Test ATS custom controls
@@ -133,6 +136,8 @@ jobs:
         run: node browser-extension/browser-autopilot.test.js
       - name: Test one-click HH response and cover-letter continuation
         run: node browser-extension/site-apply.test.js
+      - name: Test HH browser discovery
+        run: node browser-extension/hh-discovery.test.js
       - name: Test floating panel policy
         run: node browser-extension/floating-panel.test.js
       - name: Test popup timeout and recovery behavior

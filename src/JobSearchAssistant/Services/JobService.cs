@@ -87,7 +87,7 @@ public sealed class JobService(
                     catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                     catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
                     {
-                        errors.Add(ex is HttpRequestException http ? $"Поиск HH недоступен (HTTP {http.StatusCode})." : "HH не ответил на поисковый запрос за 15 секунд.");
+                        errors.Add(ex is HhReadException hhError ? hhError.Message : ex is HttpRequestException http ? $"Поиск HH недоступен (HTTP {http.StatusCode})." : "HH не ответил на поисковый запрос за 15 секунд.");
                         hhSearchFailed = true;
                         break;
                     }
@@ -102,7 +102,9 @@ public sealed class JobService(
             // vacancies cannot crowd junior roles out of the daily candidate pool.
             foreach (var id in ids.Where(id => !existingIds.Contains(id)).Take(hhBudget * 4))
             {
-                var dto = await hh.GetVacancyAsync(id, ct);
+                HhVacancyDto? dto;
+                try { dto = await hh.GetVacancyAsync(id, ct); }
+                catch (HhReadException ex) { errors.Add(ex.Message); break; }
                 if (dto is null) continue;
                 if (!AutomaticSubmissionPolicy.HasSafeSeniority(dto.Title)) continue;
                 if (options.RemoteOnly && !dto.Remote) continue;
