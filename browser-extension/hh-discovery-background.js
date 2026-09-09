@@ -25,7 +25,9 @@ async function discoverHhInBrowser(api, status) {
       const current=await chrome.tabs.get(tab.id);
       if(current.status!=='complete'||current.url!==expectedUrl)throw new Error('Страница HH не загрузилась за 30 секунд.');
       await browserAutopilotWait(1000);
-      const r=await Promise.race([chrome.tabs.sendMessage(tab.id,{type:'vjaReadHhDiscovery'},{frameId:0}),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Страница HH не ответила за 10 секунд.')),10000))]);
+      let timer,r;
+      try {r=await Promise.race([chrome.tabs.sendMessage(tab.id,{type:'vjaReadHhDiscovery'},{frameId:0}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Страница HH не ответила за 10 секунд.')),10000);})]);}
+      finally {clearTimeout(timer);}
       if(r?.blocked)throw new Error(r.blocked);
       return r;
     };
