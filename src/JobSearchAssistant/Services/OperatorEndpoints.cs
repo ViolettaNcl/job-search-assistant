@@ -5,10 +5,21 @@ using Microsoft.EntityFrameworkCore;
 namespace JobSearchAssistant.Services;
 
 public sealed record RecruiterMessageRequest(string Text);
+public sealed record ScreeningReviewRequest(ExtensionAnalyzeRequest Vacancy, string? ResumeText);
 public static class OperatorEndpoints
 {
     public static void MapOperatorEndpoints(this WebApplication app)
     {
+        app.MapPost("/api/operator/screening", (ScreeningReviewRequest request, HttpContext context, OpportunityScoringService scoring, ScreeningReviewService review) =>
+        {
+            // Private CV text stays in the local process and is never persisted or sent to an AI provider.
+            if (context.Connection.RemoteIpAddress is null || !System.Net.IPAddress.IsLoopback(context.Connection.RemoteIpAddress)
+                || !new[] { "localhost", "127.0.0.1", "[::1]" }.Contains(context.Request.Host.Host)) return Results.StatusCode(403);
+            if (request.Vacancy is null || request.ResumeText?.Length > 80000) return Results.BadRequest(new { error = "Vacancy required; resume text must be at most 80000 characters." });
+            var v = request.Vacancy;
+            var a = scoring.Assess(v.Title ?? "", v.Description ?? "", v.Remote, v.Experience ?? "", v.Location ?? v.Country ?? "", v.RemoteScope ?? "");
+            return Results.Ok(review.Review(a, request.ResumeText));
+        });
         app.MapGet("/api/operator/vacancies/{id:guid}", async (Guid id, AppDbContext db, OpportunityScoringService scoring, EvidenceRetrievalService evidence, CancellationToken ct) =>
         {
             var v = await db.Vacancies.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);

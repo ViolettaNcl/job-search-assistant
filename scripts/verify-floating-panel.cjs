@@ -4,7 +4,12 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const http = require('node:http');
 (async () => {
-  const server = http.createServer((req,res) => {res.setHeader('Content-Type','text/html');res.end('<!doctype html><h1>Junior C# Developer — synthetic fixture</h1><p>C# SQL remote</p>');});
+  const backendState={autoApplyEnabled:false,allowed:true,apiReady:true,automationMode:'hh-api',remainingToday:90,autoApplyMinimumScore:50,dailyAutoApplyLimit:90};
+  const server = http.createServer((req,res) => {
+    if(req.url==='/api/automation/status'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(backendState));return;}
+    if(req.url==='/api/settings/autoapply'){let body='';req.on('data',c=>body+=c);req.on('end',()=>{const v=JSON.parse(body);backendState.autoApplyEnabled=v.enabled;backendState.autoApplyMinimumScore=v.minimumScore;backendState.dailyAutoApplyLimit=v.dailyLimit;res.setHeader('Content-Type','application/json');res.end('{}');});return;}
+    res.setHeader('Content-Type','text/html');res.end('<!doctype html><h1>Junior C# Developer — synthetic fixture</h1><p>C# SQL remote</p>');
+  });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
   const base=`http://127.0.0.1:${server.address().port}`;
   const extension=path.resolve('browser-extension');
@@ -21,6 +26,21 @@ const http = require('node:http');
     assert(popup,'floating extension iframe must load');
     await popup.locator('#oneClickApply').waitFor();
     assert.equal(await popup.locator('#pinPanel').isVisible(),false);
+    await popup.evaluate(() => {
+      window.vjaRenderScreening({notice:'Причина отказа неизвестна', suggestedResumeExcerpt:'Projects: C# SQL', requirements:[{skill:'<img src=x onerror=alert(1)>', importance:'Required', projectIds:['dental'], resumeState:'Not mentioned'}], unsupportedRequirements:['Azure'], reviewReasons:[], resumeTextChecked:true, verifiedTermsToAdd:['SQL']});
+    });
+    assert.equal(await popup.locator('#screeningTerms img').count(),0,'vacancy content must render as text');
+    assert((await popup.locator('#screeningTerms').textContent()).includes('<img'));
+    assert((await popup.locator('#screeningResult').textContent()).includes('SQL'));
+    assert.equal(await popup.locator('#screeningExcerpt').inputValue(),'Projects: C# SQL');
+    await popup.evaluate(() => window.vjaRenderScreening(null));
+    assert.equal(await popup.locator('#screeningResult').textContent(),'','clear stale resume result for another vacancy');
+    await popup.locator('#rocketAutopilot').click();
+    await popup.locator('#rocketAutopilot[aria-pressed="true"]').waitFor();
+    assert.equal(backendState.autoApplyMinimumScore,50);assert.equal(backendState.dailyAutoApplyLimit,90);
+    await popup.locator('#rocketAutopilot').click();
+    await popup.locator('#rocketAutopilot[aria-pressed="false"]').waitFor();
+    assert.equal(backendState.autoApplyEnabled,false,'rocket must stop without changing saved preferences');
     const tabId=await popup.evaluate(async()=> (await activeTab()).id);
     const another=await context.newPage();await another.goto(base+'/other');await another.bringToFront();
     assert.equal(await popup.evaluate(async()=> (await activeTab()).id),tabId,'panel must stay bound to original tab');

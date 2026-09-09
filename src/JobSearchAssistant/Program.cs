@@ -39,6 +39,7 @@ builder.Services.AddSingleton<CandidateKnowledgeService>();
 builder.Services.AddSingleton<OpportunityScoringService>();
 builder.Services.AddSingleton<EvidenceRetrievalService>();
 builder.Services.AddSingleton<ApplicationDraftService>();
+builder.Services.AddSingleton<ScreeningReviewService>();
 builder.Services.Configure<ReasoningOptions>(builder.Configuration.GetSection("Reasoning"));
 builder.Services.AddHttpClient<IAiReasoningProvider, ChatReasoningProvider>().ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddSingleton<ApplicationWritingService>();
@@ -221,7 +222,7 @@ app.MapGet("/api/applications/activity", async (int? limit, AppDbContext db, Can
     return Results.Ok(items);
 });
 
-app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobService jobs, AutoApplyRunTracker runs, BrowserAutopilotTracker browserAutopilot, IOptions<SecurityOptions> security, CollectionCoordinator collector, CancellationToken ct) =>
+app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobService jobs, AutoApplyRunTracker runs, BrowserAutopilotTracker browserAutopilot, IOptions<SecurityOptions> security, IOptions<SearchOptions> search, CollectionCoordinator collector, CancellationToken ct) =>
 {
     var state = await db.AppStates.AsNoTracking().SingleAsync(x => x.Id == 1, ct);
     var localNow = DateTimeOffset.Now;
@@ -267,6 +268,8 @@ app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobSer
             ? (last is null ? null : new { type = last.Type, message = last.Note, attempted = 0, submitted = 0, failed = 0 })
             : new { type = latestRun.Ready ? "Cycle" : "Setup", message = latestRun.Message, attempted = latestRun.Attempted, submitted = latestRun.Submitted, failed = latestRun.Failed },
         diagnostics,
+        browserSearchQueries = search.Value.RussiaQueries,
+        remoteOnly = search.Value.RemoteOnly,
         collection = collector.Snapshot
     });
 });
@@ -298,7 +301,7 @@ app.MapGet("/api/vacancies/{id:guid}/application-draft", async (Guid id, AppDbCo
     return vacancy is null ? Results.NotFound() : Results.Ok(drafts.Build(vacancy));
 });
 
-app.MapPost("/api/extension/analyze", (ExtensionAnalyzeRequest request, MatchScoringService scoring, ApplicationDraftService drafts) =>
+app.MapPost("/api/extension/analyze", (ExtensionAnalyzeRequest request, MatchScoringService scoring, ApplicationDraftService drafts, ScreeningReviewService screening) =>
 {
     var result = scoring.Score(
         request.Title ?? "",
@@ -322,6 +325,7 @@ app.MapPost("/api/extension/analyze", (ExtensionAnalyzeRequest request, MatchSco
     {
         match = result,
         recommendation = result.Assessment?.Decision ?? "REVIEW",
+        screening = result.Assessment is null ? null : screening.Review(result.Assessment),
         draft
     });
 });

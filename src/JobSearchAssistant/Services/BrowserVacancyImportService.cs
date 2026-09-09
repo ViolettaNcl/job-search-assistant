@@ -30,6 +30,16 @@ public sealed class BrowserVacancyImportService(AppDbContext db, MatchScoringSer
             : request.Source.Trim().ToLowerInvariant();
         var externalId = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(request.Url))).ToLowerInvariant();
 
+        // Browser and API imports share the HH vacancy identity, independent of tracking parameters/subdomain.
+        if (uri.Host.Equals("hh.ru", StringComparison.OrdinalIgnoreCase) || uri.Host.EndsWith(".hh.ru", StringComparison.OrdinalIgnoreCase))
+        {
+            var id = System.Text.RegularExpressions.Regex.Match(uri.AbsolutePath, @"^/vacancy/(\d+)/?$");
+            if (!id.Success) throw new ArgumentException("HH import requires a vacancy page.");
+            source = "hh";
+            externalId = id.Groups[1].Value;
+        }
+        else if (source == "hh") throw new ArgumentException("HH source requires an HH vacancy URL.");
+
         var companyName = Clean(request.Company, uri.Host);
         var title = Clean(request.Title, $"Vacancy — {uri.Host}");
         var description = request.Description?.Trim() ?? "";

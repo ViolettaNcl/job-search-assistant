@@ -223,6 +223,7 @@ async function analyze() {
     $("coverLetter").value = latest.draft.coverLetter;
     chips($("matched"), latest.match.matched);
     chips($("missing"), latest.match.missing);
+    window.vjaRenderScreening?.(latest.screening);
     $("result").classList.remove("hidden");
 
     await refreshFieldPlan();

@@ -96,3 +96,5 @@ button:disabled { opacity: .55; cursor: default; }
 html.floating, html.floating body { width:100%; min-width:0; background:rgba(249,250,255,.86); }
 html.floating main { width:100%; max-width:100%; }
 html.floating #pinPanel { display:none; }
+
+#browserSearchMode{width:auto;min-height:0;margin-right:8px}
