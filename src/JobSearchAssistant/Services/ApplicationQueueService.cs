@@ -34,6 +34,9 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
         => await GetAsync(limit, minimumScore, null, ct);
 
     public async Task<IReadOnlyList<ApplicationQueueItem>> GetAsync(int limit, int minimumScore, string? source, CancellationToken ct)
+        => await GetAsync(limit, minimumScore, source, false, ct);
+
+    public async Task<IReadOnlyList<ApplicationQueueItem>> GetAsync(int limit, int minimumScore, string? source, bool automaticOnly, CancellationToken ct)
     {
         limit = Math.Clamp(limit, 1, 50);
         minimumScore = Math.Clamp(minimumScore, 50, 100);
@@ -76,6 +79,8 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
         }
         return rows
             .Where(v => v.MatchScore >= minimumScore && v.EligibilityStatus != "Likely ineligible")
+            // Filter before Take: review-only jobs must not crowd out safe auto-applications.
+            .Where(v => !automaticOnly || (v.Source == "hh" && AutomaticSubmissionPolicy.IsVerifiedEligible(v) && AutomaticSubmissionPolicy.HasSafeSeniority(v.Title)))
             .Where(v => QueueDeferralPolicy.ShouldAppearInQueue(v, now))
             .Select(v =>
             {

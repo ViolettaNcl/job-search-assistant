@@ -100,7 +100,7 @@ public sealed class ApplicationQueueServiceTests
             Vacancy = active,
             VacancyId = active.Id,
             Type = VacancyStatus.Saved.ToString(),
-            Note = QueueDeferralPolicy.BuildNote(now.AddHours(4)),
+            Note = QueueDeferralPolicy.BuildNote(now.AddHours(4)) + "\nRequired employer question needs review",
             CreatedAt = now
         });
 
@@ -137,6 +137,30 @@ public sealed class ApplicationQueueServiceTests
         Assert.AreEqual(expired.Id, queue[0].VacancyId);
         Assert.IsFalse(queue.Any(x => x.VacancyId == active.Id));
         Assert.IsFalse(queue.Any(x => x.VacancyId == ordinarySaved.Id));
+    }
+
+    [TestMethod]
+    public async Task AutomaticQueue_FiltersReviewAndSeniorBeforeLimit()
+    {
+        await using var db = CreateDb();
+        var company = new Company { Name = "Queue fixture", Source = "hh", ExternalId = "auto" };
+        for (var i = 0; i < 55; i++)
+        {
+            var review = CreateVacancy(company, "Junior .NET", 99, "Verify", DateTimeOffset.UtcNow);
+            review.Source = "hh";
+            db.Add(review);
+        }
+        var senior = CreateVacancy(company, "Senior C#", 100, "Eligible", DateTimeOffset.UtcNow);
+        var eligible = CreateVacancy(company, "Junior C#", 75, "Eligible", DateTimeOffset.UtcNow);
+        senior.Source = eligible.Source = "hh";
+        db.AddRange(senior, eligible);
+        await db.SaveChangesAsync();
+        var service = new ApplicationQueueService(db, new ApplicationDraftService(Options.Create(new CandidateProfileOptions())));
+        var automatic = await service.GetAsync(1, 50, "hh", true, CancellationToken.None);
+        Assert.AreEqual(1, automatic.Count);
+        Assert.AreEqual(eligible.Id, automatic[0].VacancyId);
+        var manual = await service.GetAsync(50, 50, "hh", CancellationToken.None);
+        Assert.IsTrue(manual.Any(x => x.EligibilityStatus == "Verify"), "Review queue stays available for manual decisions");
     }
 
     private static Vacancy CreateVacancy(Company company, string title, int score, string eligibility, DateTimeOffset published)

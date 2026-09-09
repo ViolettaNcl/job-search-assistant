@@ -137,6 +137,8 @@ jobs:
         run: node browser-extension/browser-autopilot.test.js
       - name: Test one-click HH response and cover-letter continuation
         run: node browser-extension/site-apply.test.js
+      - name: Test discovery-to-submission orchestration
+        run: node browser-extension/autopilot-flow.test.js
       - name: Test HH browser discovery
         run: node browser-extension/hh-discovery.test.js
       - name: Test floating panel policy
