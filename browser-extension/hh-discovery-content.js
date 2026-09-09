@@ -16,6 +16,13 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (/^\/vacancy\/\d+$/.test(location.pathname)) {
     if (/Резюме доставлено|Вы откликнулись|Вы уже откликались/.test(text)) {respond({alreadyApplied:true});return false;}
     const vacancy = extractPage();
+    // Recommendations elsewhere on the page can mention remote work; they do not define this vacancy.
+    const structured = window.vjaAtsStructured?.readStructuredJobPosting?.(document);
+    const description = vacancy.description || '';
+    const explicitlyOnsite = /не (?:предусмотрен[ао]? |рассматриваем )?удал[её]н|no remote|not remote|onsite only|только (?:в )?офис/i.test(description);
+    vacancy.remote = !explicitlyOnsite && Boolean(structured?.remote || /удал[её]нн|remote|work from (?:home|anywhere)/i.test(description));
+    vacancy.remoteScope = vacancy.remote ? 'Remote stated in vacancy description or structured data' : '';
+
     if (!vacancy.title || (vacancy.description || '').length < 80) respond({blocked:'Не удалось прочитать описание HH. Нужна ручная проверка страницы.'});
     else respond({vacancy});
     return false;

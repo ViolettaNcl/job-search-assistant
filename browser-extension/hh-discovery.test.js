@@ -14,6 +14,7 @@ assert.deepEqual(Array.from(read({links:['https://hh.ru/vacancy/1?a=b','https://
 assert(read({pathname:'/vacancy/1',text:'Резюме доставлено'}).alreadyApplied);
 assert(read({pathname:'/vacancy/1',vacancy:{title:'Junior C#',description:'short'}}).blocked);
 assert.equal(read({pathname:'/vacancy/1',vacancy:{title:'Junior C#',description:'C# SQL '.repeat(30)}}).vacancy.title,'Junior C#');
+assert.equal(read({pathname:'/vacancy/1',text:'Рекомендуем: удаленная работа',vacancy:{title:'Junior C#',description:'C# SQL '.repeat(30),remote:true}}).vacancy.remote,false,'recommended jobs must not make current vacancy remote');
 console.log('HH browser discovery challenge stops, URL validation and duplicate signals passed');
 
 // Exercise the background adapter with mocked Chrome/API: no network or employer actions.
