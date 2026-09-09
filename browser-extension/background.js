@@ -1,4 +1,4 @@
-importScripts("browser-autopilot.js", "hh-discovery-background.js");
+importScripts("browser-autopilot.js", "hh-discovery-navigation.js", "hh-discovery-background.js");
 
 async function restrictLocalStorageAccess() {
   try {

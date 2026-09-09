@@ -88,3 +88,8 @@ jobs:
         env:
           NODE_PATH: /tmp/vja-browser-tests/node_modules
         run: node scripts/verify-floating-panel.cjs
+
+      - name: Verify HH redirect discovery, import and challenge stop in Chromium
+        env:
+          NODE_PATH: /tmp/vja-browser-tests/node_modules
+        run: node scripts/verify-hh-discovery-redirect.cjs

@@ -67,11 +67,12 @@ public sealed class OperatorPreparationService(OpportunityScoringService scoring
         {
             var suggestion = await ai.SuggestAsync(new(title, description, strategy, russian), ct);
             if (suggestion is null) return new(assessment, strategy, fallback, "", "disabled");
-            var issues = ApplicationClaimValidator.ValidateSuggestion(suggestion.Letter, suggestion.EvidenceIds, knowledge.Get());
+            var letter = writer.AddContact(suggestion.Letter, russian);
+            var issues = ApplicationClaimValidator.ValidateSuggestion(letter, suggestion.EvidenceIds, knowledge.Get());
             if (suggestion.EvidenceIds.Any(id => !strategy.Projects.Any(p => p.Id == id))) issues = [..issues, "Evidence was not selected for this vacancy."];
             if (issues.Length > 0) return new(assessment, strategy, fallback with { RequiresReview = true, ReviewReasons = issues }, "", "invalid-output-fallback");
             // Free-form prose is never authorized for unattended submission by a lexical validator.
-            var draft = new GroundedApplication(suggestion.Letter, "ai-assisted-suggestion", suggestion.EvidenceIds, true,
+            var draft = new GroundedApplication(letter, "ai-assisted-suggestion", suggestion.EvidenceIds, true,
                 ["Review AI wording and every factual claim before use.", ..suggestion.Unknowns]);
             return new(assessment, strategy, draft, suggestion.EmployerNeed, "suggestion-ready");
         }
