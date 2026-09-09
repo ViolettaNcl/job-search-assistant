@@ -206,3 +206,6 @@ The rocket starts/stops HH autopilot using the backend's saved threshold/quota. 
 
 
 2.7.3 fixes discovery stopping on benign HH regional redirects, tracking parameters, URL encoding and trailing slashes. Vacancy IDs and requested search terms/filters must still match. Responses are checked against the tab and content URL before importing. The exact legacy 2.7.2 redirect stop recovers once automatically; CAPTCHA and login stops remain. A confirmed empty result set advances on schedule. Duplicate dashboard messages are collapsed. Generated letters include the configured candidate email in Russian and English, including reviewed AI suggestions.
+
+
+2.7.4: queued eligible HH jobs are processed before another discovery run. Browser discovery checks the automatic queue after every imported vacancy and sends the selected verified job with its tailored letter before reading the next card. Pause/quota and unresolved submission states stop this continuation. The backend filters review-only and senior roles before the queue limit. The dashboard defaults to applications, shows discovery and recorded submission dates separately, and refreshes receipts/review stops every ten seconds. Diagnosis and secondary tools are collapsible.

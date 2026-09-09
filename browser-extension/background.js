@@ -148,7 +148,7 @@ async function browserAutopilotDefer(api, plan, reason) {
   await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(plan.trackedId)}/status`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: "Saved", note: `QueueDeferredUntil=${deferredUntil}` })
+    body: JSON.stringify({ status: "Saved", note: `QueueDeferredUntil=${deferredUntil}\n${reason || "Нужна проверка формы HH"}` })
   }).catch(() => {});
   return `Нужна ручная проверка вакансии «${plan.jobTitle}»: ${reason || "HH изменил форму"}. Вакансия отложена на 4 часа, чтобы не открывать дубли.`;
 }
@@ -177,6 +177,31 @@ async function browserAutopilotProcess(api, plan, tabId) {
   return { completed: false, retry: false, message };
 }
 
+async function browserAutopilotApplyNext(api) {
+  const status = await browserAutopilotJson(`${api}/api/automation/status`);
+  if (!self.vjaBrowserAutopilot.shouldRun(status)) return { stopped: true };
+    const queue = await browserAutopilotJson(`${api}/api/application-queue?limit=50&source=hh&automaticOnly=true&minScore=${encodeURIComponent(status.autoApplyMinimumScore || 75)}`);
+    const candidate = self.vjaBrowserAutopilot?.selectCandidate?.(queue, status.autoApplyMinimumScore || 75);
+    if (!candidate) return null;
+    // Recheck after queue preparation so Pause/quota changes do not start another job.
+    const live = await browserAutopilotJson(`${api}/api/automation/status`);
+    if (!self.vjaBrowserAutopilot.shouldRun(live)) return { stopped: true };
+    const draft = await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(candidate.vacancyId)}/application-draft`);
+    const current = await browserAutopilotJson(`${api}/api/automation/status`);
+    if (!self.vjaBrowserAutopilot.shouldRun(current) || !self.vjaBrowserAutopilot.selectCandidate([candidate], current.autoApplyMinimumScore)) return { stopped: true };
+    const plan = self.vjaBrowserAutopilot.buildPlan(candidate, draft);
+    if (!plan.coverLetter) throw new Error("Персональное сопроводительное письмо не было создано.");
+
+    await chrome.storage.local.remove("vjaSiteApplyResult");
+    await chrome.storage.local.set({ vjaPendingSiteApply: plan, vjaBrowserAutopilotActivePlan: plan });
+    const tab = await chrome.tabs.create({ url: plan.sourceUrl, active: false });
+    if (!tab?.id) throw new Error("Не удалось открыть HH-вакансию.");
+    await chrome.storage.local.set({ vjaBrowserAutopilotTabId: tab.id });
+    const result = await browserAutopilotProcess(api, plan, tab.id);
+    await browserAutopilotHeartbeat(api, Boolean(result.retry), result.message, plan.jobTitle);
+    return result;
+}
+
 async function runBrowserAutopilot() {
   if (browserAutopilotRunning) return;
   browserAutopilotRunning = true;
@@ -202,10 +227,26 @@ async function runBrowserAutopilot() {
       }
     }
 
+    // Finish useful work already queued before spending time on another search.
+    const queuedResult = await browserAutopilotApplyNext(api);
+    if (queuedResult) return;
+
     const discoverySettings = await chrome.storage.sync.get('vjaHhBrowserSearch');
     let discoveryMessage = '';
     if (discoverySettings.vjaHhBrowserSearch) {
-      discoveryMessage = await discoverHhInBrowser(api, status);
+      let applicationResult = null;
+      discoveryMessage = await discoverHhInBrowser(api, status, async () => {
+        try {
+          const result = await browserAutopilotApplyNext(api);
+          if (result) applicationResult = result;
+          return !result?.retry && !result?.stopped;
+        } catch (error) {
+          applicationResult = { stopped: true, message: `Отправка остановлена: ${error.message}` };
+          return false;
+        }
+      });
+      if (applicationResult?.message) await browserAutopilotHeartbeat(api, Boolean(applicationResult.retry), applicationResult.message);
+      if (applicationResult) return;
       if ((await chrome.storage.local.get('vjaHhDiscoveryBlocked')).vjaHhDiscoveryBlocked) {await browserAutopilotHeartbeat(api,false,discoveryMessage);return;}
     }
     const refreshed = await browserAutopilotJson(`${api}/api/automation/status`);
@@ -216,27 +257,12 @@ async function runBrowserAutopilot() {
       await browserAutopilotJson(`${api}/api/collect/start`, { method: "POST" });
     }
 
-    const queue = await browserAutopilotJson(`${api}/api/application-queue?limit=50&source=hh&minScore=${encodeURIComponent(status.autoApplyMinimumScore || 75)}`);
-    const candidate = self.vjaBrowserAutopilot?.selectCandidate?.(queue, status.autoApplyMinimumScore || 75);
-    if (!candidate) {
+    const result = await browserAutopilotApplyNext(api);
+    if (!result) {
       const issue = status.collection?.error || status.collection?.result?.errors?.join(" ");
-      const message = discoveryMessage || (status.collection?.running ? "Ищу вакансии. Очередь обновится после завершения поиска."
-        : issue || `Ожидание: в очереди нет подходящих вакансий от ${status.autoApplyMinimumScore}/100. Найдено HH: ${status.collection?.result?.hhFound ?? status.diagnostics?.newHhVacancies ?? 0}.`);
-      await browserAutopilotHeartbeat(api, false, message);
-      return;
+      await browserAutopilotHeartbeat(api, false, discoveryMessage || issue || 'Нет вакансий, готовых к автоматической отправке. Следующий поиск — по расписанию.');
     }
 
-    const draft = await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(candidate.vacancyId)}/application-draft`);
-    const plan = self.vjaBrowserAutopilot.buildPlan(candidate, draft);
-    if (!plan.coverLetter) throw new Error("Персональное сопроводительное письмо не было создано.");
-
-    await chrome.storage.local.remove("vjaSiteApplyResult");
-    await chrome.storage.local.set({ vjaPendingSiteApply: plan, vjaBrowserAutopilotActivePlan: plan });
-    const tab = await chrome.tabs.create({ url: plan.sourceUrl, active: false });
-    if (!tab?.id) throw new Error("Не удалось открыть HH-вакансию.");
-    await chrome.storage.local.set({ vjaBrowserAutopilotTabId: tab.id });
-    const result = await browserAutopilotProcess(api, plan, tab.id);
-    await browserAutopilotHeartbeat(api, Boolean(result.retry), result.message, plan.jobTitle);
   } catch (error) {
     if (api) {
       await browserAutopilotHeartbeat(api, false, `Автопилот остановился: ${error?.message || String(error)}`).catch(() => {});

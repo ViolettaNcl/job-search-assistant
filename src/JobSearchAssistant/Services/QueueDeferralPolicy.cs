@@ -19,7 +19,7 @@ public static class QueueDeferralPolicy
             .FirstOrDefault();
 
         if (latestSaved is null || !latestSaved.Note.StartsWith(NotePrefix, StringComparison.Ordinal)) return null;
-        var raw = latestSaved.Note[NotePrefix.Length..].Trim();
+        var raw = latestSaved.Note[NotePrefix.Length..].Split('\n')[0].Trim();
         return DateTimeOffset.TryParse(raw, out var parsed) ? parsed.ToUniversalTime() : null;
     }
 

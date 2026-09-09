@@ -153,7 +153,7 @@ app.MapGet("/api/dashboard", async (AppDbContext db, StatsService stats, Cancell
         var latestHhSync = x.Events.Where(e => e.Type.StartsWith(HhNegotiationStatusMapper.EventTypePrefix, StringComparison.Ordinal)).OrderByDescending(e => e.CreatedAt).FirstOrDefault();
         return new
         {
-            x.Id, x.Title, company = x.Company.Name, x.Url, status = x.Status.ToString(), x.UpdatedAt,
+            x.Id, x.Title, company = x.Company.Name, x.Url, status = x.Status.ToString(), x.UpdatedAt, x.FirstSeenAt,
             appliedAt = x.Application?.AppliedAt,
             resume = x.Application?.ResumeExternalId,
             coverLetterIncluded = x.Application != null && !string.IsNullOrWhiteSpace(x.Application.CoverLetter),
@@ -184,8 +184,8 @@ app.MapGet("/api/dashboard", async (AppDbContext db, StatsService stats, Cancell
     });
 });
 
-app.MapGet("/api/application-queue", async (int? limit, int? minScore, string? source, ApplicationQueueService queue, CancellationToken ct)
-    => Results.Ok(await queue.GetAsync(limit ?? 20, minScore ?? 65, source, ct)));
+app.MapGet("/api/application-queue", async (int? limit, int? minScore, string? source, bool? automaticOnly, ApplicationQueueService queue, CancellationToken ct)
+    => Results.Ok(await queue.GetAsync(limit ?? 20, minScore ?? 65, source, automaticOnly ?? false, ct)));
 
 app.MapGet("/api/followups", async (int? afterBusinessDays, int? limit, int? maxAttempts, FollowUpQueueService followUps, CancellationToken ct)
     => Results.Ok(await followUps.GetAsync(afterBusinessDays ?? 5, limit ?? 30, maxAttempts ?? 2, ct)));
@@ -276,7 +276,7 @@ app.MapGet("/api/automation/status", async (AppDbContext db, HhClient hh, JobSer
 
 app.MapGet("/api/vacancies", async (AppDbContext db, string? status, int? minScore, string? market, string? type, CancellationToken ct) =>
 {
-    var q = db.Vacancies.Include(x => x.Company).AsQueryable();
+    var q = db.Vacancies.Include(x => x.Company).Include(x => x.Events).AsQueryable();
     if (Enum.TryParse<VacancyStatus>(status, true, out var parsed)) q = q.Where(x => x.Status == parsed);
     if (minScore.HasValue) q = q.Where(x => x.MatchScore >= minScore.Value);
     var rows = await q.RecentAsync(300, ct, x =>
@@ -289,6 +289,7 @@ app.MapGet("/api/vacancies", async (AppDbContext db, string? status, int? minSco
         x.EligibilityStatus, x.EligibilityReason, company = x.Company.Name, companyId = x.Company.Id,
         x.MatchScore, x.MatchLevel, status = x.Status.ToString(), x.SalaryText, x.MatchedSkills, x.MissingSkills,
         x.WhyMatch, x.HasExistingHhResponse, x.PublishedAt, x.FirstSeenAt,
+        reviewNote = x.Status == VacancyStatus.Saved ? x.Events.Where(e => e.Type == "Saved").OrderByDescending(e => e.CreatedAt).FirstOrDefault()?.Note : null,
         market = VacancyClassifier.Market(x), marketLabel = VacancyClassifier.MarketLabel(VacancyClassifier.Market(x)),
         opportunityType = VacancyClassifier.OpportunityType(x), opportunityTypeLabel = VacancyClassifier.TypeLabel(VacancyClassifier.OpportunityType(x))
     });

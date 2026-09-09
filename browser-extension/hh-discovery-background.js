@@ -1,4 +1,4 @@
-async function discoverHhInBrowser(api, status) {
+async function discoverHhInBrowser(api, status, afterImport) {
   const settings = await chrome.storage.local.get(['vjaHhDiscoveryAt','vjaHhDiscoveryQuery','vjaHhDiscoveryBlocked','vjaHhDiscoveryMessage']);
   // One-time recovery of 2.7.2's exact-string redirect bug. Real challenge errors are retained.
   if (settings.vjaHhDiscoveryBlocked===self.vjaHhNavigation.legacyRedirect) {
@@ -52,6 +52,8 @@ async function discoverHhInBrowser(api, status) {
       if(!self.vjaBrowserAutopilot.hasSafeSeniority(r.vacancy.title))continue;
       await browserAutopilotJson(`${api}/api/import/browser`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r.vacancy)});
       imported++;
+      // Qualify and apply before reading the next card; unresolved submissions retain their plan.
+      if (afterImport && await afterImport() === false) break;
       await browserAutopilotWait(2000);
     }
     const message=`Поиск через сайт HH: проверено и сохранено ${imported} вакансий. Следующий поисковый запрос — через 30 минут.`;
