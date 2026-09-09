@@ -35,7 +35,21 @@ const assert=require('node:assert/strict'),http=require('node:http'),path=requir
     });
     const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
     await worker.evaluate(async base=>{runBrowserAutopilot=async()=>{};browserAutopilotRunning=true;await chrome.alarms.clearAll();await chrome.storage.sync.set({apiBase:base,vjaHhBrowserSearch:true});await chrome.storage.local.set({vjaHhDiscoveryBlocked:self.vjaHhNavigation.legacyRedirect,vjaHhDiscoveryAt:Date.now()});},base);
-    const run=()=>worker.evaluate(async({base,status})=>await discoverHhInBrowser(base,status),{base,status});
+    let sequence=0;
+    const run=async()=>{
+      // Attach Playwright routing before navigation: the initial request of a tab
+      // opened directly by chrome.tabs.create can precede the debugger attachment.
+      const page=await context.newPage(),readyUrl=`${base}/fixture-ready/${++sequence}`;
+      await page.goto(readyUrl);
+      try{return await worker.evaluate(async({base,status,readyUrl})=>{
+        const [tab]=await chrome.tabs.query({url:readyUrl});
+        const create=chrome.tabs.create;
+        chrome.tabs.create=async properties=>chrome.tabs.update(tab.id,properties);
+        try{return await discoverHhInBrowser(base,status);}
+        finally{chrome.tabs.create=create;}
+      },{base,status,readyUrl});}
+      finally{if(!page.isClosed())await page.close();}
+    };
     const result=await run();
     assert.equal(imported.length,1,`regional redirect must reach one import: ${result}; ${imported.map(v=>v.url).join(', ')}`);
     assert.equal(new URL(imported[0].url).pathname,'/vacancy/123/');
