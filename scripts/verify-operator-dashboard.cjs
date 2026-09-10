@@ -7,7 +7,10 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),http
   const automation={allowed:true,ready:true,autoApplyEnabled:true,browserConnected:true,automationMode:'browser-extension',autoApplyMinimumScore:75,dailyAutoApplyLimit:15,appliedToday:1,remainingToday:14,lastMessage:'Отклик и письмо отправлены: Junior C# Developer.',collection:{},diagnostics:{}};
   const errors=[],directRequests=[];
   const server=http.createServer((req,res)=>{
-    if(req.url==='/'||req.url==='/operator.css'||req.url==='/dashboard-apply.js'){res.setHeader('Content-Type',req.url==='/'?'text/html; charset=utf-8':req.url.endsWith('.js')?'text/javascript':'text/css');res.end(fs.readFileSync('src/JobSearchAssistant/wwwroot/'+(req.url==='/'?'index.html':req.url.slice(1))));return;}
+    // Serve only fixed assets; request input never becomes a filesystem path.
+    if(req.url==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');res.end(fs.readFileSync('src/JobSearchAssistant/wwwroot/index.html'));return;}
+    if(req.url==='/operator.css'){res.setHeader('Content-Type','text/css');res.end(fs.readFileSync('src/JobSearchAssistant/wwwroot/operator.css'));return;}
+    if(req.url==='/dashboard-apply.js'){res.setHeader('Content-Type','text/javascript');res.end(fs.readFileSync('src/JobSearchAssistant/wwwroot/dashboard-apply.js'));return;}
     if(req.url.endsWith('/apply-tailored'))directRequests.push(req.url);
     let data=[];
     if(req.url==='/api/dashboard')data={stats:{applied:pipeline.length,interviews:0,offers:0},state:{},pipeline};
