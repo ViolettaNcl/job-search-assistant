@@ -29,7 +29,8 @@ const http = require('node:http');
       window.addEventListener('message',e=>{if(e.data?.type==='vjaDashboardApplyResult')window.dashboardResults.push(e.data);});
       window.postMessage({type:'vjaDashboardApplyRequest',vacancyId:'11111111-1111-4111-8111-111111111111',requestId:'loopback-fixture'},location.origin);
     });
-    await dashboard.waitForFunction(()=>window.dashboardResults.some(x=>x.message==='Synthetic preparation gate reached'));
+    try {await dashboard.waitForFunction(()=>window.dashboardResults.some(x=>x.message==='Synthetic preparation gate reached'),{},{timeout:10000});}
+    catch(error){console.error('Dashboard bridge diagnostic',await dashboard.evaluate(()=>window.dashboardResults),{dashboardPreparations});throw error;}
     assert.equal(dashboardPreparations,1,'alias request must reach backend preparation, not fail origin validation');
     assert.equal(dashboard.url(),base+'/index.html');
     // Remove the bridge from an already open document, then recover without reloading it.
