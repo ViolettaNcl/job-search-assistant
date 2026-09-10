@@ -211,3 +211,7 @@ The rocket starts/stops HH autopilot using the backend's saved threshold/quota. 
 
 
 2.7.5: only fully remote vacancies can enter unattended queues, including old records. Missing remote metadata is no longer assumed true; mandatory office/hybrid descriptions override a remote flag. Missing HH description stops extraction instead of treating recommended jobs as the current role. Screening review adds prioritized, evidence-grounded CV actions; no CV is silently changed.
+
+### Send from the dashboard (2.7.8)
+
+Keep the backend running and reload the dashboard after updating the extension. **Откликнуться с письмом** on a found HH vacancy sends that vacancy's prepared letter and the HH resume using an inactive tab. It does not enable autopilot or navigate the dashboard. Confirmation closes the background tab; questions or missing letter confirmation are reported on the dashboard. The bridge accepts requests only from the configured local dashboard origin and asks the backend for the vacancy and letter, never arbitrary submission text from the page.

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "2.7.7",
+  "version": "2.7.8",
   "description": "One-click vacancy analysis, tailored letter, CV/resume selection and verified submission, plus an optional all-day HH Apply Autopilot controlled from the local dashboard.",
   "permissions": [
     "activeTab",
@@ -45,7 +45,8 @@
         "site-apply.js",
         "site-apply-content.js",
         "floating-panel.js",
-        "floating-panel-content.js"
+        "floating-panel-content.js",
+        "dashboard-apply-content.js"
       ],
       "run_at": "document_idle"
     }

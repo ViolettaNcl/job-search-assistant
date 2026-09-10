@@ -23,13 +23,8 @@ public sealed class TailoredHhApplyService(
             return new HhApplyResult(false, "hh_only", "Tailored direct submission is only available for HH vacancies.");
         if (vacancy.Company.IsBlacklisted)
             return new HhApplyResult(false, "blacklisted", "Company is blacklisted.");
-        var assessment = scoring.Assess(vacancy.Title, vacancy.DescriptionText, vacancy.IsRemote, vacancy.Experience, vacancy.LocationText, vacancy.RemoteScope);
-        if (assessment.Decision != "APPLY")
-            return new HhApplyResult(false, "operator_review_required", string.Join(" ", assessment.ReviewReasons));
-        if (vacancy.MatchScore < 75)
-            return new HhApplyResult(false, "fit_below_threshold", $"Fit score {vacancy.MatchScore}/100 is below the 75-point one-click threshold. Review manually first.");
-        if (!AutomaticSubmissionPolicy.IsVerifiedEligible(vacancy))
-            return new HhApplyResult(false, "eligibility_not_verified", "This vacancy requires a location/work-authorization review before submission.");
+        var preparation = await new DashboardApplyService(db, scoring, drafts).PrepareAsync(vacancyId, ct);
+        if (!preparation.Ready) return new HhApplyResult(false, "operator_review_required", preparation.Message);
         if (vacancy.Application is not null || vacancy.HasExistingHhResponse || vacancy.Status == VacancyStatus.Applied)
             return new HhApplyResult(false, "already_applied_local", "This vacancy is already marked as applied.");
 
@@ -37,7 +32,7 @@ public sealed class TailoredHhApplyService(
         if (string.IsNullOrWhiteSpace(state.HhResumeId))
             return new HhApplyResult(false, "resume_not_selected", "Select an HH resume first.");
 
-        var draft = drafts.Build(vacancy);
+        var draft = preparation.Draft!;
         var result = await hh.ApplyAsync(vacancy.ExternalId, state.HhResumeId, draft.CoverLetter, ct);
 
         if (!result.Success)
