@@ -48,6 +48,11 @@ async function fixture({letter=true,pending=false,createFails=false,apiBase='htt
     assert(alias.trace.some(x=>x[0]==='http'&&x[1]===apiBase+'/api/vacancies/'+id+'/prepare-dashboard-apply'));
   }
   const hello=await fixture();assert.equal((await hello.request({message:{type:'vjaDashboardBridgeHello'}})).ok,true);assert(!hello.trace.some(x=>x[0]==='create'));
+  const heartbeat=await fixture();vm.runInContext('browserAutopilotRunning=true',heartbeat.context);
+  heartbeat.context.browserAutopilotWait=async()=>vm.runInContext('browserAutopilotRunning=false',heartbeat.context);
+  await heartbeat.context.runDashboardApply('http://localhost:8080',id,heartbeat.sender,'after-heartbeat');assert.equal(heartbeat.messages.at(-1).status,'confirmed');
+  const occupied=await fixture();vm.runInContext('browserAutopilotRunning=true',occupied.context);
+  await occupied.context.runDashboardApply('http://localhost:8080',id,occupied.sender,'busy');assert.equal(occupied.messages.at(-1).status,'review');assert(!occupied.trace.some(x=>x[0]==='send'));
   const valid=await fixture();assert.equal((await valid.request()).ok,true);await new Promise(r=>setImmediate(r));assert.equal(valid.messages.at(-1).status,'confirmed');
   const failed=await fixture({createFails:true});await failed.context.runDashboardApply('http://localhost:8080',id,failed.sender,'failed');assert(!failed.data.vjaPendingSiteApply);assert(!failed.data.vjaBrowserAutopilotActivePlan);assert.equal(failed.messages.at(-1).status,'review');
   console.log('Dashboard manual apply: exact vacancy/letter, inactive tab, verified receipt, no-letter stop, duplicate prevention, continuation and origin restriction passed');

@@ -6,6 +6,9 @@ async function dashboardApplyNotify(plan, result) {
 }
 async function runDashboardApply(api, vacancyId, sender, requestId) {
   const stub={dashboard:true,dashboardTabId:sender.tab.id,dashboardRequestId:requestId,trackedId:vacancyId};
+  // Opening the dashboard wakes a short heartbeat. Let it finish before claiming the
+  // shared executor; never run concurrently or wait indefinitely behind an application.
+  for(let attempt=0;attempt<50&&browserAutopilotRunning;attempt++)await browserAutopilotWait(100);
   if (browserAutopilotRunning) {await dashboardApplyNotify(stub,{message:'Сейчас выполняется другой отклик. Дождитесь результата и повторите.'});return;}
   browserAutopilotRunning=true;
   let plan,tabId;
