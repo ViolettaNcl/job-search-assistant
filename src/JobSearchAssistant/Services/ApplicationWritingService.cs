@@ -9,7 +9,7 @@ public sealed class ApplicationWritingService(IOptions<CandidateProfileOptions> 
 {
     public string AddContact(string letter, bool russian) => ApplicationContactFooter.Append(letter, candidate.Value.Email, russian);
 
-    public GroundedApplication Write(ApplicationStrategy strategy, bool russian)
+    public GroundedApplication Write(ApplicationStrategy strategy, bool russian, string? title = null, string? company = null)
     {
         var c = candidate.Value;
         var project = strategy.Projects.FirstOrDefault();
@@ -23,11 +23,38 @@ public sealed class ApplicationWritingService(IOptions<CandidateProfileOptions> 
             "route" => russian ? "алгоритмы маршрутизации и собственная нейросеть на PHP" : "route optimization and a neural network implemented in PHP",
             _ => russian ? "многоязычный веб-интерфейс портфолио" : "a multilingual portfolio interface"
         };
+        // Vacancy labels describe the employer's role, not a candidate claim. Keep them short and on one line.
+        static string Label(string? value, int max)
+        {
+            var normalized = string.Join(" ", (value ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            return normalized[..Math.Min(normalized.Length, max)];
+        }
+        var role = Label(title, 140);
+        var employer = Label(company, 80);
+        var opening = role.Length == 0
+            ? (russian ? $"Меня заинтересовали задачи по направлению {strategy.CvVariant}." : $"The {strategy.CvVariant} work interests me.")
+            : russian ? $"Откликаюсь на вакансию «{role}»{(employer.Length > 0 ? " в " + employer : "")}."
+                : $"I am applying for the {role} role{(employer.Length > 0 ? " at " + employer : "")}.";
+        var evidenceIds = new List<string> { project.Id };
+        var complement = "";
+        var second = strategy.Projects.Skip(1).FirstOrDefault();
+        if (second is not null)
+        {
+            var extra = strategy.SkillsToEmphasize.Where(s => !SkillCatalog.Proves(project.Skills, s) && SkillCatalog.Proves(second.Skills, s)).Take(3).ToArray();
+            if (extra.Length > 0)
+            {
+                complement = russian ? $" В проекте {second.Name} также использовала {string.Join(", ", extra)}."
+                    : $" My {second.Name} project also uses {string.Join(", ", extra)}.";
+                evidenceIds.Add(second.Id);
+            }
+        }
+        var source = project.Sources.FirstOrDefault();
+        var projectLink = source is null ? "" : "\n" + (russian ? "Проект: " : "Project: ") + "https://github.com/" + source.Repository;
         var letter = russian
-            ? $"Здравствуйте! Меня заинтересовали задачи по направлению {strategy.CvVariant}. В проекте {project.Name} есть близкая работа: {contribution}. Использованные технологии: {evidence}. Буду рада показать код и обсудить, как этот опыт пригодится вашей команде.\n\nGitHub: {c.GitHubUrl}\n{c.RussianName}"
-            : $"Hello! The {strategy.CvVariant} work interests me. My {project.Name} project includes relevant work on {contribution}, using {evidence}. I would be happy to walk through the code and discuss how this project experience could help your team.\n\nGitHub: {c.GitHubUrl}\n{c.Name}";
+            ? $"Здравствуйте! {opening} В проекте {project.Name} есть близкая работа: {contribution}. Использованные технологии: {evidence}.{complement} Буду рада показать код и обсудить задачи.\n\nGitHub: {c.GitHubUrl}{projectLink}\n{c.RussianName}"
+            : $"Hello! {opening} My {project.Name} project includes relevant work on {contribution}, using {evidence}.{complement} I would be happy to walk through the code and discuss the work.\n\nGitHub: {c.GitHubUrl}{projectLink}\n{c.Name}";
         var conflicts = new CandidateKnowledgeService(candidate).Get().Identity.Conflicts;
-        return new(AddContact(letter, russian), "deterministic-fallback", [project.Id], conflicts.Length > 0, conflicts);
+        return new(AddContact(letter, russian), "deterministic-fallback", evidenceIds.ToArray(), conflicts.Length > 0, conflicts);
     }
 }
 

@@ -126,4 +126,43 @@ public sealed class ApplicationDraftServiceTests
         StringAssert.Contains(apiRole.CoverLetter, "API");
         StringAssert.Contains(uiRole.CoverLetter, "интерфейс");
     }
+    [TestMethod]
+    public void GroundedLettersKeepVacancyAndEmployerInsteadOfReusingGenericOpening()
+    {
+        var first = _sut.Build("Junior Backend Developer", "API Company", "Required: C#, SQL, REST.", "Russia", "hh", 90, ["C#", "SQL", "REST"], []);
+        var second = _sut.Build("Junior Integration Developer", "Integration Company", "Required: C#, SQL, REST.", "Russia", "hh", 90, ["C#", "SQL", "REST"], []);
+        StringAssert.Contains(first.CoverLetter, "Junior Backend Developer");
+        StringAssert.Contains(first.CoverLetter, "API Company");
+        StringAssert.Contains(second.CoverLetter, "Integration Company");
+        Assert.AreNotEqual(first.CoverLetter, second.CoverLetter);
+        StringAssert.Contains(first.CoverLetter, "https://github.com/ViolettaNcl/DentalClinic");
+    }
+
+    [TestMethod]
+    public void FullStackLetterIncludesComplementaryFrontendProjectAndOnlyVerifiedSkills()
+    {
+        var draft = _sut.Build("Junior Fullstack Developer", "Example", "Required: C#, ASP.NET Core, SQL, React, TypeScript. Preferred: Azure.", "Russia", "hh", 90, ["C#", "SQL", "React"], ["Azure"]);
+        CollectionAssert.AreEqual(new[] { "dental", "cv" }, draft.Strategy!.Projects.Select(p => p.Id).ToArray());
+        StringAssert.Contains(draft.CoverLetter, "DentalClinic");
+        StringAssert.Contains(draft.CoverLetter, "CV / Portfolio");
+        StringAssert.Contains(draft.CoverLetter, "React");
+        Assert.IsFalse(draft.CoverLetter.Contains("Azure"));
+        Assert.IsTrue(draft.CoverLetter.Length < 1000);
+        Assert.AreEqual(draft.Strategy.Headline, draft.RecommendedHeadline);
+    }
+
+    [TestMethod]
+    public void FrontendDesktopAndQaHeadlinesAgreeWithApplicationStrategy()
+    {
+        foreach (var row in new[] {
+            ("Junior Frontend Developer", "Required: React, Next.js, TypeScript.", "Frontend"),
+            ("Junior WPF Developer", "Required: WPF, C#, SQL Server.", "C# Desktop"),
+            ("Junior QA Engineer", "Required: WPF, C#, Testing.", "QA Automation") })
+        {
+            var draft = _sut.Build(row.Item1, "Example", row.Item2, "Russia", "hh", 90, [], []);
+            Assert.AreEqual(row.Item3, draft.Strategy!.CvVariant);
+            Assert.AreEqual(draft.Strategy.Headline, draft.RecommendedHeadline);
+        }
+    }
+
 }

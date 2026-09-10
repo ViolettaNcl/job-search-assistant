@@ -62,7 +62,7 @@ public sealed class OperatorPreparationService(OpportunityScoringService scoring
     {
         var assessment = scoring.Assess(title, description, remote, experience, location, scope);
         var strategy = evidence.Select(assessment);
-        var fallback = writer.Write(strategy, russian);
+        var fallback = writer.Write(strategy, russian, title);
         try
         {
             var suggestion = await ai.SuggestAsync(new(title, description, strategy, russian), ct);

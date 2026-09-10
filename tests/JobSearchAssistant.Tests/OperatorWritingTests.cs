@@ -121,4 +121,23 @@ public sealed class OperatorWritingTests
         }
         Assert.AreEqual("LOW", service.Classify("Thank you for applying.").Urgency);
     }
+    [TestMethod]
+    public async Task OperatorFallbackRetainsActualRoleTitle()
+        => StringAssert.Contains((await Prepare(null)).Application.Letter, "Junior .NET Developer");
+
+    [TestMethod]
+    public void SecondProjectMustContributeEvidenceNotRepeatFirstProject()
+    {
+        var knowledge = new CandidateKnowledgeService(Profile);
+        var scorer = new OpportunityScoringService(Profile);
+        var evidence = new EvidenceRetrievalService(knowledge);
+        var backend = evidence.Select(scorer.Assess("Junior Backend Developer", "Required: C#, ASP.NET Core, SQL, REST.", true, location: "Russia"));
+        CollectionAssert.AreEqual(new[] { "dental" }, backend.Projects.Select(p => p.Id).ToArray());
+        var fullstack = evidence.Select(scorer.Assess("Junior Fullstack Developer", "Required: C#, ASP.NET Core, SQL, React, TypeScript.", true, location: "Russia"));
+        var letter = new ApplicationWritingService(Profile).Write(fullstack, false, "Junior Fullstack Developer", "Example");
+        CollectionAssert.AreEqual(new[] { "dental", "cv" }, letter.EvidenceIds);
+        StringAssert.Contains(letter.Letter, "React");
+        Assert.AreEqual(0, ApplicationClaimValidator.ValidateSuggestion(letter.Letter, letter.EvidenceIds, knowledge.Get()).Length);
+    }
+
 }

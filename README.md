@@ -219,6 +219,7 @@ Persistent PostgreSQL startup applies registered EF migrations automatically. Th
 Current priority: qualified **fully remote** HH applications with a short evidence-grounded letter. Version 2.7.5 makes remote-only the default again, following Violetta's explicit preference. Automatic queues and API submission also exclude old non-remote records and contradictory mandatory-office descriptions. Unknown remote format is not treated as remote. Explicit `Search:RemoteOnly=false` remains a manual search override; unattended applications still require remote work.
 
 Completed foundations:
+- vacancy/company-specific grounded openings, complementary project selection and consistent career headlines (2.7.6);
 - immediate qualified application after browser discovery, existing-queue processing before another search, pause/quota rechecks and confirmed resume + letter receipts (2.7.4);
 - discovery and submission timestamps, review reasons and live application journal (2.7.4);
 - configured contact email in letters; phone and private answers stay in local configuration;

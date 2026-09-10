@@ -110,10 +110,11 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
         var strategy = new EvidenceRetrievalService(new CandidateKnowledgeService(candidate)).Select(assessment);
         if (assessment.Understanding.CareerLane != "excluded" && strategy.Projects.Length > 0)
         {
-            var grounded = new ApplicationWritingService(candidate).Write(strategy, russian);
+            var grounded = new ApplicationWritingService(candidate).Write(strategy, russian, title, company);
             coverLetter = grounded.Letter;
             shortMessage = grounded.Letter;
             emphasize = strategy.SkillsToEmphasize;
+            headline = strategy.Headline;
             verify.AddRange(grounded.ReviewReasons);
         }
         if (missingSkills.Length > 0) verify.Add($"Do not claim these skills unless independently verified: {string.Join(", ", missingSkills)}.");
