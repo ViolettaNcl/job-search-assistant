@@ -13,9 +13,12 @@ public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> 
 {
     public OpportunityAssessment Assess(string title, string text, bool remote, string experience = "", string location = "", string scope = "", int minimumScore = 75)
     {
+        experience = VacancyExperience.Normalize(experience);
         remote = RemoteWorkPolicy.IsFullyRemote(remote, text);
+        var understandingText = !string.IsNullOrWhiteSpace(experience) && !VacancyExperience.IsKnownBand(experience)
+            ? text + "\nExperience requirements: " + experience : text;
         var k = new CandidateKnowledgeService(options).Get();
-        var u = new VacancyUnderstandingService().Understand(title, text, remote, experience, location);
+        var u = new VacancyUnderstandingService().Understand(title, understandingText, remote, experience, location);
         var matches = u.Requirements.Select(r => new RequirementMatch(r,
             k.Projects.Any(p => SkillCatalog.Proves(p.Skills, r.Skill)) ? "Project evidence" : "Not evidenced",
             k.Projects.Where(p => SkillCatalog.Proves(p.Skills, r.Skill)).Select(p => p.Id).ToArray())).ToArray();
@@ -26,9 +29,11 @@ public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> 
         var technical = denominator == 0 ? 0 : (int)Math.Round(100 * numerator / denominator);
         var eligibility = Eligibility(k, text + " " + scope, location, remote, u.WorkMode);
         var review = new List<string>(k.Identity.Conflicts);
+        if (!string.IsNullOrWhiteSpace(experience) && !VacancyExperience.IsKnownBand(experience))
+            review.Add("Free-text experience requirements need review; no employment history is inferred.");
         if (u.RequiredYears > 0) review.Add($"Requires {u.RequiredYears}+ years; verified salaried experience is unknown. Project work is not employment.");
-        if (experience == "between1And3" && u.RequiredYears is null && u.PreferredYears is null)
-            review.Add("HH lists 1–3 years; mandatory versus preferred experience needs review.");
+        if (experience == "between1And3" && u.Seniority != "Junior" && u.RequiredYears is null && u.PreferredYears is null)
+            review.Add("HH lists 1–3 years without an explicit junior/intern level; review the experience expectation.");
         if (experience == "between3And6") review.Add("HH lists 3–6 years; verified employment history is insufficient for unattended application.");
         foreach (var language in u.Languages)
             if (!k.Languages.Any(l => l.Contains(language, StringComparison.OrdinalIgnoreCase))) review.Add($"Language requirement needs review: {language} is not verified.");
@@ -51,7 +56,7 @@ public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> 
             "Uncalibrated opportunity priority index, not percentage of requirements met or probability of being hired.",
             decision, eligibility.Status, eligibility.Reason,
             [new("Technical match", technical, $"{families.Count(g => g.All(m => m.ProjectIds.Length > 0))}/{families.Length} distinct families covered; preferred families count half."),
-             new("Experience compatibility", exp, u.RequiredYears > 0 ? "Mandatory experience lacks employment evidence." : "Project experience; no salaried years claimed."),
+             new("Experience compatibility", exp, u.RequiredYears > 0 ? "Mandatory experience lacks employment evidence." : experience == "between1And3" && u.Seniority == "Junior" ? "Junior/intern with HH 1–3-year band, accepted by user preference when no mandatory years are stated. Project evidence only; no employment years claimed." : "Project experience; no salaried years claimed."),
              new("Evidence strength", evidence, "Share of requirement families with repository-backed project evidence."),
              new("Seniority compatibility", seniority, u.Seniority),
              new("Eligibility", eligibility.Status == "Eligible" ? 100 : eligibility.Status == "Likely ineligible" ? 0 : null, eligibility.Reason),

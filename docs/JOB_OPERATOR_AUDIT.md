@@ -111,3 +111,14 @@ Found and corrected: grounded writing discarded actual vacancy/company context, 
 All application claims remain project experience. Optional AI prose remains review-only. No promise of ATS bypass, hidden keywords, invented employment, new platform, or deployment. Remote-only gates and confirmed resume + letter receipts are unchanged. Regression coverage proves context retention, frontend/backend complementary evidence, redundant-project omission, accurate headlines and evidence-reference validation.
 
 27 JavaScript suites passed locally. Full backend, browser, SQLite, CodeQL and Windows checks are recorded on the latest release PR head. Live HH submission remains unverified after the previous browser displayed the HH VPN restriction; fixture success is not a production success rate.
+
+
+## 2.7.7 — junior experience bands and broader technical discovery (2026-09-10)
+
+Base inspected: `3385d232014a3fa928d022f594b0eecbc6175463`; branch `fix/junior-autopilot-opportunities`.
+
+The user explicitly accepts junior/intern opportunities carrying HH's 1–3-year category. That metadata band previously stopped otherwise qualified junior applications. It now permits a decision based on skills, location and requirements when the role is explicitly entry-level and no mandatory years are stated. Neutral-level jobs still need review. Required years and free-text experience unknowns are not waived or converted into employment claims. Russian/English band text is normalized in backend qualification, so imports and API records use the same policy.
+
+Search defaults now interleave C#/.NET, frontend, WPF, PHP internships, QA automation, technical implementation and SQL/API support. Internship classification also recognizes verified non-.NET technologies. The browser execution layer remains generic: immediately after import, qualify → prepare the job's letter → apply → verify → record. Existing pause, quota, remote-only, duplicate and unknown-answer stops remain.
+
+Regression additions cover diverse junior roles with 1–3 metadata, non-.NET internships, hard experience/eligibility gaps, neutral/senior rejection, and requalification of an old Verify frontend record into the automatic queue with a project-grounded letter. The real background orchestration fixture now proves two different role families receive their own letter and confirmed receipts. CI/Windows results are recorded in the release PR. No live HH submission is claimed; the last real browser check encountered HH's VPN restriction.
