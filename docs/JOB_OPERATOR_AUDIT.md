@@ -100,3 +100,14 @@ Base main inspected: `ff7e80f1d1a4bfc42ac74fc9559517f44e1b69c6`; branch `fix/rem
 - Regression additions: remote defaults, legacy onsite/contradictory queue candidates before limit, import normalization, real extraction functions on DOM fixtures, truthful prioritized screening actions. Existing immediate-discovery/letter receipt, duplicate, timeout, SQLite and Windows gates retained.
 - Live browser verification attempted 2026-09-10: HH returned “VPN мешает работе сайта” before vacancy content. No live application was sent and no production success rate is claimed. The code does not bypass that restriction.
 - CI results are recorded in the release PR and checked on its latest head before merge.
+
+
+## 2.7.6 — vacancy-specific writing review (2026-09-10)
+
+Main inspected: `32de84262e55056e33947d4b61ac437f9b1925b7`; no active PRs at start. Branch: `fix/vacancy-specific-application-writing`.
+
+Found and corrected: grounded writing discarded actual vacancy/company context, the independent headline classifier could disagree with strategy, and ranking two projects independently could omit complementary frontend evidence. Writing now retains bounded role/company labels, links the main project, includes a second project only for additional relevant verified skills, and uses the same strategy headline. Frontend-only roles no longer receive a Full-Stack .NET variant; QA retains QA positioning even when FleetManagement provides the best evidence.
+
+All application claims remain project experience. Optional AI prose remains review-only. No promise of ATS bypass, hidden keywords, invented employment, new platform, or deployment. Remote-only gates and confirmed resume + letter receipts are unchanged. Regression coverage proves context retention, frontend/backend complementary evidence, redundant-project omission, accurate headlines and evidence-reference validation.
+
+27 JavaScript suites passed locally. Full backend, browser, SQLite, CodeQL and Windows checks are recorded on the latest release PR head. Live HH submission remains unverified after the previous browser displayed the HH VPN restriction; fixture success is not a production success rate.
