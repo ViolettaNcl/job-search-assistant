@@ -166,14 +166,8 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
             2 => $"Откликаюсь на вакансию «{title}» в {company}. Мне близко то, что в этой роли важно работать с {focus}.",
             _ => $"Хочу откликнуться на вакансию «{title}» в {company}. Больше всего меня заинтересовали задачи про {focus}."
         };
-        var closing = variant switch
-        {
-            1 => "Буду рада познакомиться и подробнее обсудить задачи.",
-            2 => "Буду рада коротко обсудить, чем могу быть полезна команде.",
-            _ => "Буду рада пообщаться и ответить на вопросы."
-        };
 
-        return $"Здравствуйте!\n\n{opening}\n\n{RussianEvidence(roleKind, emphasize)}\n\nGitHub: {_candidate.GitHubUrl}\n\n{closing}\n\nВиолетта";
+        return $"Здравствуйте!\n\n{opening}\n\n{RussianEvidence(roleKind, emphasize)}\n\nGitHub: {_candidate.GitHubUrl}\n\nВиолетта";
     }
 
     private string BuildEnglishLetter(string company, string title, string roleKind, string focus, string[] emphasize, int variant)
@@ -184,14 +178,8 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
             2 => $"I would like to apply for the {title} role at {company}. The focus on {focus} feels particularly relevant to me.",
             _ => $"I am interested in the {title} opening at {company}. I was especially drawn to the work around {focus}."
         };
-        var closing = variant switch
-        {
-            1 => "I would be glad to meet and discuss the role in more detail.",
-            2 => "I would be happy to have a short conversation about how I could help the team.",
-            _ => "I would be happy to talk and answer any questions."
-        };
 
-        return $"Hi,\n\n{opening}\n\n{EnglishEvidence(roleKind, emphasize)}\n\nGitHub: {_candidate.GitHubUrl}\n\n{closing}\n\nVioletta";
+        return $"Hi,\n\n{opening}\n\n{EnglishEvidence(roleKind, emphasize)}\n\nGitHub: {_candidate.GitHubUrl}\n\nVioletta";
     }
 
     private static string RussianEvidence(string roleKind, string[] emphasize)

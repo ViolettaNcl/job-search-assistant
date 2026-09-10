@@ -5,7 +5,9 @@ const path = require('node:path');
 const http = require('node:http');
 (async () => {
   const backendState={autoApplyEnabled:false,allowed:true,apiReady:true,automationMode:'hh-api',remainingToday:90,autoApplyMinimumScore:50,dailyAutoApplyLimit:90};
+  let dashboardPreparations=0;
   const server = http.createServer((req,res) => {
+    if(req.url.endsWith('/prepare-dashboard-apply')){dashboardPreparations++;res.writeHead(400,{'Content-Type':'application/json'});res.end(JSON.stringify({message:'Synthetic preparation gate reached'}));return;}
     if(req.url==='/api/automation/status'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(backendState));return;}
     if(req.url==='/api/settings/autoapply'){let body='';req.on('data',c=>body+=c);req.on('end',()=>{const v=JSON.parse(body);backendState.autoApplyEnabled=v.enabled;backendState.autoApplyMinimumScore=v.minimumScore;backendState.dailyAutoApplyLimit=v.dailyLimit;res.setHeader('Content-Type','application/json');res.end('{}');});return;}
     res.setHeader('Content-Type','text/html');res.end('<!doctype html><h1>Junior C# Developer — synthetic fixture</h1><p>C# SQL remote</p>');
@@ -18,6 +20,20 @@ const http = require('node:http');
     const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
     // Stop background polling and direct backend reads to the local fixture only.
     await worker.evaluate(async base=>{await chrome.alarms.clearAll();await chrome.storage.sync.set({apiBase:base});},base);
+    // Real Chrome sender metadata and content-script relay, with Windows' default
+    // 127.0.0.1 dashboard and the extension's localhost backend setting.
+    await worker.evaluate(async base=>chrome.storage.sync.set({apiBase:base.replace('127.0.0.1','localhost')}),base);
+    const dashboard=await context.newPage();await dashboard.goto(base+'/index.html');
+    await dashboard.evaluate(()=>{
+      window.dashboardResults=[];
+      window.addEventListener('message',e=>{if(e.data?.type==='vjaDashboardApplyResult')window.dashboardResults.push(e.data);});
+      window.postMessage({type:'vjaDashboardApplyRequest',vacancyId:'11111111-1111-4111-8111-111111111111',requestId:'loopback-fixture'},location.origin);
+    });
+    await dashboard.waitForFunction(()=>window.dashboardResults.some(x=>x.message==='Synthetic preparation gate reached'));
+    assert.equal(dashboardPreparations,1,'alias request must reach backend preparation, not fail origin validation');
+    assert.equal(dashboard.url(),base+'/index.html');
+    await dashboard.close();
+    await worker.evaluate(async base=>chrome.storage.sync.set({apiBase:base}),base);
     const page=await context.newPage();await page.goto(base+'/vacancy/1');
     await worker.evaluate(async () => {const tabs=await chrome.tabs.query({});const tab=tabs.find(t=>t.url?.includes('/vacancy/1'));await chrome.tabs.sendMessage(tab.id,{type:'vjaToggleFloatingPanel'},{frameId:0});});
     // The actual extension iframe (inside a closed shadow root) is discoverable as a frame.

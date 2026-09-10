@@ -51,8 +51,8 @@ public sealed class ApplicationWritingService(IOptions<CandidateProfileOptions> 
         var source = project.Sources.FirstOrDefault();
         var projectLink = source is null ? "" : "\n" + (russian ? "Проект: " : "Project: ") + "https://github.com/" + source.Repository;
         var letter = russian
-            ? $"Здравствуйте! {opening} В проекте {project.Name} есть близкая работа: {contribution}. Использованные технологии: {evidence}.{complement} Буду рада показать код и обсудить задачи.\n\nGitHub: {c.GitHubUrl}{projectLink}\n{c.RussianName}"
-            : $"Hello! {opening} My {project.Name} project includes relevant work on {contribution}, using {evidence}.{complement} I would be happy to walk through the code and discuss the work.\n\nGitHub: {c.GitHubUrl}{projectLink}\n{c.Name}";
+            ? $"Здравствуйте! {opening} В проекте {project.Name} есть близкая работа: {contribution}. Использованные технологии: {evidence}.{complement}\n\nGitHub: {c.GitHubUrl}{projectLink}\n{c.RussianName}"
+            : $"Hello! {opening} My {project.Name} project includes relevant work on {contribution}, using {evidence}.{complement}\n\nGitHub: {c.GitHubUrl}{projectLink}\n{c.Name}";
         var conflicts = new CandidateKnowledgeService(candidate).Get().Identity.Conflicts;
         return new(AddContact(letter, russian), "deterministic-fallback", evidenceIds.ToArray(), conflicts.Length > 0, conflicts);
     }
@@ -71,6 +71,8 @@ public static class ApplicationClaimValidator
             if (!projects.Any(p => SkillCatalog.Proves(p.Skills, skill))) errors.Add("Unsupported skill: " + skill);
         if (VacancyUnderstandingService.Has(letter, @"\b\d+\s*(?:years?|лет|года)|commercial experience|коммерческ|certified|сертифи|bachelor|магистр|relocat|переез|зарплат|salary|visa|виз[ауы]"))
             errors.Add("Employment, degree, legal or personal commitment requires candidate review.");
+        if (VacancyUnderstandingService.Has(letter, @"(?:показать|покажу|рассказать|расскажу|объяснить|объясню|разобрать|разберу)[^.\n]{0,80}(?:код|проект)|(?:show|explain|walk\s+(?:you\s+)?through|demonstrate)[^.\n]{0,80}(?:code|project)|code\s+walkthrough"))
+            errors.Add("Do not offer a code demonstration or project walkthrough; provide GitHub links instead.");
         return errors.ToArray();
     }
 }
