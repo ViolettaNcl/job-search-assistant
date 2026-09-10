@@ -30,15 +30,41 @@ public sealed class RemotiveClient(IHttpClientFactory clients, IOptions<Remotive
 
     public bool Enabled => _options.Enabled;
 
+    private readonly SemaphoreSlim _feedLock = new(1, 1);
+    private IReadOnlyList<ExternalVacancyDto>? _cached;
+    private DateTimeOffset _nextFetch;
+    private DateTimeOffset _retryAfter;
+
+    // Remotive advises at most four feed requests a day. Share the feed across collection scopes.
     public async Task<IReadOnlyList<ExternalVacancyDto>> GetSoftwareJobsAsync(CancellationToken ct)
     {
         if (!Enabled) return [];
+        await _feedLock.WaitAsync(ct);
+        try
+        {
+            if (_cached is not null && DateTimeOffset.UtcNow < _nextFetch) return _cached;
+            if (DateTimeOffset.UtcNow < _retryAfter) throw new HttpRequestException("Remotive retry cooldown is active.");
+            try
+            {
+                _cached = await FetchAsync(ct);
+                _nextFetch = DateTimeOffset.UtcNow.AddHours(6);
+                return _cached;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException)
+            { _retryAfter = DateTimeOffset.UtcNow.AddMinutes(15); throw; }
+        }
+        finally { _feedLock.Release(); }
+    }
+
+    private async Task<IReadOnlyList<ExternalVacancyDto>> FetchAsync(CancellationToken ct)
+    {
         var client = clients.CreateClient("remotive");
-        var url = $"{_options.ApiUrl}?category=software-dev";
+        var url = _options.ApiUrl; // One complete feed, then the shared technical career-lane filter.
         using var response = await client.GetAsync(url, ct);
-        if (!response.IsSuccessStatusCode) return [];
+        response.EnsureSuccessStatusCode();
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
-        if (!json.RootElement.TryGetProperty("jobs", out var jobs) || jobs.ValueKind != JsonValueKind.Array) return [];
+        if (!json.RootElement.TryGetProperty("jobs", out var jobs) || jobs.ValueKind != JsonValueKind.Array) throw new JsonException("Remotive jobs array missing.");
 
         var list = new List<ExternalVacancyDto>();
         foreach (var job in jobs.EnumerateArray())

@@ -23,14 +23,41 @@ const http = require('node:http');
     // Real Chrome sender metadata and content-script relay, with Windows' default
     // 127.0.0.1 dashboard and the extension's localhost backend setting.
     await worker.evaluate(async base=>chrome.storage.sync.set({apiBase:base.replace('127.0.0.1','localhost')}),base);
+    // Drain startup's disabled-autopilot heartbeat before this manual-dispatch fixture.
+    // Otherwise the shared submission mutex can legitimately report 'busy' on the first request.
+    await worker.evaluate(async()=>{
+      for(let attempt=0;attempt<100;attempt++) {
+        if(!browserAutopilotRunning)return;
+        await new Promise(resolve=>setTimeout(resolve,50));
+      }
+      throw new Error('Background startup did not settle before the dashboard fixture');
+    });
     const dashboard=await context.newPage();await dashboard.goto(base+'/index.html');
     await dashboard.evaluate(()=>{
       window.dashboardResults=[];
       window.addEventListener('message',e=>{if(e.data?.type==='vjaDashboardApplyResult')window.dashboardResults.push(e.data);});
       window.postMessage({type:'vjaDashboardApplyRequest',vacancyId:'11111111-1111-4111-8111-111111111111',requestId:'loopback-fixture'},location.origin);
     });
-    await dashboard.waitForFunction(()=>window.dashboardResults.some(x=>x.message==='Synthetic preparation gate reached'));
+    try {await dashboard.waitForFunction(()=>window.dashboardResults.some(x=>x.message==='Synthetic preparation gate reached'),{},{timeout:10000});}
+    catch(error){console.error('Dashboard bridge diagnostic',await dashboard.evaluate(()=>window.dashboardResults),{dashboardPreparations});throw error;}
     assert.equal(dashboardPreparations,1,'alias request must reach backend preparation, not fail origin validation');
+    assert.equal(dashboard.url(),base+'/index.html');
+    // Remove the bridge from an already open document, then recover without reloading it.
+    await worker.evaluate(async()=>{
+      const tab=(await chrome.tabs.query({})).find(t=>t.url?.endsWith('/index.html'));
+      await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>window.vjaDashboardBridgeCleanup?.()});
+      await repairDashboardBridges();
+      // Reinjection must not create duplicate apply listeners.
+      await chrome.scripting.executeScript({target:{tabId:tab.id},files:['dashboard-apply-content.js']});
+    });
+    await dashboard.evaluate(()=>{
+      window.addEventListener('message',e=>{if(e.data?.type==='vjaDashboardBridgeReady')window.bridgeReady=e.data;});
+      window.postMessage({type:'vjaDashboardBridgeHello',requestId:'recovered'},location.origin);
+    });
+    await dashboard.waitForFunction(()=>window.bridgeReady?.ok);
+    await dashboard.evaluate(()=>window.postMessage({type:'vjaDashboardApplyRequest',vacancyId:'11111111-1111-4111-8111-111111111111',requestId:'recovered-apply'},location.origin));
+    await dashboard.waitForFunction(()=>window.dashboardResults.some(x=>x.requestId==='recovered-apply'&&x.message==='Synthetic preparation gate reached'));
+    assert.equal(dashboardPreparations,2,'one request after recovery, no duplicate listeners');
     assert.equal(dashboard.url(),base+'/index.html');
     await dashboard.close();
     await worker.evaluate(async base=>chrome.storage.sync.set({apiBase:base}),base);

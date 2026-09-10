@@ -50,7 +50,7 @@ builder.Services.AddSingleton<BrowserAutopilotTracker>();
 builder.Services.AddSingleton<ApplicationQuestionService>();
 builder.Services.AddSingleton<CandidateProfileReadinessService>();
 builder.Services.AddScoped<HhClient>();
-builder.Services.AddScoped<RemotiveClient>();
+builder.Services.AddSingleton<RemotiveClient>();
 builder.Services.AddScoped<AdzunaClient>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<TailoredHhApplyService>();
