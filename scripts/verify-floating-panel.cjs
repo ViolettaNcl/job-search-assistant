@@ -23,6 +23,15 @@ const http = require('node:http');
     // Real Chrome sender metadata and content-script relay, with Windows' default
     // 127.0.0.1 dashboard and the extension's localhost backend setting.
     await worker.evaluate(async base=>chrome.storage.sync.set({apiBase:base.replace('127.0.0.1','localhost')}),base);
+    // Drain startup's disabled-autopilot heartbeat before this manual-dispatch fixture.
+    // Otherwise the shared submission mutex can legitimately report 'busy' on the first request.
+    await worker.evaluate(async()=>{
+      for(let attempt=0;attempt<100;attempt++) {
+        if(!browserAutopilotRunning)return;
+        await new Promise(resolve=>setTimeout(resolve,50));
+      }
+      throw new Error('Background startup did not settle before the dashboard fixture');
+    });
     const dashboard=await context.newPage();await dashboard.goto(base+'/index.html');
     await dashboard.evaluate(()=>{
       window.dashboardResults=[];
