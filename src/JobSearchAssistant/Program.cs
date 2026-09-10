@@ -499,4 +499,4 @@ public sealed record ExtensionAnalyzeRequest(
     string? RemoteScope,
     string? Experience,
     string? Source,
-    bool Remote = true);
+    bool Remote = false);

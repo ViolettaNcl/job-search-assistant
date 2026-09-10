@@ -13,6 +13,7 @@ public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> 
 {
     public OpportunityAssessment Assess(string title, string text, bool remote, string experience = "", string location = "", string scope = "", int minimumScore = 75)
     {
+        remote = RemoteWorkPolicy.IsFullyRemote(remote, text);
         var k = new CandidateKnowledgeService(options).Get();
         var u = new VacancyUnderstandingService().Understand(title, text, remote, experience, location);
         var matches = u.Requirements.Select(r => new RequirementMatch(r,
@@ -54,7 +55,7 @@ public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> 
              new("Evidence strength", evidence, "Share of requirement families with repository-backed project evidence."),
              new("Seniority compatibility", seniority, u.Seniority),
              new("Eligibility", eligibility.Status == "Eligible" ? 100 : eligibility.Status == "Likely ineligible" ? 0 : null, eligibility.Reason),
-             new("Location compatibility", eligibility.Status == "Eligible" ? remote ? 100 : 85 : null, "Remote preferred. Local onsite/hybrid allowed. Relocation requires explicit acceptance."),
+             new("Location compatibility", eligibility.Status == "Eligible" ? remote ? 100 : 85 : null, search?.Value.RemoteOnly != false ? "Only verified fully remote work; required office attendance is excluded." : "Remote preferred; local work follows explicit preferences."),
              new("Career value", career, u.CareerLane),
              new("Application friction", null, "Unknown until the employer form is inspected.")], matches, review.ToArray());
     }
@@ -67,7 +68,7 @@ public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> 
             return ("Likely ineligible", "Current country is explicitly excluded.");
         if (!remote)
         {
-            if (search?.Value.RemoteOnly == true) return ("Likely ineligible", "Explicit remote-only preference.");
+            if (search?.Value.RemoteOnly != false) return ("Likely ineligible", "Explicit remote-only preference.");
             if (k.LocationPreferences.UnacceptableRelocationCities.Any(c => location.Contains(c, StringComparison.OrdinalIgnoreCase)))
                 return ("Likely ineligible", "Explicitly excluded location.");
             var local = VacancyUnderstandingService.Has(k.CurrentCity, "Volgograd|Волгоград") && VacancyUnderstandingService.Has(location, "Volgograd|Волгоград");

@@ -6,6 +6,12 @@
     if (!report) return;
     node('screeningNotice').textContent = report.notice;
     node('screeningExcerpt').value = report.suggestedResumeExcerpt || '';
+    node('screeningActions').replaceChildren();
+    for (const action of report.actions || []) {
+      const item = document.createElement('li');
+      item.textContent = (action.priority === 'High' ? 'Проверить до отправки: ' : '') + action.message;
+      node('screeningActions').append(item);
+    }
     node('screeningTerms').replaceChildren();
     for (const term of report.requirements || []) {
       const row = document.createElement('p');

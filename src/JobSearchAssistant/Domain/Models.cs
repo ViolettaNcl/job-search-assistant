@@ -180,7 +180,7 @@ public sealed record SearchOptions
     public int IntervalMinutes { get; init; } = 30;
     public int MaxNewVacanciesPerRun { get; init; } = 80;
     public int MinimumTelegramScore { get; init; } = 65;
-    public bool RemoteOnly { get; init; } = false;
+    public bool RemoteOnly { get; init; } = true;
     public bool IncludeRelocationWithVisa { get; init; } = false;
 }
 

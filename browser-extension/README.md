@@ -180,17 +180,16 @@ After updating extension code, click **Reload** on the extension card.
 
 ## Privacy and safety model
 
-Vacancy pages are not transmitted in the background. Page text/form metadata are sent to the configured backend only after the user requests analysis or a form action.
+Manual analysis sends the current vacancy text/form metadata to the configured backend. When the user enables HH browser discovery and autopilot, the extension also imports the configured HH search results and vacancy descriptions in the background. Unrelated tabs are not collected.
 
 Reusable answers and CV Vault files remain in the local Chrome profile. Multi-step application context uses ephemeral `chrome.storage.session` and expires automatically. Cross-tab handoff does not enumerate or inspect unrelated tabs; it follows only the browser-provided opener relationship and deterministic ATS tenant identity. Queue deferrals store only a vacancy status plus expiry note in the existing CRM event history.
 
 ## Next iteration
 
-- validate real application forms and cross-tab behavior across Workday, SmartRecruiters, Teamtailor, Recruitee, Workable, Greenhouse, Lever, Ashby and Personio;
-- add platform-specific adapters only where field/value mapping can be proven deterministic and safe;
-- add a more flexible defer menu only if real usage shows 4 hours is too rigid;
-- optional company-specific writing provider with deterministic truthful fallback;
-- continue using outcome analytics to decide which sources, role families and CV variants deserve more applications.
+- Complete the authenticated HH pilot first: fully remote vacancy → grounded letter → resume + letter submission → confirmed receipt → CRM dates. Existing Chrome fixtures do not prove production reliability.
+- Validate changed HH work-format and letter controls on real accessible pages; stop on unknown forms, CAPTCHA or login.
+- Compare the actual selected HH resume text with the vacancy. Prioritized screening actions distinguish missing mandatory evidence from truthful project wording that could be clearer. They never promise to bypass employer filters.
+- Use outcome analytics after sufficient real samples. Additional ATS adapters and company-specific AI automation are deferred until the HH pilot is reliable. No LinkedIn setup is required.
 
 
 Operator 2.7.0 moves qualification and project selection into backend services. Scores are explained priority indices, not hiring probabilities. Optional AI suggestions are available in the local dashboard, clearly labeled and review-only; normal extension drafts use verified project evidence with deterministic fallback. The popup's HH API button observer now avoids redundant class writes that could starve the browser event loop. See `docs/JOB_OPERATOR_AUDIT.md` for measured checks and the remaining real HH pilot gates.
@@ -209,3 +208,6 @@ The rocket starts/stops HH autopilot using the backend's saved threshold/quota. 
 
 
 2.7.4: queued eligible HH jobs are processed before another discovery run. Browser discovery checks the automatic queue after every imported vacancy and sends the selected verified job with its tailored letter before reading the next card. Pause/quota and unresolved submission states stop this continuation. The backend filters review-only and senior roles before the queue limit. The dashboard defaults to applications, shows discovery and recorded submission dates separately, and refreshes receipts/review stops every ten seconds. Diagnosis and secondary tools are collapsible.
+
+
+2.7.5: only fully remote vacancies can enter unattended queues, including old records. Missing remote metadata is no longer assumed true; mandatory office/hybrid descriptions override a remote flag. Missing HH description stops extraction instead of treating recommended jobs as the current role. Screening review adds prioritized, evidence-grounded CV actions; no CV is silently changed.

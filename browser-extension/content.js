@@ -68,7 +68,7 @@ function detectTitle(ats) {
 
 function detectDescription(ats) {
   const targeted = firstText(selectorsFor(ats, "description"));
-  const raw = targeted || textOf(document.body);
+  const raw = targeted || (ats === "hh" ? "" : textOf(document.body));
   return raw.slice(0, 28000);
 }
 
@@ -107,15 +107,15 @@ function extractPage() {
   const ats = detectAts();
   const structured = window.vjaAtsStructured?.readStructuredJobPosting?.(document) || null;
   const bodyRaw = textOf(document.body);
-  const body = bodyRaw.toLowerCase();
   const locationText = structured?.location || detectLocation(ats);
   const country = structured?.country || inferCountry(ats, locationText, bodyRaw);
-  const remoteOnPage = /remote|удален|удалён|work from home|home office|fully distributed/i.test(body);
+  const description = structured?.description || detectDescription(ats);
+  const remoteOnPage = /remote|удален|удалён|work from home|home office|fully distributed/i.test(description);
   const remote = Boolean(structured?.remote || remoteOnPage);
   return {
     title: structured?.title || detectTitle(ats),
     company: structured?.company || detectCompany(ats),
-    description: structured?.description || detectDescription(ats),
+    description,
     country,
     location: locationText,
     remoteScope: remote ? (structured?.remote ? "Remote detected in structured job data" : "Remote detected on page") : "",

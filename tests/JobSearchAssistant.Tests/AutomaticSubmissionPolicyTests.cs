@@ -20,6 +20,7 @@ public sealed class AutomaticSubmissionPolicyTests
         Assert.AreEqual(10, schedule.CycleMinutes);
         Assert.AreEqual(180, schedule.FailureCooldownMinutes);
         Assert.AreEqual(30, search.IntervalMinutes);
+        Assert.IsTrue(search.RemoteOnly);
     }
 
     [TestMethod]
@@ -77,10 +78,24 @@ public sealed class AutomaticSubmissionPolicyTests
         Assert.IsFalse(AutomaticSubmissionPolicy.IsEntryLevelTitle("Senior Software Engineer"));
     }
 
+    [TestMethod]
+    public void AutoSubmit_RejectsLegacyNonRemoteAndContradictoryRemoteRecords()
+    {
+        var vacancy = EligibleVacancy();
+        vacancy.IsRemote = false;
+        Assert.IsFalse(AutomaticSubmissionPolicy.CanSubmit(vacancy, 50));
+        vacancy.IsRemote = true;
+        vacancy.DescriptionText = "Remote. Required to visit the office every week.";
+        Assert.IsFalse(AutomaticSubmissionPolicy.CanSubmit(vacancy, 50));
+        vacancy.DescriptionText = "Fully remote worldwide. C#, SQL.";
+        Assert.IsTrue(AutomaticSubmissionPolicy.CanSubmit(vacancy, 50));
+    }
+
     private static Vacancy EligibleVacancy()
         => new()
         {
             Source = "hh",
+            IsRemote = true,
             Title = "Junior .NET Developer",
             MatchScore = 96,
             EligibilityStatus = "Eligible",

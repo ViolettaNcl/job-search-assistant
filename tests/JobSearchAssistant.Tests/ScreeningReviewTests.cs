@@ -71,6 +71,30 @@ public sealed class ScreeningReviewTests
     }
 
     [TestMethod]
+    public void ActionsSeparateMandatoryGapsFromPreferredSkillsAndDoNotDiagnoseRejection()
+    {
+        var r = Review("Required: C#, SQL. Preferred: Azure.", "C#");
+        Assert.IsFalse(r.Actions.Any(a => a.Code == "must-have-gap"));
+        Assert.IsTrue(r.Actions.Any(a => a.Code == "describe-project-evidence" && a.Message.Contains("SQL")));
+        Assert.AreEqual("Unknown", r.EmployerDecisionReason);
+        var mandatory = Review("Required: C#, SQL, Azure. 3 years experience required.", "C# SQL Azure");
+        Assert.IsTrue(mandatory.Actions.Any(a => a.Code == "must-have-gap" && a.Priority == "High"));
+        Assert.IsTrue(mandatory.Actions.Any(a => a.Code == "unverified-resume-claim"));
+        Assert.IsTrue(mandatory.Actions.Any(a => a.Code == "employment-review"));
+        Assert.AreEqual(0, mandatory.VerifiedTermsToAdd.Length);
+        Assert.IsFalse(mandatory.SuggestedResumeExcerpt.Contains("Azure"));
+    }
+
+    [TestMethod]
+    public void MissingResumeAndMandatoryEducationProduceSpecificNextActions()
+    {
+        var r = Review("Required: C#, SQL. University degree required.");
+        Assert.IsTrue(r.Actions.Any(a => a.Code == "check-selected-resume"));
+        Assert.IsTrue(r.Actions.Any(a => a.Code == "education-review"));
+        Assert.IsFalse(r.Actions.Any(a => a.Code == "describe-project-evidence"));
+    }
+
+    [TestMethod]
     public void NoEvidenceProducesNoInventedResumeExcerpt()
     {
         var r = Review("Required: Python, Azure.", "Python Azure");

@@ -44,9 +44,23 @@ public sealed class JobOperatorCoreTests
     [TestMethod]
     public void RemotePreferredAllowsLocalOnsiteButHonorsExplicitRemoteOnly()
     {
-        Assert.AreEqual("Eligible", Assess("C#, SQL", remote: false, location: "Волгоград").EligibilityStatus);
+        Assert.AreEqual("Eligible", Assess("C#, SQL", remote: false, location: "Волгоград", search: new() { RemoteOnly = false }).EligibilityStatus);
         Assert.AreEqual("Likely ineligible", Assess("C#, SQL", remote: false, location: "Волгоград", search: new() { RemoteOnly = true }).EligibilityStatus);
         Assert.AreEqual("Likely ineligible", Assess("C#, SQL", remote: false, location: "Moscow").EligibilityStatus);
+    }
+
+    [TestMethod]
+    public void RemoteOnlyDefaultRejectsLocalOfficeAndContradictoryLabels()
+    {
+        Assert.AreEqual("SKIP", Assess("C#, SQL", remote: false, location: "Волгоград").Decision);
+        foreach (var condition in new[] { "Hybrid, two office days", "Remote after probation", "Must attend the office weekly", "Обязательное посещение офиса", "Удалёнка после испытательного срока", "На месте работодателя", "Не удалённая работа" })
+        {
+            var result = Assess("Required: C#, SQL. Remote worldwide. " + condition);
+            Assert.AreEqual("SKIP", result.Decision, condition);
+            Assert.AreNotEqual("Remote", result.Understanding.WorkMode, condition);
+        }
+        Assert.AreEqual("APPLY", Assess("Required: C#, SQL. Fully remote worldwide. Hybrid cloud architecture.").Decision);
+        Assert.IsFalse(RemoteWorkPolicy.IsFullyRemote(false, "C# SQL"));
     }
 
     [TestMethod]
