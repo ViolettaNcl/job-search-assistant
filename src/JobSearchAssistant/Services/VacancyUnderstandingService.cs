@@ -45,7 +45,7 @@ public sealed class VacancyUnderstandingService
         var role = Has(title, @"\bQA\b|тестиров|quality|automation") ? "QA automation"
             : Has(title, @"implementation|внедрен") ? "Implementation"
             : Has(title, @"support|поддерж") ? "Technical support"
-            : Has(title, @"developer|engineer|разработ|программист") || Has(title, @"стаж|intern") && Has(all, @"C#|\.NET") ? "Software engineering" : "Other";
+            : Has(title, @"developer|engineer|разработ|программист") || Has(title, @"стаж|intern") && Has(all, @"C#|\.NET|React|TypeScript|JavaScript|PHP|WPF") ? "Software engineering" : "Other";
         var technical = unique.Any(r => r.Skill is "C#" or "SQL" or "SQL Server" or "REST" or "Testing");
         var lane = role == "Software engineering" ? "primary"
             : role is "QA automation" or "Implementation" && technical ? "secondary"

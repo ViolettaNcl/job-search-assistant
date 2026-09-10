@@ -149,18 +149,17 @@ public sealed record SearchOptions
     public string[] RussiaQueries { get; init; } =
     [
         "Junior C# Developer",
-        "Junior .NET Developer",
-        "C# .NET разработчик",
-        ".NET разработчик",
-        "ASP.NET Core разработчик",
-        "Младший разработчик C#",
-        "Стажер C# .NET",
-        "Стажёр C# .NET",
-        "Стажировка .NET",
+        "Junior Frontend Developer React",
+        "Стажер .NET",
         "Junior QA Automation",
-        "Стажер тестировщик",
-        "Junior специалист по внедрению",
-        "Technical Support Engineer"
+        "Junior Backend Developer",
+        "Junior Fullstack Developer",
+        "Младший разработчик WPF",
+        "Junior специалист по внедрению SQL",
+        "Стажер программист PHP",
+        "Junior .NET Developer",
+        "Младший специалист технической поддержки SQL",
+        "Стажер разработчик TypeScript"
     ];
 
     public string[] InternationalQueries { get; init; } =

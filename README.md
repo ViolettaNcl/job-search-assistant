@@ -219,6 +219,7 @@ Persistent PostgreSQL startup applies registered EF migrations automatically. Th
 Current priority: qualified **fully remote** HH applications with a short evidence-grounded letter. Version 2.7.5 makes remote-only the default again, following Violetta's explicit preference. Automatic queues and API submission also exclude old non-remote records and contradictory mandatory-office descriptions. Unknown remote format is not treated as remote. Explicit `Search:RemoteOnly=false` remains a manual search override; unattended applications still require remote work.
 
 Completed foundations:
+- junior/intern vacancies with the HH 1–3-year metadata band can qualify when no explicit mandatory employment years are stated; rotation covers remote C#/.NET, frontend, WPF, PHP, QA, implementation and SQL/API support (2.7.7);
 - vacancy/company-specific grounded openings, complementary project selection and consistent career headlines (2.7.6);
 - immediate qualified application after browser discovery, existing-queue processing before another search, pause/quota rechecks and confirmed resume + letter receipts (2.7.4);
 - discovery and submission timestamps, review reasons and live application journal (2.7.4);
@@ -234,3 +235,10 @@ Remaining release gates, in order:
 5. Consider further platforms only after the HH pilot meets its gates. LinkedIn is excluded. Production hosting/PostgreSQL deployment is deferred until separately requested; no Vercel deployment is part of this release.
 
 ATS preparation means clear, truthful, relevant CV content. It cannot guarantee passing a recruiter's private filters. Pasted resume text is compared locally and is not automatically written into the selected HH resume.
+
+
+### Junior autopilot policy (2.7.7)
+
+For eligible remote junior/intern vacancies, the HH `between1And3` band alone no longer forces a manual stop. The score still reflects less certain experience compatibility; the user's saved threshold/quota are unchanged. Explicit required years, unrecognized free-text experience requirements, missing must-have skills, senior roles and hiring restrictions still require review or exclusion. Applications describe verified project work, never invented employment years. Known Russian/English HH experience bands are normalized; free text is not silently discarded.
+
+Browser discovery continues to qualify and attempt resume + vacancy-specific letter submission immediately after each import, before reading the next vacancy. Import is retained for identity/history; only confirmed resume + letter results count as successful applications. Default query rotation alternates technical directions instead of spending its first several searches on near-identical .NET queries. Additional boards and LinkedIn are not enabled.

@@ -167,6 +167,26 @@ public sealed class ApplicationQueueServiceTests
         Assert.IsTrue(manual.Any(x => x.EligibilityStatus == "Verify"), "Review queue stays available for manual decisions");
     }
 
+    [TestMethod]
+    public async Task AutomaticQueueRequalifiesJuniorBandAndBuildsItsLetterWithoutManualApproval()
+    {
+        await using var db = CreateDb();
+        var company = new Company { Name = "Frontend employer", Source = "hh", ExternalId = "junior-band" };
+        var vacancy = CreateVacancy(company, "Junior Frontend Developer", 99, "Verify", DateTimeOffset.UtcNow);
+        vacancy.Source = "hh"; vacancy.Experience = "between1And3"; vacancy.LocationText = "Russia";
+        vacancy.DescriptionText = "Required: React, TypeScript, Next.js. Remote Russia.";
+        db.Add(vacancy); await db.SaveChangesAsync();
+        var candidate = Options.Create(new CandidateProfileOptions());
+        var queue = new ApplicationQueueService(db, new(candidate), new(candidate));
+        var items = await queue.GetAsync(10, 75, "hh", true, CancellationToken.None);
+        Assert.AreEqual(1, items.Count);
+        Assert.AreEqual(vacancy.Id, items[0].VacancyId);
+        StringAssert.Contains(items[0].ShortMessage, "Frontend employer");
+        StringAssert.Contains(items[0].ShortMessage, "CV / Portfolio");
+        StringAssert.Contains(items[0].ShortMessage, "React");
+        Assert.IsFalse(items[0].ShortMessage.Contains("years of experience"));
+    }
+
     private static Vacancy CreateVacancy(Company company, string title, int score, string eligibility, DateTimeOffset published)
         => new()
         {
