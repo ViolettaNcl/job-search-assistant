@@ -4,7 +4,7 @@ const id='11111111-1111-4111-8111-111111111111';
 async function fixture({letter=true,pending=false,createFails=false,apiBase='http://localhost:8080'}={}) {
   const data={},trace=[],messages=[],listeners=[],tabs=new Map();
   const event={addListener:()=>{}},local={get:async()=>({...data}),set:async x=>Object.assign(data,x),remove:async keys=>[].concat(keys).forEach(k=>delete data[k]),setAccessLevel:async()=>{}};
-  const context={console,URL,Date,Promise,AbortController,setTimeout,clearTimeout,self:{},chrome:{runtime:{onInstalled:event,onStartup:event,onMessage:{addListener:f=>listeners.push(f)},getURL:p=>'chrome-extension://test/'+p},alarms:{create:async()=>{},onAlarm:event},storage:{local,sync:{get:async()=>({apiBase})}},tabs:{
+  const context={console,URL,Date,Promise,AbortController,setTimeout,clearTimeout,self:{},chrome:{runtime:{onInstalled:event,onStartup:event,onMessage:{addListener:f=>listeners.push(f)},getManifest:()=>({version:'2.7.10'}),getURL:p=>'chrome-extension://test/'+p},alarms:{create:async()=>{},onAlarm:event},storage:{local,sync:{get:async()=>({apiBase})}},tabs:{
     create:async p=>{trace.push(['create',p]);if(createFails)throw Error('tab unavailable');const tab={id:2,status:'complete',url:p.url};tabs.set(2,tab);return tab;},
     get:async n=>tabs.get(n),remove:async n=>{trace.push(['close',n]);tabs.delete(n);},update:async(n,p)=>trace.push(['activate',p]),
     sendMessage:async(n,m)=>{if(n===1){messages.push(m);return;}assert.equal(m.plan.automatic,false);assert.equal(m.plan.trackedId,id);assert.equal(m.plan.coverLetter,'Verified letter for selected vacancy');trace.push(['send',m.plan]);return pending?{status:'submitted-needs-letter'}:{submitted:true,status:'confirmed',coverLetterFilled:letter};}
@@ -47,6 +47,7 @@ async function fixture({letter=true,pending=false,createFails=false,apiBase='htt
     await new Promise(r=>setImmediate(r));assert.equal(alias.messages.at(-1).status,'confirmed',url);
     assert(alias.trace.some(x=>x[0]==='http'&&x[1]===apiBase+'/api/vacancies/'+id+'/prepare-dashboard-apply'));
   }
+  const hello=await fixture();assert.equal((await hello.request({message:{type:'vjaDashboardBridgeHello'}})).ok,true);assert(!hello.trace.some(x=>x[0]==='create'));
   const valid=await fixture();assert.equal((await valid.request()).ok,true);await new Promise(r=>setImmediate(r));assert.equal(valid.messages.at(-1).status,'confirmed');
   const failed=await fixture({createFails:true});await failed.context.runDashboardApply('http://localhost:8080',id,failed.sender,'failed');assert(!failed.data.vjaPendingSiteApply);assert(!failed.data.vjaBrowserAutopilotActivePlan);assert.equal(failed.messages.at(-1).status,'review');
   console.log('Dashboard manual apply: exact vacancy/letter, inactive tab, verified receipt, no-letter stop, duplicate prevention, continuation and origin restriction passed');

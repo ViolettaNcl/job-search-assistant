@@ -5,7 +5,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),http
   const vacancy={id:'fixture',title:'Junior C# Developer',company:'Example Studio',source:'hh',sourceLabel:'HH',url:'https://example.invalid/vacancy/1',firstSeenAt:found,matchScore:86,eligibilityStatus:'Eligible',eligibilityReason:'Verified project evidence',marketLabel:'Россия',opportunityTypeLabel:'Полная занятость'};
   const pipeline=[{...vacancy,appliedAt:sent,updatedAt:sent,status:'Applied',automatic:true,coverLetterIncluded:true}];
   const automation={allowed:true,ready:true,autoApplyEnabled:true,browserConnected:true,automationMode:'browser-extension',autoApplyMinimumScore:75,dailyAutoApplyLimit:15,appliedToday:1,remainingToday:14,lastMessage:'Отклик и письмо отправлены: Junior C# Developer.',collection:{},diagnostics:{}};
-  const errors=[],directRequests=[];
+  const errors=[],directRequests=[];let international=false;
   const server=http.createServer((req,res)=>{
     // Serve only fixed assets; request input never becomes a filesystem path.
     if(req.url==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');res.end(fs.readFileSync('src/JobSearchAssistant/wwwroot/index.html'));return;}
@@ -16,7 +16,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),http
     if(req.url==='/api/dashboard')data={stats:{applied:pipeline.length,interviews:0,offers:0},state:{},pipeline};
     else if(req.url==='/api/automation/status')data=automation;
     else if(req.url==='/api/operator/today')data={applicationsRecordedToday:1,needsReview:1,best:[]};
-    else if(req.url.includes('/api/vacancies?status=New'))data=[vacancy];
+    else if(req.url.includes('/api/vacancies?status=New'))data=international?[vacancy,{...vacancy,id:'remote-fixture',source:'remotive',sourceLabel:'Remotive',title:'Junior React Developer'}]:[vacancy];
     else if(req.url.includes('/api/vacancies?status=Saved'))data=[{...vacancy,id:'review',title:'Junior QA — проверить вопрос',status:'Saved',reviewNote:'QueueDeferredUntil=2026-09-10T12:00:00Z\nУточните дату выхода на работу.'}];
     res.setHeader('Content-Type','application/json');res.end(JSON.stringify(data));
   });
@@ -32,12 +32,20 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),http
     await page.evaluate(()=>refreshDashboard());assert.equal(await page.locator('#countPipeline').innerText(),'2');assert((await page.locator('#pipeline').innerText()).includes('Нет подтверждённой даты'));
     await page.locator('[data-view="review"]').click();assert((await page.locator('#jobs').innerText()).includes('Уточните дату выхода'));assert(!(await page.locator('#jobs').innerText()).includes('QueueDeferredUntil'));
     await page.locator('[data-view="all"]').click();assert((await page.locator('#jobs .dates').innerText()).includes('09.09.2026'));
+    assert.equal(await page.locator('#jobs .actions').first().locator('a').first().textContent(),'Посмотреть вакансию');
+    international=true;await page.evaluate(()=>refreshDashboard());
+    await page.locator('[data-source="remotive"]').click();assert.equal(await page.locator('#jobs .card').count(),1);assert((await page.locator('#jobs').innerText()).includes('Junior React'));
+    await page.locator('[data-source="hh"]').click();assert.equal(await page.locator('#jobs .card').count(),1);
     // A local bridge fixture exercises the actual dashboard without any employer connection.
     await page.evaluate(()=>{
-      window.requests=[];
-      window.addEventListener('message',e=>{if(e.data?.type==='vjaDashboardApplyRequest')window.requests.push(e.data);});
+      window.requests=[];window.bridgeEnabled=false;
+      window.addEventListener('message',e=>{if(window.bridgeEnabled&&e.data?.type==='vjaDashboardBridgeHello')window.postMessage({type:'vjaDashboardBridgeReady',requestId:e.data.requestId,ok:true,version:'fixture'},location.origin);if(e.data?.type==='vjaDashboardApplyRequest')window.requests.push(e.data);});
     });
     const dashboardUrl=page.url();
+    await page.locator('[data-apply-id="fixture"]').click();
+    await page.waitForFunction(()=>document.querySelector('#jobs').textContent.includes('Запрос на отклик не отправлялся.'));
+    assert.equal(await page.evaluate(()=>window.requests.length),0,'no bridge means no dispatched application');
+    await page.evaluate(()=>{window.bridgeEnabled=true;});
     await page.locator('[data-apply-id="fixture"]').click();
     await page.waitForFunction(()=>window.requests.length===1);
     assert(await page.locator('[data-apply-id="fixture"]').isDisabled());

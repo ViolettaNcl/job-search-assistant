@@ -128,11 +128,13 @@ public sealed class JobService(
             {
                 foreach (var item in await remotive.GetSoftwareJobsAsync(ct))
                 {
-                    if (!LooksLikeDotNet(item)) continue;
+                    if (!MatchesTechnicalSearch(item)) continue;
                     feed[$"{item.Source}:{item.ExternalId}"] = item;
                 }
             }
-            catch { }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or System.Text.Json.JsonException)
+            { errors.Add("Remotive: источник временно недоступен. Следующая попытка — по расписанию."); }
             remotiveFound = feed.Count;
             var remotiveBudget = adzuna.Enabled ? Math.Max(1, remaining / 2) : remaining;
             foreach (var item in feed.Values.OrderByDescending(x => x.PublishedAt).Take(remotiveBudget * 2))
@@ -638,13 +640,11 @@ public sealed class JobService(
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(input))).ToLowerInvariant();
     }
 
-    private static bool LooksLikeDotNet(ExternalVacancyDto dto)
+    public static bool MatchesTechnicalSearch(ExternalVacancyDto dto)
     {
-        var text = $"{dto.Title} {dto.Description}";
-        return text.Contains("C#", StringComparison.OrdinalIgnoreCase) ||
-               text.Contains(".NET", StringComparison.OrdinalIgnoreCase) ||
-               text.Contains("dotnet", StringComparison.OrdinalIgnoreCase) ||
-               text.Contains("ASP.NET", StringComparison.OrdinalIgnoreCase);
+        if (!AutomaticSubmissionPolicy.HasSafeSeniority(dto.Title)) return false;
+        var understanding = new VacancyUnderstandingService().Understand(dto.Title, dto.Description, dto.Remote);
+        return understanding.CareerLane != "excluded" && understanding.Requirements.Length > 0;
     }
     private static bool ShouldConsider(ExternalVacancyDto dto, SearchOptions options)
     {

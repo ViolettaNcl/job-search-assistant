@@ -37,7 +37,16 @@ goto end
 
 :ready
 echo Backend is ready.
-start "" "http://127.0.0.1:8080/"
+rem Prefer Chrome, where the companion extension is normally installed.
+set "VJA_CHROME="
+if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "VJA_CHROME=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "VJA_CHROME=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" set "VJA_CHROME=%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
+if defined VJA_CHROME (
+  start "" "%VJA_CHROME%" "http://127.0.0.1:8080/"
+) else (
+  start "" "http://127.0.0.1:8080/"
+)
 echo.
 echo The assistant is now running. Keep the "Violetta Apply Assistant" backend window open all day.
 echo On the dashboard, use "Start AI assistant" to enable or pause automatic HH applications.

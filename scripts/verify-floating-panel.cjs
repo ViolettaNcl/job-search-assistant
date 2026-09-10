@@ -32,6 +32,23 @@ const http = require('node:http');
     await dashboard.waitForFunction(()=>window.dashboardResults.some(x=>x.message==='Synthetic preparation gate reached'));
     assert.equal(dashboardPreparations,1,'alias request must reach backend preparation, not fail origin validation');
     assert.equal(dashboard.url(),base+'/index.html');
+    // Remove the bridge from an already open document, then recover without reloading it.
+    await worker.evaluate(async()=>{
+      const tab=(await chrome.tabs.query({})).find(t=>t.url?.endsWith('/index.html'));
+      await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>window.vjaDashboardBridgeCleanup?.()});
+      await repairDashboardBridges();
+      // Reinjection must not create duplicate apply listeners.
+      await chrome.scripting.executeScript({target:{tabId:tab.id},files:['dashboard-apply-content.js']});
+    });
+    await dashboard.evaluate(()=>{
+      window.addEventListener('message',e=>{if(e.data?.type==='vjaDashboardBridgeReady')window.bridgeReady=e.data;});
+      window.postMessage({type:'vjaDashboardBridgeHello',requestId:'recovered'},location.origin);
+    });
+    await dashboard.waitForFunction(()=>window.bridgeReady?.ok);
+    await dashboard.evaluate(()=>window.postMessage({type:'vjaDashboardApplyRequest',vacancyId:'11111111-1111-4111-8111-111111111111',requestId:'recovered-apply'},location.origin));
+    await dashboard.waitForFunction(()=>window.dashboardResults.some(x=>x.requestId==='recovered-apply'&&x.message==='Synthetic preparation gate reached'));
+    assert.equal(dashboardPreparations,2,'one request after recovery, no duplicate listeners');
+    assert.equal(dashboard.url(),base+'/index.html');
     await dashboard.close();
     await worker.evaluate(async base=>chrome.storage.sync.set({apiBase:base}),base);
     const page=await context.newPage();await page.goto(base+'/vacancy/1');
