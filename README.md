@@ -196,7 +196,7 @@ The generated follow-up is Russian for Russia/HH applications and English for in
 
 ## Automatic submission
 
-Apply Autopilot is off until the user starts it from the local dashboard. The start/pause choice persists in the local database, so an enabled autopilot resumes after restarting the program. In the default browser mode, Chrome and the installed extension must stay open with an active HH login; no developer credentials are required. New installations default to an 85% fit threshold and 25 applications per local calendar day; the dashboard supports 75–100% and 1–50 per day.
+Apply Autopilot is off until the user starts it from the local dashboard. The start/pause choice persists in the local database, so an enabled autopilot resumes after restarting the program. In the default browser mode, Chrome and the installed extension must stay open with an active HH login; no developer credentials are required. New installations default to an 85/100 priority threshold and 25 applications per local calendar day; the dashboard supports 50–100 and 1–200 per day. The index is not a hiring probability.
 
 Background submission is deliberately HH-only and never uses LinkedIn. External employer forms need an open browser tab and the extension's explicit one-click action.
 
@@ -216,8 +216,20 @@ Persistent PostgreSQL startup applies registered EF migrations automatically. Th
 
 ## Next development priorities
 
-- validate and refine ATS selectors against real Greenhouse/Lever/Ashby applications;
-- enter Violetta's real Phone/LinkedIn only after explicit confirmation;
-- optional deeper language-model tailoring with a deterministic truthful fallback;
-- production deployment smoke test with persistent PostgreSQL, HH OAuth and extension end-to-end;
-- backups/restore drill and operational monitoring once real application history is accumulating.
+Current priority: qualified **fully remote** HH applications with a short evidence-grounded letter. Version 2.7.5 makes remote-only the default again, following Violetta's explicit preference. Automatic queues and API submission also exclude old non-remote records and contradictory mandatory-office descriptions. Unknown remote format is not treated as remote. Explicit `Search:RemoteOnly=false` remains a manual search override; unattended applications still require remote work.
+
+Completed foundations:
+- immediate qualified application after browser discovery, existing-queue processing before another search, pause/quota rechecks and confirmed resume + letter receipts (2.7.4);
+- discovery and submission timestamps, review reasons and live application journal (2.7.4);
+- configured contact email in letters; phone and private answers stay in local configuration;
+- configurable review-only AI provider plus deterministic evidence-grounded writing;
+- screening review with a prioritized action list: mandatory skill/experience/education gaps, eligibility review, verified skills missing from pasted CV text, and unsupported claims requiring confirmation (2.7.5).
+
+Remaining release gates, in order:
+1. Run an authenticated HH pilot on eligible remote vacancies and record actual confirmed submissions, letter failures, review stops and duplicates. Unit/fixture tests are not a production-success rate. HH access restrictions and unknown employer questions require user action.
+2. Validate current HH work-format fields and resume/letter controls against accessible live pages. Description/structured-data extraction is conservative; an unrecognized format must not silently become remote.
+3. Add a local SQLite backup/restore workflow and perform a restore drill before expanding unattended usage with substantial history. Existing restart tests prove persistence, not backup recovery.
+4. Use recruiter responses and interviews to assess application quality once the minimum sample size is met. The employer's rejection reason remains unknown unless supplied by the employer.
+5. Consider further platforms only after the HH pilot meets its gates. LinkedIn is excluded. Production hosting/PostgreSQL deployment is deferred until separately requested; no Vercel deployment is part of this release.
+
+ATS preparation means clear, truthful, relevant CV content. It cannot guarantee passing a recruiter's private filters. Pasted resume text is compared locally and is not automatically written into the selected HH resume.

@@ -87,3 +87,16 @@ Regression covers regional hosts, encoding, tracking parameters, trailing slash,
 Base main `fa7c1dde6bc549dd4220d7885d31a98281578e36`; branch `feat/autopilot-apply-flow`. Existing queued applications now take precedence over further collection. Each browser import triggers backend qualification and one controlled application, without waiting for the whole discovery batch. An unresolved receipt keeps its continuation plan and stops further discovery. Backend automatic queue filters verified eligibility/seniority before limiting results; manual review queues remain available. Review reasons are retained alongside compatible deferral timestamps.
 
 The existing dashboard now leads with autopilot and application history, exposes discovery and submission dates independently, refreshes browser receipts even without a collector completion event, and preserves unsaved threshold edits. SQLite schema/data are retained. Added orchestration fixtures, queue-starvation regression, timestamp restart checks, and a Chromium dashboard fixture. These are synthetic verification, not a measured live HH submission pilot.
+
+
+## 2.7.5 — remote-only qualification and actionable screening (2026-09-10)
+
+Base main inspected: `ff7e80f1d1a4bfc42ac74fc9559517f44e1b69c6`; branch `fix/remote-only-autopilot`. No replacement application or deployment changes.
+
+- Latest explicit user preference supersedes the earlier remote-preferred brief: remote-only default, plus unconditional remote checks before unattended queue selection/API submission. Existing history is preserved. A stale Eligible flag does not override onsite or mandatory-office evidence.
+- Browser imports default missing remote metadata to false and normalize contradictions before storage/scoring. HH extraction does not fall back to the entire page when description markup is missing.
+- Screening review returns prioritized actions for mandatory skill/experience/degree gaps, hiring eligibility, missing verified CV terms, and claims without repository evidence. Preferred gaps are not represented as mandatory. Reasons for actual rejection remain Unknown.
+- README roadmap reconciled: existing immediate applications, email footer, provider/fallback and journal retained; obsolete LinkedIn setup removed. Actual HH pilot, live control validation and backup/restore drill remain explicitly open.
+- Regression additions: remote defaults, legacy onsite/contradictory queue candidates before limit, import normalization, real extraction functions on DOM fixtures, truthful prioritized screening actions. Existing immediate-discovery/letter receipt, duplicate, timeout, SQLite and Windows gates retained.
+- Live browser verification attempted 2026-09-10: HH returned “VPN мешает работе сайта” before vacancy content. No live application was sent and no production success rate is claimed. The code does not bypass that restriction.
+- CI results are recorded in the release PR and checked on its latest head before merge.
