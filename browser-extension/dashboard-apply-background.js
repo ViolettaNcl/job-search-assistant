@@ -36,8 +36,12 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(message?.type!=='vjaDashboardApply')return false;
   (async()=>{
     const api=await browserAutopilotApiBase(),base=new URL(api),page=new URL(sender.url||'');
-    if(!sender.tab?.id || sender.frameId!==0 || !['localhost','127.0.0.1','[::1]'].includes(base.hostname)
-      || page.origin!==base.origin || !['/','/index.html'].includes(page.pathname)
+    // Windows opens 127.0.0.1 while extension defaults to localhost. Only loopback
+    // aliases of the same protocol/port are equivalent; never trust arbitrary hosts.
+    const loopback = url => ['localhost','127.0.0.1','[::1]'].includes(url.hostname);
+    const sameLocalServer = loopback(base) && loopback(page)
+      && ['http:','https:'].includes(base.protocol) && page.protocol===base.protocol && page.port===base.port;
+    if(!sender.tab?.id || sender.frameId!==0 || !sameLocalServer || !['/','/index.html'].includes(page.pathname)
       || !/^[0-9a-f-]{36}$/i.test(message.vacancyId||'') || typeof message.requestId!=='string' || message.requestId.length>100)
       throw new Error('Запрос разрешён только с локального дашборда этой программы.');
     void runDashboardApply(api,message.vacancyId,sender,message.requestId);

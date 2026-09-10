@@ -31,6 +31,28 @@ public sealed class OperatorWritingTests
         Assert.IsFalse(result.Application.Letter.Contains("коммерческ"));
     }
     [TestMethod]
+    public async Task CodeWalkthroughOffersFallBackToConciseLettersWithLinks()
+    {
+        foreach (var offer in new[] { "Буду рада показать код и обсудить задачи.", "Готова рассказать про проект.", "Объясню код на встрече.", "I would be happy to walk through the code.", "I can show you my project.", "I can explain the code." })
+        {
+            var result = await Prepare(new("APIs", ["dental"], offer, []));
+            Assert.AreEqual("invalid-output-fallback", result.ProviderStatus, offer);
+            Assert.IsFalse(result.Application.Letter.Contains(offer));
+            StringAssert.Contains(result.Application.Letter, "GitHub:");
+        }
+        var profile = Options.Create(new CandidateProfileOptions { Email = "candidate@example.com" });
+        var knowledge = new CandidateKnowledgeService(profile);
+        var strategy = new EvidenceRetrievalService(knowledge).Select(new OpportunityScoringService(profile).Assess("Junior C#", "Required: C#, SQL. Remote Russia.", true));
+        foreach (var russian in new[] { true, false })
+        {
+            var letter = new ApplicationWritingService(profile).Write(strategy, russian, "Junior C#", "Example").Letter;
+            StringAssert.Contains(letter, "GitHub:"); StringAssert.Contains(letter, "candidate@example.com");
+            Assert.AreEqual(0, ApplicationClaimValidator.ValidateSuggestion(letter, strategy.Projects.Select(p => p.Id).ToArray(), knowledge.Get()).Length);
+            Assert.IsFalse(letter.Contains("Буду рада")); Assert.IsFalse(letter.Contains("happy to"));
+        }
+    }
+
+    [TestMethod]
     public async Task InventedSkillOrEmploymentIsRejected()
     {
         foreach (var letter in new[] { "I use Python and Azure.", "I have 2 years commercial experience." })
