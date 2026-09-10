@@ -5,9 +5,10 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),http
   const vacancy={id:'fixture',title:'Junior C# Developer',company:'Example Studio',source:'hh',sourceLabel:'HH',url:'https://example.invalid/vacancy/1',firstSeenAt:found,matchScore:86,eligibilityStatus:'Eligible',eligibilityReason:'Verified project evidence',marketLabel:'Россия',opportunityTypeLabel:'Полная занятость'};
   const pipeline=[{...vacancy,appliedAt:sent,updatedAt:sent,status:'Applied',automatic:true,coverLetterIncluded:true}];
   const automation={allowed:true,ready:true,autoApplyEnabled:true,browserConnected:true,automationMode:'browser-extension',autoApplyMinimumScore:75,dailyAutoApplyLimit:15,appliedToday:1,remainingToday:14,lastMessage:'Отклик и письмо отправлены: Junior C# Developer.',collection:{},diagnostics:{}};
-  const errors=[];
+  const errors=[],directRequests=[];
   const server=http.createServer((req,res)=>{
-    if(req.url==='/'||req.url==='/operator.css'){res.setHeader('Content-Type',req.url==='/'?'text/html; charset=utf-8':'text/css');res.end(fs.readFileSync('src/JobSearchAssistant/wwwroot/'+(req.url==='/'?'index.html':'operator.css')));return;}
+    if(req.url==='/'||req.url==='/operator.css'||req.url==='/dashboard-apply.js'){res.setHeader('Content-Type',req.url==='/'?'text/html; charset=utf-8':req.url.endsWith('.js')?'text/javascript':'text/css');res.end(fs.readFileSync('src/JobSearchAssistant/wwwroot/'+(req.url==='/'?'index.html':req.url.slice(1))));return;}
+    if(req.url.endsWith('/apply-tailored'))directRequests.push(req.url);
     let data=[];
     if(req.url==='/api/dashboard')data={stats:{applied:pipeline.length,interviews:0,offers:0},state:{},pipeline};
     else if(req.url==='/api/automation/status')data=automation;
@@ -28,6 +29,28 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),http
     await page.evaluate(()=>refreshDashboard());assert.equal(await page.locator('#countPipeline').innerText(),'2');assert((await page.locator('#pipeline').innerText()).includes('Нет подтверждённой даты'));
     await page.locator('[data-view="review"]').click();assert((await page.locator('#jobs').innerText()).includes('Уточните дату выхода'));assert(!(await page.locator('#jobs').innerText()).includes('QueueDeferredUntil'));
     await page.locator('[data-view="all"]').click();assert((await page.locator('#jobs .dates').innerText()).includes('09.09.2026'));
+    // A local bridge fixture exercises the actual dashboard without any employer connection.
+    await page.evaluate(()=>{
+      window.requests=[];
+      window.addEventListener('message',e=>{if(e.data?.type==='vjaDashboardApplyRequest')window.requests.push(e.data);});
+    });
+    const dashboardUrl=page.url();
+    await page.locator('[data-apply-id="fixture"]').click();
+    await page.waitForFunction(()=>window.requests.length===1);
+    assert(await page.locator('[data-apply-id="fixture"]').isDisabled());
+    await page.evaluate(()=>{const r=window.requests[0];window.postMessage({...r,type:'vjaDashboardApplyResult',status:'review',message:'Уточните дату выхода.'},location.origin);});
+    await page.waitForFunction(()=>!document.querySelector('[data-apply-id="fixture"]').disabled);
+    assert((await page.locator('#jobs').innerText()).includes('Уточните дату выхода.'));
+    await page.locator('[data-apply-id="fixture"]').click();
+    await page.waitForFunction(()=>window.requests.length===2);
+    await page.evaluate(()=>{const r=window.requests[1];window.postMessage({...r,type:'vjaDashboardApplyResult',status:'confirmed',message:'Отклик и письмо отправлены.'},location.origin);});
+    await page.waitForFunction(()=>document.querySelector('[data-apply-id="fixture"]').textContent==='Отклик и письмо отправлены');
+    assert.equal(page.url(),dashboardUrl);assert.equal(page.context().pages().length,1);
+    automation.apiReady=true;vacancy.id='api-fixture';await page.evaluate(()=>refreshDashboard());
+    await page.locator('[data-apply-id="api-fixture"]').click();
+    await page.waitForFunction(()=>document.querySelector('[data-apply-id="api-fixture"]').textContent==='Отклик и письмо отправлены');
+    assert.deepEqual(directRequests,['/api/vacancies/api-fixture/apply-tailored']);
+    assert.equal(page.url(),dashboardUrl);assert.equal(page.context().pages().length,1);
     await page.locator('[data-view="pipeline"]').click();
     fs.mkdirSync('artifacts',{recursive:true});await page.screenshot({path:'artifacts/operator-desktop.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'dashboard must fit mobile width');

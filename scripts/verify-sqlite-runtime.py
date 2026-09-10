@@ -93,6 +93,16 @@ def verify():
                     assessment = request(f"/api/operator/vacancies/{vacancy_id}")
                     assert assessment["assessment"]["reasoningMode"] == "deterministic-fallback"
                     assert assessment["strategy"]["projects"][0]["id"] == "dental"
+                    # The new dashboard preparation endpoint must be published and must not
+                    # send this external fixture via HH or create a submission record.
+                    try:
+                        request(f"/api/vacancies/{vacancy_id}/prepare-dashboard-apply", {})
+                        raise AssertionError("Non-HH dashboard submission must be rejected")
+                    except urllib.error.HTTPError as error:
+                        assert error.code == 400
+                        assert json.loads(error.read())["ready"] is False
+                    with urllib.request.urlopen(base + "/dashboard-apply.js", timeout=5) as script:
+                        assert b"vjaDashboardApplyRequest" in script.read()
                     prepared = request(f"/api/operator/vacancies/{vacancy_id}/prepare", {})
                     assert prepared["application"]["reasoningMode"] == "deterministic-fallback"
                     assert "DentalClinic" in prepared["application"]["letter"]

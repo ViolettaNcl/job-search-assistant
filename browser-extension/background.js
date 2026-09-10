@@ -1,4 +1,4 @@
-importScripts("browser-autopilot.js", "hh-discovery-navigation.js", "hh-discovery-background.js");
+importScripts("browser-autopilot.js", "hh-discovery-navigation.js", "hh-discovery-background.js", "dashboard-apply-background.js");
 
 async function restrictLocalStorageAccess() {
   try {
@@ -134,7 +134,7 @@ async function browserAutopilotSendPlan(tabId, plan) {
 }
 
 async function browserAutopilotComplete(api, plan, result, tabId) {
-  await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(plan.trackedId)}/browser-auto-applied`, {
+  await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(plan.trackedId)}/${plan.dashboard ? "browser-applied" : "browser-auto-applied"}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ coverLetter: plan.coverLetter, resumeLabel: result.resumeLabel || plan.resumeHint, vacancyTitle: plan.jobTitle })
@@ -173,7 +173,7 @@ async function browserAutopilotProcess(api, plan, tabId) {
 
   const message = await browserAutopilotDefer(api, plan, result?.reason || result?.error);
   await chrome.storage.local.remove(["vjaBrowserAutopilotActivePlan", "vjaBrowserAutopilotTabId", "vjaPendingSiteApply", "vjaSiteApplyResult"]);
-  try { await chrome.tabs.update(tabId, { active: true }); } catch { }
+  if (!plan.dashboard) { try { await chrome.tabs.update(tabId, { active: true }); } catch { } }
   return { completed: false, retry: false, message };
 }
 
@@ -210,19 +210,20 @@ async function runBrowserAutopilot() {
     api = await browserAutopilotApiBase();
     await browserAutopilotHeartbeat(api, false, "Расширение Chrome подключено и готово к браузерному автопилоту.");
     let status = await browserAutopilotJson(`${api}/api/automation/status`);
-    if (!self.vjaBrowserAutopilot?.shouldRun?.(status)) return;
-
     const active = await chrome.storage.local.get(["vjaBrowserAutopilotActivePlan", "vjaBrowserAutopilotTabId"]);
+    if (!active.vjaBrowserAutopilotActivePlan?.dashboard && !self.vjaBrowserAutopilot?.shouldRun?.(status)) return;
     if (active.vjaBrowserAutopilotActivePlan && active.vjaBrowserAutopilotTabId) {
       try {
         const continuation = await browserAutopilotProcess(api, active.vjaBrowserAutopilotActivePlan, active.vjaBrowserAutopilotTabId);
         await browserAutopilotHeartbeat(api, Boolean(continuation.retry), continuation.message, active.vjaBrowserAutopilotActivePlan.jobTitle);
+        await dashboardApplyNotify(active.vjaBrowserAutopilotActivePlan, continuation);
         return;
       } catch (error) {
         const message = await browserAutopilotDefer(api, active.vjaBrowserAutopilotActivePlan, error?.message || String(error));
         await chrome.storage.local.remove(["vjaBrowserAutopilotActivePlan", "vjaBrowserAutopilotTabId", "vjaPendingSiteApply", "vjaSiteApplyResult"]);
         await browserAutopilotHeartbeat(api, false, message, active.vjaBrowserAutopilotActivePlan.jobTitle);
-        try { await chrome.tabs.update(active.vjaBrowserAutopilotTabId, { active: true }); } catch { }
+        await dashboardApplyNotify(active.vjaBrowserAutopilotActivePlan, { message, completed: false });
+        if (!active.vjaBrowserAutopilotActivePlan.dashboard) { try { await chrome.tabs.update(active.vjaBrowserAutopilotTabId, { active: true }); } catch { } }
         return;
       }
     }

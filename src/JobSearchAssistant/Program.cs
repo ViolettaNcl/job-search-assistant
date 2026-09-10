@@ -54,6 +54,7 @@ builder.Services.AddScoped<RemotiveClient>();
 builder.Services.AddScoped<AdzunaClient>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<TailoredHhApplyService>();
+builder.Services.AddScoped<DashboardApplyService>();
 builder.Services.AddScoped<BrowserVacancyImportService>();
 builder.Services.AddScoped<ApplicationQueueService>();
 builder.Services.AddScoped<FollowUpQueueService>();
@@ -382,6 +383,12 @@ app.MapPost("/api/vacancies/{id:guid}/apply", async (Guid id, JobService jobs, C
 {
     var result = await jobs.ApplyAsync(id, ct);
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+});
+
+app.MapPost("/api/vacancies/{id:guid}/prepare-dashboard-apply", async (Guid id, DashboardApplyService preparation, CancellationToken ct) =>
+{
+    var result = await preparation.PrepareAsync(id, ct);
+    return result.Ready ? Results.Ok(result) : Results.BadRequest(result);
 });
 
 app.MapPost("/api/vacancies/{id:guid}/apply-tailored", async (Guid id, TailoredHhApplyService apply, CancellationToken ct) =>
