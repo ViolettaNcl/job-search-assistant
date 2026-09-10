@@ -153,7 +153,11 @@ public sealed class ApplicationQueueServiceTests
         var senior = CreateVacancy(company, "Senior C#", 100, "Eligible", DateTimeOffset.UtcNow);
         var eligible = CreateVacancy(company, "Junior C#", 75, "Eligible", DateTimeOffset.UtcNow);
         senior.Source = eligible.Source = "hh";
-        db.AddRange(senior, eligible);
+        var onsite = CreateVacancy(company, "Junior onsite C#", 100, "Eligible", DateTimeOffset.UtcNow);
+        onsite.Source = "hh"; onsite.IsRemote = false;
+        var hybrid = CreateVacancy(company, "Junior hybrid C#", 99, "Eligible", DateTimeOffset.UtcNow);
+        hybrid.Source = "hh"; hybrid.DescriptionText = "Remote. Must attend the office weekly.";
+        db.AddRange(senior, eligible, onsite, hybrid);
         await db.SaveChangesAsync();
         var service = new ApplicationQueueService(db, new ApplicationDraftService(Options.Create(new CandidateProfileOptions())));
         var automatic = await service.GetAsync(1, 50, "hh", true, CancellationToken.None);

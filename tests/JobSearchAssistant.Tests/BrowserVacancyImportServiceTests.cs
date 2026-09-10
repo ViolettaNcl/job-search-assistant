@@ -70,6 +70,24 @@ public sealed class BrowserVacancyImportServiceTests
         Assert.AreEqual(1, await db.Vacancies.CountAsync());
     }
 
+    [TestMethod]
+    public async Task BrowserImport_DoesNotAssumeRemoteWhenFlagMissingOrOfficeRequired()
+    {
+        await using var db = CreateDb();
+        var sut = new BrowserVacancyImportService(db, new MatchScoringService(Options.Create(new CandidateProfileOptions())));
+        var request = new BrowserVacancyImportRequest("https://hh.ru/vacancy/987", "Junior C#", "Employer", "C# SQL", "Russia", "Волгоград", "", "noExperience", "hh.ru");
+        var unknown = await sut.ImportAsync(request, CancellationToken.None);
+        Assert.IsFalse(unknown.IsRemote);
+        Assert.AreEqual("Likely ineligible", unknown.EligibilityStatus);
+        var hybrid = await sut.ImportAsync(request with { Remote = true, Description = "C# SQL. Remote with required office visits. Hybrid." }, CancellationToken.None);
+        Assert.IsFalse(hybrid.IsRemote);
+        Assert.AreEqual("Likely ineligible", hybrid.EligibilityStatus);
+        var remote = await sut.ImportAsync(request with { Remote = true, Description = "Required: C#, SQL. Fully remote Russia." }, CancellationToken.None);
+        Assert.IsTrue(remote.IsRemote);
+        Assert.AreEqual("Eligible", remote.EligibilityStatus);
+        Assert.AreEqual(1, await db.Vacancies.CountAsync());
+    }
+
     private static AppDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()

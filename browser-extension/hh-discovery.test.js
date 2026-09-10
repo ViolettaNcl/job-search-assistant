@@ -46,3 +46,17 @@ assert(navigation.sameTask('https://hh.ru/vacancy/123','https://volgograd.hh.ru/
 for(const url of ['https://hh.ru/vacancy/456','https://hh.ru/account/login','https://hh.ru/captcha','https://hh.ru.attacker.com/vacancy/123','https://evilhh.ru/vacancy/123','http://hh.ru/vacancy/123']) assert.equal(navigation.sameTask('https://hh.ru/vacancy/123',url),false);
 assert.equal(navigation.sameTask('https://hh.ru/search/vacancy?text=C%23&schedule=remote','https://hh.ru/search/vacancy?text=C%23'),false);
 assert.equal(navigation.sameTask('https://hh.ru/search/vacancy?text=C%23','https://hh.ru/search/vacancy?text=sales'),false);
+
+// Run the real page extraction functions against DOM fixtures, not a replacement extractor.
+const extractionSource = fs.readFileSync(__dirname+'/content.js','utf8').split('function textByIds(')[0];
+function extractHh(description) {
+  const context = {window:{vjaAtsStructured:{detectAtsHost:()=> 'hh'}},location:{hostname:'hh.ru',href:'https://hh.ru/vacancy/123'},
+    document:{title:'Junior C#',body:{innerText:'Рекомендуем: удаленная работа'},querySelector:selector => selector === "[data-qa='vacancy-description']" && description ? {innerText:description} : null}};
+  vm.createContext(context); vm.runInContext(extractionSource, context);
+  return context.extractPage();
+}
+assert.equal(extractHh('C# SQL in our office').remote,false);
+assert.equal(extractHh('C# SQL, удалённая работа').remote,true);
+assert.equal(extractHh(null).remote,false,'missing HH description cannot use recommendation text');
+assert.equal(extractHh(null).description,'');
+console.log('Real HH extraction ignores recommendations and stops on missing description');

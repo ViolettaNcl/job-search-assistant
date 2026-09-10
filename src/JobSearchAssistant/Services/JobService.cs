@@ -479,7 +479,7 @@ public sealed class JobService(
             .ToListAsync(ct);
 
         foreach (var v in rows) RefreshQualification(v, minimumScore);
-        var eligible = rows.Where(AutomaticSubmissionPolicy.IsVerifiedEligible).ToArray();
+        var eligible = rows.Where(v => RemoteWorkPolicy.IsFullyRemote(v.IsRemote, v.DescriptionText) && AutomaticSubmissionPolicy.IsVerifiedEligible(v)).ToArray();
         var safe = eligible.Where(x => AutomaticSubmissionPolicy.HasSafeSeniority(x.Title)).ToArray();
         var aboveScore = safe.Where(x => x.MatchScore >= minimumScore).ToArray();
         var coolingDown = aboveScore.Count(x => x.Events.Any(e => e.Type == "AutoApplyFailed" && e.CreatedAt >= retryAfter));
@@ -648,7 +648,7 @@ public sealed class JobService(
     }
     private static bool ShouldConsider(ExternalVacancyDto dto, SearchOptions options)
     {
-        // Remote is preferred by default; explicit RemoteOnly remains a hard preference.
+        // Remote-only is the current user preference; an explicit search override is still supported.
         if (!options.RemoteOnly) return true;
         return dto.Remote;
     }

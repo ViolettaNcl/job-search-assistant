@@ -80,7 +80,7 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
         return rows
             .Where(v => v.MatchScore >= minimumScore && v.EligibilityStatus != "Likely ineligible")
             // Filter before Take: review-only jobs must not crowd out safe auto-applications.
-            .Where(v => !automaticOnly || (v.Source == "hh" && AutomaticSubmissionPolicy.IsVerifiedEligible(v) && AutomaticSubmissionPolicy.HasSafeSeniority(v.Title)))
+            .Where(v => !automaticOnly || (v.Source == "hh" && RemoteWorkPolicy.IsFullyRemote(v.IsRemote, v.DescriptionText) && AutomaticSubmissionPolicy.IsVerifiedEligible(v) && AutomaticSubmissionPolicy.HasSafeSeniority(v.Title)))
             .Where(v => QueueDeferralPolicy.ShouldAppearInQueue(v, now))
             .Select(v =>
             {

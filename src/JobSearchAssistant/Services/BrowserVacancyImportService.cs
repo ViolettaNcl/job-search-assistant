@@ -16,7 +16,7 @@ public sealed record BrowserVacancyImportRequest(
     string? RemoteScope,
     string? Experience,
     string? Source,
-    bool Remote = true);
+    bool Remote = false);
 
 public sealed class BrowserVacancyImportService(AppDbContext db, MatchScoringService scoring)
 {
@@ -47,7 +47,8 @@ public sealed class BrowserVacancyImportService(AppDbContext db, MatchScoringSer
         var location = request.Location?.Trim() ?? "";
         var remoteScope = request.RemoteScope?.Trim() ?? (request.Remote ? "Remote detected in browser" : "");
         var experience = request.Experience?.Trim() ?? "";
-        var match = scoring.Score(title, description, request.Remote, experience, location.Length > 0 ? location : country, remoteScope);
+        var fullyRemote = RemoteWorkPolicy.IsFullyRemote(request.Remote, description);
+        var match = scoring.Score(title, description, fullyRemote, experience, location.Length > 0 ? location : country, remoteScope);
 
         var company = await GetOrCreateCompanyAsync(companyName, ct);
         var existing = await db.Vacancies.Include(x => x.Company)
@@ -79,7 +80,7 @@ public sealed class BrowserVacancyImportService(AppDbContext db, MatchScoringSer
         existing.LocationText = location;
         existing.RemoteScope = remoteScope;
         existing.Experience = experience;
-        existing.IsRemote = request.Remote;
+        existing.IsRemote = fullyRemote;
         existing.MatchScore = match.Score;
         existing.MatchLevel = match.Level;
         existing.MatchedSkills = string.Join(", ", match.Matched);

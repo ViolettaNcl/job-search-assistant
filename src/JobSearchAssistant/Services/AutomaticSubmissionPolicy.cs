@@ -22,6 +22,7 @@ public static partial class AutomaticSubmissionPolicy
            && vacancy.Company is not null
            && !vacancy.Company.IsBlacklisted
            && vacancy.MatchScore >= minimumScore
+           && RemoteWorkPolicy.IsFullyRemote(vacancy.IsRemote, vacancy.DescriptionText)
            && IsVerifiedEligible(vacancy)
            && HasSafeSeniority(vacancy.Title);
 
