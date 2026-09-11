@@ -6,8 +6,8 @@ async function fixture({letter=true,pending=false,createFails=false,apiBase='htt
   const event={addListener:()=>{}},local={get:async()=>({...data}),set:async x=>Object.assign(data,x),remove:async keys=>[].concat(keys).forEach(k=>delete data[k]),setAccessLevel:async()=>{}};
   const context={console,URL,Date,Promise,AbortController,setTimeout,clearTimeout,self:{},chrome:{runtime:{onInstalled:event,onStartup:event,onMessage:{addListener:f=>listeners.push(f)},getManifest:()=>({version:'2.7.11'}),getURL:p=>'chrome-extension://test/'+p},alarms:{create:async()=>{},onAlarm:event},storage:{local,sync:{get:async()=>({apiBase})}},tabs:{
     create:async p=>{trace.push(['create',p]);if(createFails)throw Error('tab unavailable');const tab={id:2,status:'complete',url:p.url};tabs.set(2,tab);return tab;},
-    get:async n=>tabs.get(n),remove:async n=>{trace.push(['close',n]);tabs.delete(n);},update:async(n,p)=>trace.push(['activate',p]),
-    sendMessage:async(n,m)=>{if(n===1){messages.push(m);return;}assert.equal(m.plan.automatic,false);assert.equal(m.plan.trackedId,id);assert.equal(m.plan.coverLetter,'Verified letter for selected vacancy');trace.push(['send',m.plan]);return pending?{status:'submitted-needs-letter'}:{submitted:true,status:'confirmed',coverLetterFilled:letter};}
+    get:async n=>tabs.get(n),remove:async n=>{trace.push(['close',n]);tabs.delete(n);},update:async(n,p)=>{Object.assign(tabs.get(n),p);if(p.active)trace.push(['activate',p]);},
+    sendMessage:async(n,m)=>{if(m.type==='vjaSiteApplyReady')return {ok:true};if(n===1){messages.push(m);return;}assert.equal(m.plan.automatic,false);assert.equal(m.plan.trackedId,id);assert.equal(m.plan.coverLetter,'Verified letter for selected vacancy');trace.push(['send',m.plan]);return pending?{status:'submitted-needs-letter'}:{submitted:true,status:'confirmed',coverLetterFilled:letter};}
   }}};
   context.fetch=async(url,options)=>{
     trace.push(['http',url,options?.body]);let value={};
@@ -31,7 +31,7 @@ async function fixture({letter=true,pending=false,createFails=false,apiBase='htt
   const noLetter=await fixture({letter:false});await noLetter.context.runDashboardApply('http://localhost:8080',id,noLetter.sender,'two');
   assert.equal(noLetter.messages.at(-1).status,'review');assert(!noLetter.trace.some(x=>x[0]==='http'&&x[1].endsWith('/browser-applied')));assert(!noLetter.trace.some(x=>x[0]==='activate'));
   const resume=await fixture({pending:true});await resume.context.runDashboardApply('http://localhost:8080',id,resume.sender,'three');
-  assert.equal(resume.messages.at(-1).status,'pending');assert(resume.data.vjaBrowserAutopilotActivePlan);
+  assert.equal(resume.messages.at(-1).status,'pending');assert((await resume.context.applicationJobs()).some(j=>j.state==='waiting'));
   const count=resume.trace.filter(x=>x[0]==='send').length;await resume.context.runDashboardApply('http://localhost:8080',id,resume.sender,'duplicate');assert.equal(resume.trace.filter(x=>x[0]==='send').length,count);
   resume.setPending(false);await resume.context.runBrowserAutopilot();assert.equal(resume.messages.at(-1).status,'confirmed','manual continuation must run with autopilot off and API ready');
   assert.equal(resume.trace.filter(x=>x[0]==='create').length,1,'continue existing tab');
@@ -52,7 +52,7 @@ async function fixture({letter=true,pending=false,createFails=false,apiBase='htt
   heartbeat.context.browserAutopilotWait=async()=>vm.runInContext('browserAutopilotRunning=false',heartbeat.context);
   await heartbeat.context.runDashboardApply('http://localhost:8080',id,heartbeat.sender,'after-heartbeat');assert.equal(heartbeat.messages.at(-1).status,'confirmed');
   const occupied=await fixture();vm.runInContext('browserAutopilotRunning=true',occupied.context);
-  await occupied.context.runDashboardApply('http://localhost:8080',id,occupied.sender,'busy');assert.equal(occupied.messages.at(-1).status,'review');assert(!occupied.trace.some(x=>x[0]==='send'));
+  await occupied.context.runDashboardApply('http://localhost:8080',id,occupied.sender,'busy');assert.equal(occupied.messages.at(-1).status,'confirmed');assert(occupied.trace.some(x=>x[0]==='send'),'manual application is independent of discovery mutex');
   const valid=await fixture();assert.equal((await valid.request()).ok,true);await new Promise(r=>setImmediate(r));assert.equal(valid.messages.at(-1).status,'confirmed');
   const failed=await fixture({createFails:true});await failed.context.runDashboardApply('http://localhost:8080',id,failed.sender,'failed');assert(!failed.data.vjaPendingSiteApply);assert(!failed.data.vjaBrowserAutopilotActivePlan);assert.equal(failed.messages.at(-1).status,'review');
   const oldId='22222222-2222-4222-8222-222222222222';
@@ -65,7 +65,7 @@ async function fixture({letter=true,pending=false,createFails=false,apiBase='htt
     if(kind==='expired')stale.tabs.set(99,{id:99,status:'complete'});
     await stale.context.runDashboardApply('http://localhost:8080',id,stale.sender,'recover-'+kind);
     assert.equal(stale.messages.at(-1).status,'confirmed',kind+' must not lock another vacancy');
-    assert(stale.data.vjaApplicationReview[oldId],kind+' keeps uncertain result for review');
+    assert((await stale.context.applicationJobs()).some(j=>j.plan.trackedId===oldId&&j.state==='review'),kind+' keeps uncertain result for review');
     const sends=stale.trace.filter(x=>x[0]==='send').length;
     await stale.context.runDashboardApply('http://localhost:8080',oldId,stale.sender,'same-old');
     assert.equal(stale.messages.at(-1).status,'review');
@@ -81,13 +81,13 @@ async function fixture({letter=true,pending=false,createFails=false,apiBase='htt
   const paused=await fixture();
   paused.data.vjaBrowserAutopilotActivePlan={...oldPlan,dashboard:false};
   await paused.context.runBrowserAutopilot();
-  assert(paused.data.vjaApplicationReview[oldId],'stale autopilot plan is recovered even while autopilot off');
+  assert((await paused.context.applicationJobs()).some(j=>j.plan.trackedId===oldId&&j.state==='review'),'stale autopilot plan is recovered even while autopilot off');
   assert(!paused.trace.some(x=>x[0]==='send'),'pause never starts another submission');
   const timeout=await fixture();let attempts=0;
   timeout.context.chrome.tabs.sendMessage=async()=>{attempts++;throw Error('lost channel');};
   await assert.rejects(()=>timeout.context.browserAutopilotSendPlan(2,{id:'timeout'}),/lost channel/);
   assert.equal(attempts,1,'unknown dispatch must not be repeated five times');
-  const priority=await fixture();vm.runInContext('dashboardApplyWaiting=1',priority.context);
+  const priority=await fixture();vm.runInContext('applicationWorkers.set(1,Promise.resolve());applicationWorkers.set(2,Promise.resolve());applicationWorkers.set(3,Promise.resolve())',priority.context);
   assert.equal((await priority.context.browserAutopilotApplyNext('http://localhost:8080')).stopped,true);
   assert(!priority.trace.some(x=>x[0]==='send'));
   console.log('Dashboard manual apply: exact vacancy/letter, inactive tab, verified receipt, no-letter stop, duplicate prevention, continuation and origin restriction passed');
