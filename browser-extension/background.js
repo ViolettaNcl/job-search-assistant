@@ -134,7 +134,7 @@ async function browserAutopilotComplete(api, plan, result, tabId) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ coverLetter: plan.coverLetter, resumeLabel: result.resumeLabel || plan.resumeHint, vacancyTitle: plan.jobTitle })
   });
-  await updateApplicationJob(plan.id,{completed:true,pending:null});
+  await updateApplicationJob(plan.id,{completed:true,review:false,reason:null,pending:null});
   if (!plan.popup) { try { await chrome.tabs.remove(tabId); } catch { } }
 }
 
@@ -223,13 +223,14 @@ async function runBrowserAutopilot() {
   if (browserAutopilotRunning) return;
   browserAutopilotRunning = true;
   let api = "";
+  let continuations = Promise.resolve();
   try {
     api = await browserAutopilotApiBase();
     await browserAutopilotHeartbeat(api, false, "Расширение Chrome подключено и готово к браузерному автопилоту.");
     let status = await browserAutopilotJson(`${api}/api/automation/status`);
     await reconcileApplicationState(api);
     const active = (await applicationJobs()).filter(job=>!job.completed&&!job.review);
-    await Promise.all(active.filter(job=>!job.plan.automatic || self.vjaBrowserAutopilot.shouldRun(status))
+    continuations = Promise.allSettled(active.filter(job=>!job.plan.automatic || self.vjaBrowserAutopilot.shouldRun(status))
       .map(job=>executeApplication(api,job.plan)));
     if(!self.vjaBrowserAutopilot.shouldRun(status))return;
 
@@ -274,6 +275,7 @@ async function runBrowserAutopilot() {
       await browserAutopilotHeartbeat(api, false, `Автопилот остановился: ${error?.message || String(error)}`).catch(() => {});
     }
   } finally {
+    await continuations;
     browserAutopilotRunning = false;
   }
 }

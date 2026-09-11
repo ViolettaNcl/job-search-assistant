@@ -101,7 +101,8 @@ async function executeApplication(api, plan) {
   const pool = plan.automatic ? automaticApplicationPool : manualApplicationPool;
   const task = pool(async () => {
     let job = await applicationJob(plan.id);
-    if (!job || job.completed || job.review) return;
+    const confirmed = job?.result?.result?.submitted && job.result.result.status === 'confirmed' && job.result.result.coverLetterFilled;
+    if (!job || job.completed || (job.review && !confirmed)) return;
     try {
       // A persisted receipt needs bookkeeping only, even if its tab is gone.
       if (job.result?.result?.submitted && job.result.result.status === 'confirmed' && job.result.result.coverLetterFilled) {
@@ -154,7 +155,9 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     const tab=await chrome.tabs.get(message.tabId);
     if(!tab?.id)throw new Error('Вкладка закрыта.');
     await migrateLegacyApplication();
-    const existing=(await applicationJobs()).find(job=>job.tabId===tab.id || (message.plan && sameApplication(job.plan,message.plan)));
+    const existing=(await applicationJobs()).find(job=>
+      (job.tabId===tab.id && ((!job.completed && !job.review) || sameApplication(job.plan,{sourceUrl:tab.url}))) ||
+      (message.plan && sameApplication(job.plan,message.plan)));
     if(message.type==='vjaGetSiteApply')return {ok:true,job:existing};
     if(existing) {
       if(existing.tabId!==tab.id || existing.review || existing.completed || (existing.dispatched && !existing.pending?.startClicked && !existing.pending?.finalClicked))

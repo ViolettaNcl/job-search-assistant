@@ -2,12 +2,13 @@ const applicationStateKeys = ['vjaBrowserAutopilotActivePlan','vjaBrowserAutopil
 async function reconcileApplicationState(api) {
   await migrateLegacyApplication();
   for (const job of await applicationJobs()) {
-    if (job.completed || job.review || applicationLocks.has(job.plan.id)) continue;
+    if (job.completed || applicationLocks.has(job.plan.id)) continue;
     const result = job.result?.result;
     if (result?.submitted && result.status === 'confirmed' && result.coverLetterFilled) {
       await executeApplication(api,job.plan);
       continue;
     }
+    if (job.review) continue;
     let missing = false;
     if (job.tabId) {try {missing = !await chrome.tabs.get(job.tabId);} catch {missing = true;}}
     if (missing && !job.dispatched) {await updateApplicationJob(job.plan.id,{tabId:null}); continue;}

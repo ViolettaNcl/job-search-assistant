@@ -58,6 +58,12 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
   const manual=concurrent.send(9);await tick();
   assert.equal(concurrent.trace.filter(x=>x[0]==='send').length,3,'manual sends while autopilot is waiting');
   held.resolve();await Promise.all([auto,manual]);assert.equal(concurrent.jobs().filter(j=>j.completed).length,3);
+  const manualFirst=await fixture(),firstGate=deferred();manualFirst.setGate(firstGate);
+  const firstManual=manualFirst.send(9);await tick();
+  manualFirst.enable([7,8].map(n=>({vacancyId:id(n),title:'Junior C#',url:'https://hh.ru/vacancy/'+n,matchScore:90})));
+  const nextAuto=manualFirst.context.runBrowserAutopilot();await tick();
+  assert.equal(manualFirst.trace.filter(x=>x[0]==='send').length,3,'autopilot can start while an earlier manual application waits');
+  firstGate.resolve();await Promise.all([firstManual,nextAuto]);
   const duplicate=await fixture(),hold=deferred();duplicate.setGate(hold);const a=duplicate.send(1);await tick();await duplicate.send(1);assert.equal(duplicate.trace.filter(x=>x[0]==='send').length,1);hold.resolve();await a;
   // Each tab writes only its own progress, including simultaneous continuations.
   const isolated=await fixture(),pause=deferred();isolated.setGate(pause);const runs=[isolated.send(1),isolated.send(2)];await tick();
@@ -68,11 +74,16 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
   assert.equal((await storage(jobs[0],'vjaSiteApplyResult',{id:jobs[1].plan.id,result:{submitted:true}})).ok,false);
   assert.equal((await storage(jobs[0],'vjaPendingSiteApply',jobs[0].plan,{frameId:1})).ok,false);
   assert.equal((await storage(jobs[0],'vjaPendingSiteApply',jobs[0].plan,{url:'https://evil.test/'})).ok,false);
+  assert.equal((await storage(jobs[0],'vjaPendingSiteApply',jobs[0].plan,{url:'https://hh.ru/vacancy/999'})).ok,false);
   pause.resolve();await Promise.all(runs);
   const failed=await fixture({createFails:true});await failed.send();assert.equal(failed.jobs().length,0);assert.equal(failed.messages.at(-1).status,'review');
   // Lost backend after a confirmed receipt preserves it and retries bookkeeping only.
   const receipt=await fixture();receipt.setRecordFailure(true);await receipt.send();assert(receipt.jobs()[0].result.result.submitted);assert(!receipt.jobs()[0].review);
   receipt.setRecordFailure(false);await receipt.context.runBrowserAutopilot();assert(receipt.jobs()[0].completed);assert.equal(receipt.trace.filter(x=>x[0]==='send').length,1);
+  const late=await fixture({letter:false});await late.send();const lateJob=late.jobs()[0];assert(lateJob.review);
+  await late.context.updateApplicationJob(lateJob.plan.id,{result:{id:lateJob.plan.id,result:{submitted:true,status:'confirmed',coverLetterFilled:true}}});
+  await late.context.reconcileApplicationState('http://localhost:8080');
+  assert(late.jobs()[0].completed);assert(!late.jobs()[0].review);assert.equal(late.trace.filter(x=>x[0]==='send').length,1,'late receipt retries bookkeeping, never a submission');
   // A safe pre-dispatch closed tab is reopened, unknown post-dispatch is isolated.
   for(const dispatched of [false,true]) {
     const closed=await fixture();const plan=closed.context.self.vjaBrowserAutopilot.buildPlan({vacancyId:id(2),title:'Junior C#',url:'https://hh.ru/vacancy/2'},{coverLetter:'Letter for '+id(2)});plan.automatic=false;
