@@ -98,6 +98,11 @@ jobs:
           NODE_PATH: /tmp/vja-browser-tests/node_modules
         run: node scripts/verify-hh-discovery-redirect.cjs
 
+      - name: Verify concurrent applications and closed-tab recovery in Chromium
+        env:
+          NODE_PATH: /tmp/vja-browser-tests/node_modules
+        run: node scripts/verify-parallel-applications.cjs
+
       - name: Verify operator dashboard dates, review list and live refresh
         env:
           NODE_PATH: /tmp/vja-browser-tests/node_modules

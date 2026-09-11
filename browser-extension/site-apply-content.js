@@ -548,6 +548,10 @@ const vjaSiteRuns = new Map();
 function vjaRunSiteApplyOnce(plan, options = {}) {
   if (!vjaSiteRuns.has(plan.id)) {
     const run = (async () => {
+      const samePage = window.vjaSiteApply?.sameJobUrl?.(plan.sourceUrl,location.href);
+      const continuation = window.vjaSiteApply?.canResume?.({sourceUrl:plan.sourceUrl,currentUrl:location.href,
+        jobTitle:plan.jobTitle,pageText:document.title+' '+String(document.body?.innerText || '').slice(0,20000)});
+      if (!samePage && !continuation?.ok) throw new Error('Вкладка открыла другую вакансию. Отклик остановлен.');
       const saved = await vjaSiteStorageGet('vjaSiteApplyResult');
       if (saved?.id === plan.id && saved.result?.submitted && saved.result.status === 'confirmed') return saved.result;
       const pending = await vjaSiteStorageGet('vjaPendingSiteApply');
@@ -579,6 +583,7 @@ async function vjaResumePendingSiteApply() {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'vjaSiteApplyReady') {sendResponse({ready:true});return false;}
   if (message?.type !== 'siteApplyNow') return false;
   vjaRunSiteApplyOnce(message.plan || {}, {resumed:Boolean(message.plan?.startClicked)})
     .then(sendResponse)

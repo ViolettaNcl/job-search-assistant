@@ -247,7 +247,7 @@ Browser discovery continues to qualify and attempt resume + vacancy-specific let
 
 In **Найденные вакансии**, **Откликнуться с письмом** prepares and sends the selected HH application without leaving the dashboard. It also works with autopilot switched off. With authorized HH API access, the backend submits directly. Otherwise the updated extension uses an inactive HH tab in the signed-in Chrome profile and closes it only after confirming both the response and cover letter. The card shows progress, confirmation or the reason human review is needed; required questions/CAPTCHA do not trigger a foreground switch or a fabricated answer. Install/reload the matching extension and reload the dashboard after upgrading the Windows bundle.
 
-The single-application action rechecks current requirements, fully remote work, exclusions, duplicates and the configured priority threshold before execution. A browser click alone is never recorded as success. Automated fixtures verify this flow; they are not evidence of live HH delivery rates.
+The single-application action checks the destination, explicit exclusions and duplicates before execution. As of 2.7.12, clicking Apply is the user's decision regardless of fit, country, education or the autopilot threshold. A browser click alone is never recorded as success. Automated fixtures verify this flow; they are not evidence of live HH delivery rates.
 
 ### Dashboard connection recovery and source tabs (2.7.10)
 
@@ -262,3 +262,11 @@ For later mobile work: first add Windows autostart to avoid a terminal ritual, t
 Dashboard applications reconcile saved HH receipts before inspecting the old tab. Closed-tab or expired tasks no longer lock unrelated vacancies, including when autopilot is off. Unknown outcomes are kept in the extension's private local review ledger and excluded from automatic retries; inspect the existing HH response and letter before any manual retry on HH. This release does not assume that an expired task failed to submit.
 
 A lost execution channel sends only one application command, then polls for a receipt for 15 seconds (after the 60-second command timeout). Manual requests take priority at the next safe discovery boundary; an already executing application remains serialized. Eligibility review now explains unknown Russia hiring scope in Russian and applies with autopilot on or off. It does not assert unverified hiring eligibility.
+
+### Parallel applications and advisory requirements (2.7.12)
+
+The extension runs up to three manual applications and two browser-autopilot applications concurrently. Additional manual requests stay in a persisted queue. Each vacancy owns its tab, letter, continuation and receipt; closing one tab cannot lock other vacancies. The extension waits for the content script to connect before dispatching. Confirmed receipts survive backend outages and closed tabs; an uncertain dispatched vacancy is held for review instead of being sent twice. Popup and dashboard applications share the same executor. Existing 2.7.11 state is migrated automatically when the extension starts.
+
+Manual Apply does not ask for a second fit confirmation or block because of education, hiring country, missing skills, score or work mode. Autopilot treats education, country and missing skills as advice while keeping the chosen score threshold, remote/junior selection, daily limit and pause. Descriptions and candidate facts remain truthful; required employer form fields still need valid answers.
+
+To upgrade, stop the old backend, extract the complete Windows package and start its `start-assistant.cmd`. Keep private `user-settings.cmd` settings if present. Replace the contents of the already installed extension folder with the package's `extension` contents and click Reload at `chrome://extensions`; keep the same extension installation so saved state and local settings survive. Reload the dashboard and check that the connected extension version is 2.7.12. The database remains at `%LOCALAPPDATA%\\ViolettaApplyAssistant\\jobassistant.db`.

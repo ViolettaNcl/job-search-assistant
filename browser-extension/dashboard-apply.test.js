@@ -11,6 +11,7 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
     create:async p=>{trace.push(['create',p]);if(createFails)throw Error('tab unavailable');const tab={id:++nextTab,status:'complete',url:p.url};tabs.set(tab.id,tab);return tab;},
     get:async n=>tabs.get(n),remove:async n=>{trace.push(['close',n]);tabs.delete(n);},update:async(n,p)=>{trace.push(['update',n,p]);Object.assign(tabs.get(n),p);return tabs.get(n);},
     sendMessage:async(n,m)=>{if(n===1){messages.push(m);return;}
+      if(m.type==='vjaSiteApplyReady')return {ready:true};
       assert.equal(m.plan.coverLetter,'Letter for '+m.plan.trackedId);trace.push(['send',n,clone(m.plan)]);
       if(gate)await gate.promise;
       return pending?{status:'submitted-needs-letter'}:{submitted:true,status:'confirmed',coverLetterFilled:letter};}

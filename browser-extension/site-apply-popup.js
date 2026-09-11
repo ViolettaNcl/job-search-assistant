@@ -51,7 +51,7 @@ function vjaSiteApplyReason(result) {
 async function vjaHandleSiteApplyResult(envelope, cvName = "") {
   const result = envelope?.result || envelope || {};
   const note = $("fillNote");
-  if (result.submitted && result.status === "confirmed") {
+  if (result.submitted && result.status === "confirmed" && result.coverLetterFilled) {
     const resumeLabel = result.resumeLabel || cvName || result?.cvResult?.filename || "";
     const recorded = envelope.recorded || await vjaRecordConfirmedSiteApply(envelope, resumeLabel);
     if (note) note.textContent = recorded

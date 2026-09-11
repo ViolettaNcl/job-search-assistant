@@ -94,6 +94,17 @@ async function browserAutopilotStoredResult(planId) {
   return job?.result?.id === planId ? job.result.result : null;
 }
 
+async function waitForApplicationContent(tabId) {
+  for (let attempt=0;attempt<30;attempt++) {
+    try {
+      const reply=await browserAutopilotWithTimeout(chrome.tabs.sendMessage(tabId,{type:'vjaSiteApplyReady'}),1000,'Page readiness timeout');
+      if(reply?.ready)return;
+    } catch { }
+    await browserAutopilotWait(250);
+  }
+  throw new Error('Расширение не подключилось к вкладке вакансии. Повторите отклик.');
+}
+
 async function browserAutopilotSendPlan(tabId, plan) {
   let lastError = null;
   const storedResult = await browserAutopilotStoredResult(plan.id);
@@ -145,6 +156,7 @@ async function browserAutopilotProcess(api, plan, tabId) {
     return {completed:true,message:`Отклик и письмо отправлены: ${plan.jobTitle}.`};
   }
   await browserAutopilotWaitForTab(tabId);
+  await waitForApplicationContent(tabId);
   const job = await applicationJob(plan.id);
   let continuationPlan = job?.pending || plan;
   // The first command is persisted before dispatch. A restart can only inspect or

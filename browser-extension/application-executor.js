@@ -64,7 +64,12 @@ async function applicationTabStorage(message, sender) {
     const job = (await applicationJobs()).find(item => item.tabId === sender.tab.id);
     if (!job) return {ok:message.operation === 'get', value:undefined, error:'application-not-assigned'};
     let originAllowed=false;
-    try {const page=new URL(sender.url),source=new URL(job.plan.sourceUrl);originAllowed=page.origin===source.origin || (/^(.*\.)?hh\.ru$/.test(page.hostname)&&/^(.*\.)?hh\.ru$/.test(source.hostname));}catch{}
+    try {
+      const page=new URL(sender.url),source=new URL(job.plan.sourceUrl);
+      originAllowed=page.origin===source.origin || (/^(.*\.)?hh\.ru$/.test(page.hostname)&&/^(.*\.)?hh\.ru$/.test(source.hostname));
+      const vacancyId=page.pathname.match(/^\/vacancy\/(\d+)/)?.[1] || page.searchParams.get('vacancyId');
+      if (/(^|\.)hh\.ru$/.test(page.hostname) && vacancyId && vacancyId !== source.pathname.match(/^\/vacancy\/(\d+)/)?.[1]) originAllowed=false;
+    }catch{}
     if(!originAllowed)return {ok:false,error:'application-origin-mismatch'};
     const field = message.key === 'vjaPendingSiteApply' ? 'pending' : 'result';
     if (message.operation === 'get') return {ok:true, value:job[field]};
@@ -104,6 +109,10 @@ async function executeApplication(api, plan) {
         const result = {completed:true,message:`Отклик и письмо отправлены: ${plan.jobTitle}.`};
         await dashboardApplyNotify(plan,result);
         return result;
+      }
+      if (!job.dispatched) {
+        plan = {...job.plan,expiresAt:Date.now()+10*60*1000};
+        job = await updateApplicationJob(plan.id,{plan,pending:plan});
       }
       // Reserve a blank tab before navigation so page scripts cannot read another job.
       if (!job.tabId) {

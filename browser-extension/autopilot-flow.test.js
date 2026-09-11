@@ -9,6 +9,7 @@ async function scenario({queued=false,pauseAfterImport=false,pending=false,lette
   const context={console,URL,Date,Promise,AbortController,setTimeout,clearTimeout,self:{},chrome:{runtime:{onInstalled:event,onStartup:event,onMessage:event,getURL:p=>'chrome-extension://fixture/'+p},alarms:{create:async()=>{},onAlarm:event},storage:{local,sync:{get:async()=>({apiBase:'http://localhost:8080',vjaHhBrowserSearch:true})}},tabs:{
     create:async p=>{const t={id:++nextTab,status:'complete',url:p.url};tabs.set(t.id,t);trace.push('open:'+p.url);return t;},get:async id=>tabs.get(id),update:async(id,p)=>Object.assign(tabs.get(id),p),remove:async id=>tabs.delete(id),
     sendMessage:async(id,m)=>{const tab=tabs.get(id);if(m.type==='vjaReadHhDiscovery'){if(tab.url.includes('/search/'))return{pageUrl:tab.url,links:['https://hh.ru/vacancy/1','https://hh.ru/vacancy/2']};trace.push('read:'+tab.url);return{pageUrl:tab.url,vacancy:{title:roles[Number(new URL(tab.url).pathname.split('/').pop())-1],url:tab.url}};}
+      if(m.type==='vjaSiteApplyReady')return {ready:true};
       assert(m.plan.coverLetter.includes('letter for '+m.plan.trackedId),'each vacancy must receive its own prepared letter');trace.push('role:'+m.plan.jobTitle);trace.push('submit:'+m.plan.trackedId);return pending?{status:'submitted-needs-letter'}:{status:'confirmed',submitted:true,coverLetterFilled:letter};}
   }}};
   vm.createContext(context);context.importScripts=(...paths)=>paths.forEach(p=>vm.runInContext(fs.readFileSync(__dirname+'/'+p,'utf8'),context));
