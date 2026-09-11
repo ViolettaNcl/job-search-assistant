@@ -87,8 +87,10 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
             .Select(v =>
             {
                 var learningBoost = RecruitmentLearning.CalculateBoost(v, history);
-                var priorityScore = Math.Clamp(CalculatePriorityScore(v, now) + learningBoost, 0, 130);
                 var draft = drafts.Build(v);
+                var project = draft.Strategy?.Projects.FirstOrDefault();
+                var supported = project is null ? 0 : draft.Strategy!.SkillsToEmphasize.Where(skill => SkillCatalog.Proves(project.Skills, skill)).Select(SkillCatalog.Family).Distinct().Count();
+                var priorityScore = Math.Clamp(CalculatePriorityScore(v, now) + learningBoost + Math.Min(6, supported * 2), 0, 130);
                 return new ApplicationQueueItem(
                     v.Id,
                     v.Title,
@@ -101,7 +103,7 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
                     priorityScore,
                     PriorityLabel(priorityScore, v.MatchScore),
                     learningBoost,
-                    RecruitmentLearning.ExplainBoost(learningBoost),
+                    (project is null ? "" : $"Связь с задачами вакансии: проект {project.Name}, совпадений по группам навыков — {supported}. ") + RecruitmentLearning.ExplainBoost(learningBoost),
                     v.EligibilityStatus,
                     v.EligibilityReason,
                     v.MatchLevel,

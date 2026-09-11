@@ -14,7 +14,15 @@ public sealed record OutcomeSegment(
     int Rejections,
     double ResponseRate,
     double InterviewRate,
-    double OfferRate);
+    double OfferRate)
+{
+    public int PositiveResponses { get; init; }
+    public double PositiveResponseRate { get; init; }
+    public int Waiting { get; init; }
+    public int RecentWaiting { get; init; }
+    public int Withdrawn { get; init; }
+    public int Closed { get; init; }
+}
 
 public sealed record OutcomeAnalyticsResult(
     OutcomeSegment Overall,
@@ -24,7 +32,12 @@ public sealed record OutcomeAnalyticsResult(
     IReadOnlyList<OutcomeSegment> ByScoreBand,
     IReadOnlyList<OutcomeSegment> ByCvVariant,
     int AttributedCvApplications,
-    int TotalApplications);
+    int TotalApplications)
+{
+    public IReadOnlyList<OutcomeSegment> ByDirection { get; init; } = [];
+    public IReadOnlyList<OutcomeSegment> ByLetterVersion { get; init; } = [];
+    public int TechnicalFailures { get; init; }
+}
 
 public sealed class OutcomeAnalyticsService(AppDbContext db)
 {
@@ -34,6 +47,7 @@ public sealed class OutcomeAnalyticsService(AppDbContext db)
             .AsNoTracking()
             .Include(x => x.Company)
             .Include(x => x.Application)
+            .Include(x => x.Events)
             .Where(x => x.Application != null)
             .ToListAsync(ct);
 
@@ -53,7 +67,26 @@ public sealed class OutcomeAnalyticsService(AppDbContext db)
             byScoreBand,
             byCv,
             attributed,
-            rows.Count);
+            rows.Count)
+        {
+            ByDirection = Group(rows, Direction),
+            ByLetterVersion = Group(rows, v => SubmissionDetails.Read(v).LetterVersion, key => key == "unknown" ? "Версия письма не записана" : key),
+            TechnicalFailures = await db.ApplicationEvents.Where(e => e.Type == "AutoApplyFailed" || e.Type == "BrowserApplyReview").Select(e => e.VacancyId).Distinct().CountAsync(ct)
+        };
+    }
+
+    public async Task<object> ExportHistoryAsync(CancellationToken ct)
+    {
+        var rows = await db.Vacancies.AsNoTracking().Include(v => v.Company).Include(v => v.Application).Include(v => v.Events)
+            .Where(v => v.Application != null || v.Events.Any(e => e.Type == "AutoApplyFailed" || e.Type == "BrowserApplyReview"))
+            .ToListAsync(ct);
+        return new { exportedAt = DateTimeOffset.UtcNow, applications = rows.Select(v => new {
+            v.Id, v.Title, company = v.Company.Name, v.Source, v.Url, status = v.Status.ToString(),
+            v.MatchScore, direction = Direction(v), appliedAt = v.Application?.AppliedAt,
+            actualResume = v.Application?.ResumeExternalId, actualCoverLetter = v.Application?.CoverLetter,
+            letterVersion = SubmissionDetails.Read(v).LetterVersion,
+            events = v.Events.OrderBy(e => e.CreatedAt).Select(e => new { e.Type, e.Note, e.CreatedAt })
+        }) };
     }
 
     private static IReadOnlyList<OutcomeSegment> Group(
@@ -74,9 +107,10 @@ public sealed class OutcomeAnalyticsService(AppDbContext db)
     {
         var list = rows.ToList();
         var applications = list.Count;
-        var responses = list.Count(v => HasResponse(v.Status));
-        var interviews = list.Count(v => HasInterview(v.Status));
-        var offers = list.Count(v => v.Status == VacancyStatus.Offer);
+        var responses = list.Count(v => Reached(v, HasResponse));
+        var interviews = list.Count(v => Reached(v, HasInterview));
+        var positive = list.Count(v => Reached(v, status => HasResponse(status) && status != VacancyStatus.Rejected));
+        var offers = list.Count(v => Reached(v, status => status == VacancyStatus.Offer));
         var rejections = list.Count(v => v.Status == VacancyStatus.Rejected);
 
         return new OutcomeSegment(
@@ -89,7 +123,37 @@ public sealed class OutcomeAnalyticsService(AppDbContext db)
             rejections,
             Rate(responses, applications),
             Rate(interviews, applications),
-            Rate(offers, applications));
+            Rate(offers, applications))
+        {
+            PositiveResponses = positive, PositiveResponseRate = Rate(positive, applications),
+            Waiting = list.Count(v => v.Status == VacancyStatus.Applied),
+            RecentWaiting = list.Count(v => v.Status == VacancyStatus.Applied && v.Application!.AppliedAt >= DateTimeOffset.UtcNow.AddDays(-7)),
+            Withdrawn = list.Count(v => v.Status == VacancyStatus.Withdrawn),
+            Closed = list.Count(v => v.Status == VacancyStatus.Closed)
+        };
+    }
+
+    public static bool Reached(Vacancy vacancy, Func<VacancyStatus, bool> predicate)
+    {
+        if (predicate(vacancy.Status)) return true;
+        return vacancy.Events.Any(e =>
+        {
+            if (Enum.TryParse<VacancyStatus>(e.Type, out var status)) return predicate(status);
+            var parts = e.Type.Split(':');
+            if (parts.Length < 4 || parts[0] != HhNegotiationStatusMapper.EventTypePrefix) return false;
+            return predicate(HhNegotiationStatusMapper.Map(new("", "", parts[2], "", parts[3], "", false, false, null, null), VacancyStatus.Applied));
+        });
+    }
+
+    public static string Direction(Vacancy vacancy)
+    {
+        var snapshot = SubmissionDetails.Read(vacancy);
+        if (snapshot.RoleVariant != "unknown") return snapshot.RoleVariant;
+        var role = new VacancyUnderstandingService().Understand(vacancy.Title, vacancy.DescriptionText, vacancy.IsRemote);
+        if (role.RoleFamily != "Software engineering") return role.RoleFamily;
+        if (role.Requirements.Any(r => r.Skill is "React" or "Next.js" or "TypeScript")) return "Frontend / Fullstack";
+        if (role.Requirements.Any(r => r.Skill == "WPF")) return "C# Desktop";
+        return role.Requirements.Any(r => r.Skill is "C#" or ".NET" or "ASP.NET Core") ? ".NET Backend" : "Software engineering";
     }
 
     public static bool HasResponse(VacancyStatus status)
@@ -136,12 +200,13 @@ public sealed class OutcomeAnalyticsService(AppDbContext db)
                 ? "external:unknown"
                 : $"external:{value}";
         }
-        if (vacancy.Source.Equals("hh", StringComparison.OrdinalIgnoreCase)) return "hh";
+        if (vacancy.Source.Equals("hh", StringComparison.OrdinalIgnoreCase)) return resume.StartsWith("hh/browser:", StringComparison.OrdinalIgnoreCase) ? resume : "hh";
         return "unknown";
     }
 
     private static string CvLabel(string key)
     {
+        if (key.StartsWith("hh/browser:", StringComparison.OrdinalIgnoreCase)) return "HH: " + key[11..];
         if (key == "hh") return "HH selected resume";
         if (key is "unknown" or "external:unknown") return "CV not recorded";
         if (key.StartsWith("external:", StringComparison.OrdinalIgnoreCase)) return key["external:".Length..];

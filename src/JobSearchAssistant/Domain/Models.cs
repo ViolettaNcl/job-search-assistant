@@ -11,7 +11,9 @@ public enum VacancyStatus
     TestTask,
     Rejected,
     Offer,
-    Skipped
+    Skipped,
+    Withdrawn,
+    Closed
 }
 
 public sealed class Company
@@ -112,6 +114,7 @@ public sealed record CandidateProfileOptions
     public LocationPreferences LocationPreferences { get; init; } = new();
     public string GreekName { get; init; } = "Βιολέττα Νικολάου";
     public string Email { get; init; } = "violettanicolaou@gmail.com";
+    public string Telegram { get; init; } = "@Violet111";
     public string Phone { get; init; } = "";
     public string LinkedInUrl { get; init; } = "";
     public string CurrentCountry { get; init; } = "Russia";

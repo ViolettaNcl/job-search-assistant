@@ -115,6 +115,7 @@ function vjaSiteFieldValue(el) {
 }
 
 async function vjaSiteSetTextVerified(el, value) {
+  if (Number(el?.maxLength) > 0 && String(value || "").length > Number(el.maxLength)) return false;
   const expected = String(value || '').trim();
   if (!el || !expected) return false;
   const normalize = window.vjaSiteApply?.clean || (input => String(input || '').replace(/\s+/g, ' ').trim());

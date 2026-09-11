@@ -15,6 +15,8 @@ public sealed record ApplicationDraft(
     string[] Emphasize,
     string[] VerifyBeforeSubmit)
 {
+    public string LetterVersion { get; init; } = ApplicationWritingService.LetterVersion;
+    public string ResumeHint { get; init; } = "";
     public ApplicationStrategy? Strategy { get; init; }
     public string ReasoningMode { get; init; } = "deterministic-fallback";
 }
@@ -91,6 +93,7 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
         var answers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["email"] = _candidate.Email,
+            ["telegram"] = ApplicationContactFooter.NormalizeTelegram(_candidate.Telegram),
             ["github"] = _candidate.GitHubUrl,
             ["portfolio"] = _candidate.CvUrl,
             ["currentLocation"] = $"{_candidate.CurrentCity}, {_candidate.CurrentCountry}",
@@ -121,8 +124,8 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
         if (score < 75) verify.Add("Fit score is below the normal auto-apply threshold; review before applying.");
         verify.Add("Never invent years of commercial employment, certifications, relocation commitments or legal declarations.");
 
-        coverLetter = ApplicationContactFooter.Append(coverLetter, _candidate.Email, russian);
-        shortMessage = ApplicationContactFooter.Append(shortMessage, _candidate.Email, russian);
+        coverLetter = ApplicationContactFooter.Append(coverLetter, _candidate.Email, russian, _candidate.Telegram);
+        shortMessage = ApplicationContactFooter.Append(shortMessage, _candidate.Email, russian, _candidate.Telegram);
 
         return new ApplicationDraft(
             russian ? "ru" : "en",
@@ -133,7 +136,7 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
             coverLetter,
             answers,
             emphasize,
-            verify.ToArray()) { Strategy = strategy };
+            verify.ToArray()) { Strategy = strategy, ResumeHint = headline };
     }
 
     private string BuildRussianShort(string company, string title, string roleKind, string focus, string[] emphasize, int variant)
@@ -355,10 +358,13 @@ public sealed class ApplicationDraftService(IOptions<CandidateProfileOptions> ca
 
     private static bool IsRussianMarket(string country, string source, string description)
     {
+        var cyrillic = Regex.Matches(description ?? "", "[А-Яа-яЁё]").Count;
+        var latin = Regex.Matches(description ?? "", "[A-Za-z]").Count;
+        if (latin > 100 && cyrillic < 10) return false;
+        if (cyrillic > 40) return true;
         if (country.Contains("Russia", StringComparison.OrdinalIgnoreCase) || country.Contains("Россия", StringComparison.OrdinalIgnoreCase)) return true;
         if (source.Equals("hh", StringComparison.OrdinalIgnoreCase)) return true;
-        var cyrillic = Regex.Matches(description ?? "", "[А-Яа-яЁё]").Count;
-        return cyrillic > 40;
+        return false;
     }
 
     private static string Clean(string value, string fallback)

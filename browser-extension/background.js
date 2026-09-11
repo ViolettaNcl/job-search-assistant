@@ -132,7 +132,7 @@ async function browserAutopilotComplete(api, plan, result, tabId) {
   await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(plan.trackedId)}/${plan.automatic ? "browser-auto-applied" : "browser-applied"}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ coverLetter: plan.coverLetter, resumeLabel: result.resumeLabel || plan.resumeHint, vacancyTitle: plan.jobTitle })
+    body: JSON.stringify({ coverLetter: plan.coverLetter, resumeLabel: result.resumeLabel || "", vacancyTitle: plan.jobTitle, letterVersion:plan.letterVersion || "unknown", roleVariant:plan.roleVariant || "unknown" })
   });
   await updateApplicationJob(plan.id,{completed:true,review:false,reason:null,pending:null});
   if (!plan.popup) { try { await chrome.tabs.remove(tabId); } catch { } }
