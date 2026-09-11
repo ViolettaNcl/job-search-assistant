@@ -79,6 +79,30 @@ public sealed class OutcomeAnalyticsServiceTests
         Assert.IsTrue(OutcomeAnalyticsService.HasInterview(VacancyStatus.Offer));
     }
 
+    [TestMethod]
+    public async Task AnalyticsKeepsInterviewHistoryAndSeparatesWaitingCancellationAndVersions()
+    {
+        await using var db = CreateDb(); var company = Company("Example");
+        var rejected = Applied(company, "Junior QA", "hh", "HH", 80, VacancyStatus.Rejected, "hh/browser:QA Engineer");
+        rejected.Events.Add(new ApplicationEvent { Type = "HrInterview", VacancyId = rejected.Id });
+        rejected.Events.Add(new ApplicationEvent { Type = SubmissionDetails.EventType, VacancyId = rejected.Id,
+            Note = System.Text.Json.JsonSerializer.Serialize(new SubmissionSnapshot("human-2.7.13", "QA Automation")) });
+        var waiting = Applied(company, "Junior C#", "hh", "HH", 85, VacancyStatus.Applied, "hh/browser:C# Developer");
+        waiting.Application!.AppliedAt = DateTimeOffset.UtcNow;
+        var withdrawn = Applied(company, "Junior C#", "hh", "HH", 85, VacancyStatus.Withdrawn, "hh/browser:C# Developer");
+        var closed = Applied(company, "Junior C#", "hh", "HH", 85, VacancyStatus.Closed, "hh/browser:C# Developer");
+        db.AddRange(rejected, waiting, withdrawn, closed); await db.SaveChangesAsync();
+        var result = await new OutcomeAnalyticsService(db).GetAsync(default);
+        Assert.AreEqual(1, result.Overall.Rejections);
+        Assert.AreEqual(1, result.Overall.Interviews, "A later rejection must not erase an interview already reached.");
+        Assert.AreEqual(1, result.Overall.PositiveResponses);
+        Assert.AreEqual(1, result.Overall.RecentWaiting);
+        Assert.AreEqual(1, result.Overall.Withdrawn); Assert.AreEqual(1, result.Overall.Closed);
+        Assert.AreEqual(2, result.ByCvVariant.Count);
+        Assert.AreEqual(3, result.ByLetterVersion.Single(x => x.Key == "unknown").Applications);
+        Assert.AreEqual(1, result.ByDirection.Single(x => x.Key == "QA Automation").Applications);
+    }
+
     private static Company Company(string name)
         => new() { Name = name, Source = "global", ExternalId = Guid.NewGuid().ToString("N") };
 

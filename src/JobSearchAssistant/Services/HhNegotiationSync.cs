@@ -13,7 +13,10 @@ public sealed record HhNegotiationDto(
     bool HasUpdates,
     bool ViewedByOpponent,
     DateTimeOffset? CreatedAt,
-    DateTimeOffset? UpdatedAt);
+    DateTimeOffset? UpdatedAt)
+{
+    public bool VacancyArchived { get; init; }
+}
 
 public static class HhNegotiationParser
 {
@@ -44,7 +47,7 @@ public static class HhNegotiationParser
                 ReadBoolean(item, "has_updates"),
                 ReadBoolean(item, "viewed_by_opponent"),
                 ReadDate(item, "created_at"),
-                ReadDate(item, "updated_at")));
+                ReadDate(item, "updated_at")) { VacancyArchived = item.TryGetProperty("vacancy", out var vacancy) && ReadBoolean(vacancy, "archived") });
         }
         return result;
     }
@@ -76,10 +79,10 @@ public static class HhNegotiationStatusMapper
     public static VacancyStatus Map(HhNegotiationDto negotiation, VacancyStatus current)
     {
         var externalState = $"{negotiation.StateId} {negotiation.StateName} {negotiation.EmployerStateId} {negotiation.EmployerStateName}".ToLowerInvariant();
-        var target = MapExternalState(externalState, negotiation.HasUpdates);
+        var target = MapExternalState(externalState, negotiation.VacancyArchived);
 
+        if (target is VacancyStatus.Rejected or VacancyStatus.Withdrawn or VacancyStatus.Closed) return target;
         if (current == VacancyStatus.Offer) return current;
-        if (target == VacancyStatus.Rejected) return target;
         if (current == VacancyStatus.Rejected) return current;
         if (current is VacancyStatus.HrInterview or VacancyStatus.TechInterview or VacancyStatus.TestTask)
             return target == VacancyStatus.Offer ? target : current;
@@ -106,19 +109,22 @@ public static class HhNegotiationStatusMapper
             negotiation.StateId,
             negotiation.EmployerStateId,
             negotiation.HasUpdates ? "unread" : "read",
+            negotiation.VacancyArchived ? "archived" : "active",
             negotiation.UpdatedAt?.ToUniversalTime().Ticks.ToString() ?? "unknown"
         });
 
-    private static VacancyStatus MapExternalState(string state, bool hasUpdates)
+    private static VacancyStatus MapExternalState(string state, bool archived)
     {
         if (ContainsAny(state, "offer", "hired", "оффер", "нанят")) return VacancyStatus.Offer;
-        if (ContainsAny(state, "discard_by_applicant", "withdraw", "отозван")) return VacancyStatus.Skipped;
+        if (ContainsAny(state, "discard_by_applicant", "withdraw", "отозван")) return VacancyStatus.Withdrawn;
         if (ContainsAny(state, "discard", "reject", "отказ")) return VacancyStatus.Rejected;
+        if (archived) return VacancyStatus.Closed;
+        if (ContainsAny(state, "phone_interview", "первичный контакт")) return VacancyStatus.HrContact;
         if (ContainsAny(state, "tech_interview", "technical_interview", "техническ")) return VacancyStatus.TechInterview;
         if (ContainsAny(state, "assessment", "test_task", "test", "тестов")) return VacancyStatus.TestTask;
         if (ContainsAny(state, "interview", "интервью")) return VacancyStatus.HrInterview;
         if (ContainsAny(state, "invitation", "consider", "phone_interview", "приглаш", "первичный контакт")) return VacancyStatus.HrContact;
-        return hasUpdates ? VacancyStatus.HrContact : VacancyStatus.Applied;
+        return VacancyStatus.Applied; // An unread message alone does not establish a recruiting stage.
     }
 
     private static bool ContainsAny(string value, params string[] terms)
@@ -133,7 +139,9 @@ public static class HhNegotiationStatusMapper
         VacancyStatus.TestTask => "тестовое задание",
         VacancyStatus.Rejected => "отказ",
         VacancyStatus.Offer => "оффер",
-        VacancyStatus.Skipped => "отклик закрыт",
+        VacancyStatus.Skipped => "пропущено",
+        VacancyStatus.Withdrawn => "отклик отозван кандидатом",
+        VacancyStatus.Closed => "вакансия закрыта",
         _ => status.ToString()
     };
 }

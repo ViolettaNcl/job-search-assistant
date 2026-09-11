@@ -40,7 +40,7 @@ public sealed class HhNegotiationSyncTests
     public void Mapper_TracksRepliesTestsOffersAndRejections()
     {
         Assert.AreEqual(VacancyStatus.Applied, Map("response"));
-        Assert.AreEqual(VacancyStatus.HrContact, Map("response", hasUpdates: true));
+        Assert.AreEqual(VacancyStatus.Applied, Map("response", hasUpdates: true));
         Assert.AreEqual(VacancyStatus.HrContact, Map("invitation"));
         Assert.AreEqual(VacancyStatus.TestTask, Map("response", employerState: "assessment"));
         Assert.AreEqual(VacancyStatus.Offer, Map("response", employerState: "offer"));
@@ -65,6 +65,16 @@ public sealed class HhNegotiationSyncTests
 
         Assert.AreNotEqual(HhNegotiationStatusMapper.EventType(read), HhNegotiationStatusMapper.EventType(unread));
         StringAssert.StartsWith(HhNegotiationStatusMapper.EventType(read), HhNegotiationStatusMapper.EventTypePrefix);
+    }
+
+    [TestMethod]
+    public void WithdrawalArchiveAndUnreadAreNotEmployerRejections()
+    {
+        Assert.AreEqual(VacancyStatus.Withdrawn, Map("discard_by_applicant"));
+        Assert.AreEqual(VacancyStatus.Closed, HhNegotiationStatusMapper.Map(Negotiation("response") with { VacancyArchived = true }, VacancyStatus.Applied));
+        Assert.AreEqual(VacancyStatus.Rejected, HhNegotiationStatusMapper.Map(Negotiation("discard") with { VacancyArchived = true }, VacancyStatus.Applied));
+        Assert.AreEqual(VacancyStatus.Applied, Map("response", hasUpdates: true));
+        Assert.AreEqual(VacancyStatus.HrContact, Map("invitation", employerState: "phone_interview"));
     }
 
     private static VacancyStatus Map(string state, bool hasUpdates = false, string employerState = "")

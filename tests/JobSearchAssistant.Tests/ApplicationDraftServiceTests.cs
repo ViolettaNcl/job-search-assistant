@@ -27,7 +27,7 @@ public sealed class ApplicationDraftServiceTests
         Assert.AreEqual("Виолетта Николау", draft.CandidateName);
         Assert.AreEqual("Violetta_Nicolaou_CV_RU_v2.pdf", draft.RecommendedCv);
         StringAssert.Contains(draft.CoverLetter, "API");
-        StringAssert.Contains(draft.CoverLetter, "GitHub: https://github.com/ViolettaNcl");
+        StringAssert.Contains(draft.CoverLetter, "GitHub: https://github.com/ViolettaNcl/DentalClinic");
         Assert.IsFalse(draft.CoverLetter.Contains("диплом", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(draft.CoverLetter.Contains("официальная работа", StringComparison.OrdinalIgnoreCase));
         Assert.IsTrue(draft.CoverLetter.Length < 750);
@@ -49,7 +49,7 @@ public sealed class ApplicationDraftServiceTests
         Assert.AreEqual("en", draft.Language);
         Assert.AreEqual("Violetta_Nicolaou_CV_EN_v2.pdf", draft.RecommendedCv);
         CollectionAssert.Contains(draft.VerifyBeforeSubmit, "Do not claim these skills unless independently verified: Redis.");
-        StringAssert.Contains(draft.CoverLetter, "data and databases");
+        StringAssert.Contains(draft.CoverLetter, "database");
         Assert.IsFalse(draft.CoverLetter.Contains("Redis", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(draft.CoverLetter.Contains("honours", StringComparison.OrdinalIgnoreCase));
     }
@@ -68,7 +68,7 @@ public sealed class ApplicationDraftServiceTests
             []);
 
         StringAssert.Contains(draft.RecommendedHeadline, "QA");
-        StringAssert.Contains(draft.CoverLetter, "Testing");
+        StringAssert.Contains(draft.CoverLetter, "automated tests");
         StringAssert.Contains(draft.CoverLetter, "project");
         Assert.IsFalse(draft.CoverLetter.Contains("years of QA experience", StringComparison.OrdinalIgnoreCase));
     }
@@ -163,6 +163,33 @@ public sealed class ApplicationDraftServiceTests
             Assert.AreEqual(row.Item3, draft.Strategy!.CvVariant);
             Assert.AreEqual(draft.Strategy.Headline, draft.RecommendedHeadline);
         }
+    }
+
+    [TestMethod]
+    public void NaturalLettersKeepContactsAndDoNotClaimUnsupportedExperience()
+    {
+        foreach (var role in new[] { ("Junior .NET Developer", "C#, ASP.NET Core, SQL"), ("Junior QA Engineer", "C#, SQL, Testing"), ("Junior Frontend Developer", "React, TypeScript, Next.js"), ("Junior Implementation Engineer", "SQL, REST"), ("Junior Technical Support", "SQL, REST") })
+        {
+            var draft = _sut.Build(role.Item1, "Example", role.Item2, "Russia", "hh", 90, [], []);
+            Assert.IsTrue(draft.CoverLetter.Length < 800, role.Item1 + ": " + draft.CoverLetter.Length);
+            StringAssert.Contains(draft.CoverLetter, "Telegram: @Violet111");
+            StringAssert.Contains(draft.CoverLetter, "Email: violettanicolaou@gmail.com");
+            Assert.AreEqual("human-2.7.13", draft.LetterVersion);
+            Assert.AreEqual(draft.RecommendedHeadline, draft.ResumeHint);
+            Assert.IsFalse(draft.CoverLetter.Contains("Использованные технологии"));
+            Assert.IsFalse(draft.CoverLetter.Contains("идеально подхожу"));
+            Assert.IsFalse(draft.CoverLetter.Contains("коммерческий стаж"));
+        }
+    }
+
+    [TestMethod]
+    public void ClearlyEnglishHhDescriptionUsesEnglishLetterAndExistingEnglishCv()
+    {
+        var draft = _sut.Build("Junior Backend Developer", "Example", "We are looking for a junior developer to build REST APIs with C# and SQL. You will work with our engineering team on new features and automated tests.", "Russia", "hh", 90, [], []);
+        Assert.AreEqual("en", draft.Language);
+        Assert.AreEqual(new CandidateProfileOptions().EnglishCvFileName, draft.RecommendedCv);
+        StringAssert.Contains(draft.CoverLetter, "Hello!");
+        StringAssert.Contains(draft.CoverLetter, "@Violet111");
     }
 
 }

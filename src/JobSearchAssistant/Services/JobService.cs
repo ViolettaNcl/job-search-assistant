@@ -386,6 +386,7 @@ public sealed class JobService(
         vacancy.Status = VacancyStatus.Applied;
         vacancy.HasExistingHhResponse = true;
         db.Applications.Add(new Application { VacancyId = vacancy.Id, ResumeExternalId = state.HhResumeId, CoverLetter = letter });
+        SubmissionDetails.Record(db, vacancy, ApplicationWritingService.LetterVersion, drafts.Build(vacancy).Strategy?.CvVariant);
         db.ApplicationEvents.Add(new ApplicationEvent
         {
             VacancyId = vacancy.Id,
@@ -409,10 +410,10 @@ public sealed class JobService(
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task MarkBrowserAppliedAsync(Guid vacancyId, string? coverLetter, string? resumeLabel, bool automatic, CancellationToken ct)
+    public async Task MarkBrowserAppliedAsync(Guid vacancyId, string? coverLetter, string? resumeLabel, bool automatic, CancellationToken ct, string? letterVersion = null, string? roleVariant = null)
     {
         var vacancy = await db.Vacancies.Include(x => x.Application).Include(x => x.Events).SingleAsync(x => x.Id == vacancyId, ct);
-        vacancy.Status = VacancyStatus.Applied;
+        if (vacancy.Application is null) vacancy.Status = VacancyStatus.Applied;
         vacancy.HasExistingHhResponse = vacancy.Source == "hh" || vacancy.HasExistingHhResponse;
         vacancy.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -421,7 +422,7 @@ public sealed class JobService(
             db.Applications.Add(new Application
             {
                 VacancyId = vacancy.Id,
-                ResumeExternalId = string.IsNullOrWhiteSpace(resumeLabel) ? "hh/browser" : $"hh/browser:{resumeLabel.Trim()}",
+                ResumeExternalId = string.IsNullOrWhiteSpace(resumeLabel) ? (vacancy.Source == "hh" ? "hh/browser" : "external/manual") : (vacancy.Source == "hh" ? $"hh/browser:{resumeLabel.Trim()}" : $"external/{resumeLabel.Trim()}"),
                 CoverLetter = coverLetter?.Trim() ?? "",
                 AppliedAt = DateTimeOffset.UtcNow
             });
@@ -431,6 +432,7 @@ public sealed class JobService(
             vacancy.Application.CoverLetter = coverLetter.Trim();
         }
 
+        SubmissionDetails.Record(db, vacancy, letterVersion, roleVariant);
         var eventType = automatic ? "AutoApplied" : "Applied";
         if (!vacancy.Events.Any(x => x.Type == eventType))
         {
@@ -450,11 +452,12 @@ public sealed class JobService(
     public async Task SetStatusAsync(Guid vacancyId, VacancyStatus status, string note, CancellationToken ct)
     {
         var vacancy = await db.Vacancies.Include(x => x.Application).SingleAsync(x => x.Id == vacancyId, ct);
-        vacancy.Status = status;
+        var attemptReview = status == VacancyStatus.Saved && note.StartsWith("QueueDeferredUntil=", StringComparison.Ordinal);
+        if (!attemptReview || vacancy.Application is null) vacancy.Status = status;
         vacancy.UpdatedAt = DateTimeOffset.UtcNow;
         if (status == VacancyStatus.Applied && vacancy.Application is null)
             db.Applications.Add(new Application { VacancyId = vacancyId, ResumeExternalId = "manual", AppliedAt = DateTimeOffset.UtcNow });
-        db.ApplicationEvents.Add(new ApplicationEvent { VacancyId = vacancyId, Type = status.ToString(), Note = note });
+        db.ApplicationEvents.Add(new ApplicationEvent { VacancyId = vacancyId, Type = attemptReview ? "BrowserApplyReview" : status.ToString(), Note = note });
         await db.SaveChangesAsync(ct);
     }
 

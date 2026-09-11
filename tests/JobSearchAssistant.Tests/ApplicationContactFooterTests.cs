@@ -20,7 +20,7 @@ public sealed class ApplicationContactFooterTests
             var draft = service.Build(title, "Example", description, country, source, 85, ["C#", "SQL"], []);
             Assert.AreEqual(2, draft.CoverLetter.Split(email).Length);
             Assert.AreEqual(2, draft.ShortMessage.Split(email).Length);
-            StringAssert.Contains(draft.CoverLetter, country == "Russia" ? "связаться по email" : "contact me by email");
+            StringAssert.Contains(draft.CoverLetter, "Email:");
         }
     }
     [TestMethod]
@@ -38,7 +38,19 @@ public sealed class ApplicationContactFooterTests
         var assessment = new OpportunityScoringService(options).Assess("Junior C#", "C# SQL API remote worldwide", true);
         var strategy = new EvidenceRetrievalService(new CandidateKnowledgeService(options)).Select(assessment);
         var writer = new ApplicationWritingService(options);
-        StringAssert.Contains(writer.Write(strategy, true).Letter, "связаться по email: candidate@example.com");
-        StringAssert.Contains(writer.AddContact("Suggested project letter.", false), "contact me by email: candidate@example.com");
+        StringAssert.Contains(writer.Write(strategy, true).Letter, "Email: candidate@example.com");
+        StringAssert.Contains(writer.AddContact("Suggested project letter.", false), "Email: candidate@example.com");
     }
+    [TestMethod]
+    public void TelegramIsNormalizedAndAddedOnceAlongsideEmail()
+    {
+        var text = ApplicationContactFooter.Append("Здравствуйте!", "candidate@example.com", true, "https://t.me/Violet111");
+        StringAssert.Contains(text, "Email: candidate@example.com · Telegram: @Violet111");
+        Assert.AreEqual(text, ApplicationContactFooter.Append(text, "candidate@example.com", true, "@Violet111"));
+        Assert.AreEqual("", ApplicationContactFooter.NormalizeTelegram("@name with spaces"));
+        Assert.AreEqual("", ApplicationContactFooter.NormalizeTelegram("https://evil.test/Violet111"));
+        Assert.AreEqual("", ApplicationContactFooter.NormalizeTelegram(""));
+        Assert.AreEqual("@Violet111", new CandidateProfileOptions().Telegram);
+    }
+
 }

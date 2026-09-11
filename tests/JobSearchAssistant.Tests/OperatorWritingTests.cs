@@ -48,7 +48,7 @@ public sealed class OperatorWritingTests
             var letter = new ApplicationWritingService(profile).Write(strategy, russian, "Junior C#", "Example").Letter;
             StringAssert.Contains(letter, "GitHub:"); StringAssert.Contains(letter, "candidate@example.com");
             Assert.AreEqual(0, ApplicationClaimValidator.ValidateSuggestion(letter, strategy.Projects.Select(p => p.Id).ToArray(), knowledge.Get()).Length);
-            Assert.IsFalse(letter.Contains("Буду рада")); Assert.IsFalse(letter.Contains("happy to"));
+            Assert.IsFalse(letter.Contains("показать код")); Assert.IsFalse(letter.Contains("walk through"));
         }
     }
 
