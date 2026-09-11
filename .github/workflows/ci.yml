@@ -21,6 +21,7 @@ jobs:
           node --check browser-extension/dashboard-apply-content.js
           node --check browser-extension/dashboard-apply-background.js
           node --check browser-extension/background.js
+          node --check browser-extension/application-jobs.js
           node --check browser-extension/browser-autopilot.js
           node --check browser-extension/runtime-guard.js
           node --check browser-extension/site-apply.js
@@ -142,6 +143,8 @@ jobs:
         run: node browser-extension/site-apply.test.js
       - name: Test discovery-to-submission orchestration
         run: node browser-extension/autopilot-flow.test.js
+      - name: Test concurrent application jobs and isolated storage
+        run: node browser-extension/application-jobs.test.js
       - name: Test dashboard one-click submission
         run: node browser-extension/dashboard-apply.test.js
       - name: Test HH browser discovery

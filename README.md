@@ -262,3 +262,9 @@ For later mobile work: first add Windows autostart to avoid a terminal ritual, t
 Dashboard applications reconcile saved HH receipts before inspecting the old tab. Closed-tab or expired tasks no longer lock unrelated vacancies, including when autopilot is off. Unknown outcomes are kept in the extension's private local review ledger and excluded from automatic retries; inspect the existing HH response and letter before any manual retry on HH. This release does not assume that an expired task failed to submit.
 
 A lost execution channel sends only one application command, then polls for a receipt for 15 seconds (after the 60-second command timeout). Manual requests take priority at the next safe discovery boundary; an already executing application remains serialized. Eligibility review now explains unknown Russia hiring scope in Russian and applies with autopilot on or off. It does not assert unverified hiring eligibility.
+
+### Parallel dashboard and autopilot applications (2.7.12)
+
+Manual dashboard requests and the HH browser autopilot now share a persisted queue with up to **three concurrent application tabs**. Each job owns its own vacancy, letter, resume choice, continuation and receipt. Additional manual clicks are accepted immediately and start when a slot becomes free; the search loop no longer locks manual submissions. Jobs waiting for a receipt do not lock unrelated jobs.
+
+A background/content handshake waits for the extension to attach before dispatching. Managed page navigation and message handlers cannot start the same plan twice concurrently. Closing one tab affects only its job. A worker restart retains the queue and confirmed results; an uncertain previous send stays under review for that vacancy. Legacy single-plan state is migrated separately and cannot impose a global lock. A browser connection, running backend and working HH session are still required; CAPTCHA and unknown employer questions still require the user.

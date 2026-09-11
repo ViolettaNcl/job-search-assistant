@@ -335,7 +335,21 @@ async function vjaSiteStoreResult(plan, result) {
   }
 }
 
+const vjaSiteExecutions = new Map();
 async function vjaRunSiteApply(plan = {}, options = {}) {
+  if(vjaSiteExecutions.has(plan.id))return vjaSiteExecutions.get(plan.id);
+  const run=(async()=>{
+    if(plan.managed) {
+      const current=await vjaSiteStorageGet('vjaPendingSiteApply');
+      if(!current || current.id!==plan.id)throw new Error('This application is no longer active in this tab.');
+      plan=current;
+    }
+    return vjaExecuteSiteApply(plan,options);
+  })();
+  vjaSiteExecutions.set(plan.id,run);
+  try{return await run;}finally{vjaSiteExecutions.delete(plan.id);}
+}
+async function vjaExecuteSiteApply(plan = {}, options = {}) {
   if (plan.finalClicked) {
     await vjaSiteWait(1200);
     const receipt = vjaSiteReceipt();
@@ -543,7 +557,7 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
 
 async function vjaResumePendingSiteApply() {
   const pending = await vjaSiteStorageGet('vjaPendingSiteApply');
-  if (!pending) return;
+  if (!pending || pending.managed) return; // Managed state is owned by the job scheduler.
   const expiresAt = Number(pending.expiresAt || 0);
   if (expiresAt && Date.now() > expiresAt) {
     await vjaSiteStorageRemove('vjaPendingSiteApply');
@@ -561,8 +575,9 @@ async function vjaResumePendingSiteApply() {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if(message?.type==='vjaSiteApplyReady'){sendResponse({ok:true});return false;}
   if (message?.type !== 'siteApplyNow') return false;
-  vjaRunSiteApply(message.plan || {})
+  vjaRunSiteApply(message.plan || {}, {resumed:Boolean(message.plan?.resumeOnly)})
     .then(sendResponse)
     .catch(error => sendResponse({ submitted: false, status: 'error', error: error?.message || String(error) }));
   return true;
