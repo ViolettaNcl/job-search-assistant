@@ -109,21 +109,18 @@ async function browserAutopilotStoredResult(planId) {
 
 async function browserAutopilotSendPlan(tabId, plan) {
   let lastError = null;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const storedResult = await browserAutopilotStoredResult(plan.id);
-    if (storedResult) return storedResult;
-    try {
-      const result = await browserAutopilotWithTimeout(
-        chrome.tabs.sendMessage(tabId, { type: "siteApplyNow", plan }),
-        60000,
-        "The HH application page did not answer within 60 seconds."
-      );
-      if (result) return result;
-    } catch (error) {
-      lastError = error;
-    }
-    await browserAutopilotWait(1800);
-  }
+  const storedResult = await browserAutopilotStoredResult(plan.id);
+  if (storedResult) return storedResult;
+  try {
+    const result = await browserAutopilotWithTimeout(
+      chrome.tabs.sendMessage(tabId, { type: "siteApplyNow", plan }),
+      60000,
+      "Страница HH не ответила за 60 секунд."
+    );
+    if (result) return result;
+  } catch (error) { lastError = error; }
+  // Navigation may close the message channel while a receipt is being persisted.
+  // Poll the receipt only; never dispatch the application command again here.
 
   for (let attempt = 0; attempt < 15; attempt++) {
     const result = await browserAutopilotStoredResult(plan.id);
@@ -155,6 +152,11 @@ async function browserAutopilotDefer(api, plan, reason) {
 
 async function browserAutopilotProcess(api, plan, tabId) {
   await browserAutopilotHeartbeat(api, true, `Открываю «${plan.jobTitle}» и готовлю отклик с письмом.`, plan.jobTitle);
+  const savedResult=await browserAutopilotStoredResult(plan.id);
+  if(savedResult?.submitted && savedResult.status==='confirmed' && savedResult.coverLetterFilled) {
+    await browserAutopilotComplete(api,plan,savedResult,tabId);
+    return {completed:true,message:`Отклик и письмо отправлены: ${plan.jobTitle}.`};
+  }
   await browserAutopilotWaitForTab(tabId);
   const pendingState = await chrome.storage.local.get("vjaPendingSiteApply");
   const continuationPlan = pendingState.vjaPendingSiteApply?.id === plan.id
@@ -172,16 +174,21 @@ async function browserAutopilotProcess(api, plan, tabId) {
   }
 
   const message = await browserAutopilotDefer(api, plan, result?.reason || result?.error);
-  await chrome.storage.local.remove(["vjaBrowserAutopilotActivePlan", "vjaBrowserAutopilotTabId", "vjaPendingSiteApply", "vjaSiteApplyResult"]);
+  await archiveApplicationReview(api,plan,result,message);
   if (!plan.dashboard) { try { await chrome.tabs.update(tabId, { active: true }); } catch { } }
   return { completed: false, retry: false, message };
 }
 
 async function browserAutopilotApplyNext(api) {
+  if(dashboardApplyWaiting)return {stopped:true};
+  const pending=await chrome.storage.local.get(['vjaBrowserAutopilotActivePlan','vjaPendingSiteApply']);
+  if(pending.vjaBrowserAutopilotActivePlan || pending.vjaPendingSiteApply)return {stopped:true};
   const status = await browserAutopilotJson(`${api}/api/automation/status`);
   if (!self.vjaBrowserAutopilot.shouldRun(status)) return { stopped: true };
     const queue = await browserAutopilotJson(`${api}/api/application-queue?limit=50&source=hh&automaticOnly=true&minScore=${encodeURIComponent(status.autoApplyMinimumScore || 75)}`);
-    const candidate = self.vjaBrowserAutopilot?.selectCandidate?.(queue, status.autoApplyMinimumScore || 75);
+    const available=[];
+    for(const item of queue)if(!await applicationNeedsReview(item))available.push(item);
+    const candidate = self.vjaBrowserAutopilot?.selectCandidate?.(available, status.autoApplyMinimumScore || 75);
     if (!candidate) return null;
     // Recheck after queue preparation so Pause/quota changes do not start another job.
     const live = await browserAutopilotJson(`${api}/api/automation/status`);
@@ -203,13 +210,14 @@ async function browserAutopilotApplyNext(api) {
 }
 
 async function runBrowserAutopilot() {
-  if (browserAutopilotRunning) return;
+  if (browserAutopilotRunning || dashboardApplyWaiting) return;
   browserAutopilotRunning = true;
   let api = "";
   try {
     api = await browserAutopilotApiBase();
     await browserAutopilotHeartbeat(api, false, "Расширение Chrome подключено и готово к браузерному автопилоту.");
     let status = await browserAutopilotJson(`${api}/api/automation/status`);
+    await reconcileApplicationState(api);
     const active = await chrome.storage.local.get(["vjaBrowserAutopilotActivePlan", "vjaBrowserAutopilotTabId"]);
     if (!active.vjaBrowserAutopilotActivePlan?.dashboard && !self.vjaBrowserAutopilot?.shouldRun?.(status)) return;
     if (active.vjaBrowserAutopilotActivePlan && active.vjaBrowserAutopilotTabId) {
@@ -220,7 +228,9 @@ async function runBrowserAutopilot() {
         return;
       } catch (error) {
         const message = await browserAutopilotDefer(api, active.vjaBrowserAutopilotActivePlan, error?.message || String(error));
-        await chrome.storage.local.remove(["vjaBrowserAutopilotActivePlan", "vjaBrowserAutopilotTabId", "vjaPendingSiteApply", "vjaSiteApplyResult"]);
+        const stalled={...active.vjaBrowserAutopilotActivePlan,expiresAt:Date.now()-1};
+        await chrome.storage.local.set({vjaBrowserAutopilotActivePlan:stalled});
+        await reconcileApplicationState(api);
         await browserAutopilotHeartbeat(api, false, message, active.vjaBrowserAutopilotActivePlan.jobTitle);
         await dashboardApplyNotify(active.vjaBrowserAutopilotActivePlan, { message, completed: false });
         if (!active.vjaBrowserAutopilotActivePlan.dashboard) { try { await chrome.tabs.update(active.vjaBrowserAutopilotTabId, { active: true }); } catch { } }

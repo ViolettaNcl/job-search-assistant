@@ -1,3 +1,44 @@
+// Manual clicks take priority at the next safe discovery boundary.
+var dashboardApplyWaiting = 0;
+const applicationStateKeys = ['vjaBrowserAutopilotActivePlan','vjaBrowserAutopilotTabId','vjaPendingSiteApply','vjaSiteApplyResult'];
+// Retain uncertain attempts per vacancy, rather than locking every future application.
+// Never retry an archived vacancy automatically or interpret an expired plan as success.
+async function reconcileApplicationState(api) {
+  const state=await chrome.storage.local.get(applicationStateKeys);
+  const plan=state.vjaBrowserAutopilotActivePlan || state.vjaPendingSiteApply;
+  if(!plan)return;
+  const envelope=state.vjaSiteApplyResult;
+  const result=envelope?.id===plan.id?envelope.result:null;
+  if(state.vjaBrowserAutopilotActivePlan && result?.submitted && result.status==='confirmed' && result.coverLetterFilled) {
+    await browserAutopilotComplete(api,plan,result,state.vjaBrowserAutopilotTabId);
+    await dashboardApplyNotify(plan,{completed:true,message:`Отклик и письмо отправлены: ${plan.jobTitle}.`});
+    return;
+  }
+  let missingTab=false;
+  if(state.vjaBrowserAutopilotActivePlan) {
+    try {missingTab=!state.vjaBrowserAutopilotTabId || !await chrome.tabs.get(state.vjaBrowserAutopilotTabId);}catch{missingTab=true;}
+  }
+  const expired=Number(plan.expiresAt)>0 && Number(plan.expiresAt)<=Date.now();
+  if(!missingTab&&!expired)return;
+  const reason=`Предыдущая попытка для «${plan.jobTitle || 'вакансии'}» остановлена: ${missingTab?'вкладка закрыта':'истёк срок задания'}. Проверьте отклики и письмо на HH перед повторной отправкой. Другие вакансии доступны.`;
+  await archiveApplicationReview(api,plan,result,reason);
+}
+async function archiveApplicationReview(api,plan,result,reason) {
+  const stored=await chrome.storage.local.get('vjaApplicationReview');
+  const reviews=stored.vjaApplicationReview || {};
+  const key=plan.trackedId || plan.sourceUrl || plan.id;
+  reviews[key]={plan,result,reason,recordedAt:Date.now()};
+  await chrome.storage.local.set({vjaApplicationReview:reviews});
+  await chrome.storage.local.remove(applicationStateKeys);
+  if(plan.trackedId)await browserAutopilotDefer(api,plan,reason);
+  await dashboardApplyNotify(plan,{message:reason});
+}
+async function applicationNeedsReview(candidate) {
+  const stored=await chrome.storage.local.get('vjaApplicationReview');
+  return Object.values(stored.vjaApplicationReview || {}).find(entry=>
+    (candidate.vacancyId && entry.plan?.trackedId===candidate.vacancyId) ||
+    (candidate.url && entry.plan?.sourceUrl===candidate.url));
+}
 // A dashboard click reuses the existing executor and its persisted continuation; it never enables autopilot.
 async function dashboardApplyNotify(plan, result) {
   if (!plan?.dashboard || !plan.dashboardTabId) return;
@@ -8,15 +49,25 @@ async function runDashboardApply(api, vacancyId, sender, requestId) {
   const stub={dashboard:true,dashboardTabId:sender.tab.id,dashboardRequestId:requestId,trackedId:vacancyId};
   // Opening the dashboard wakes a short heartbeat. Let it finish before claiming the
   // shared executor; never run concurrently or wait indefinitely behind an application.
-  for(let attempt=0;attempt<50&&browserAutopilotRunning;attempt++)await browserAutopilotWait(100);
+  dashboardApplyWaiting++;
+  try {for(let attempt=0;attempt<50&&browserAutopilotRunning;attempt++)await browserAutopilotWait(100);}
+  finally {dashboardApplyWaiting--;}
   if (browserAutopilotRunning) {await dashboardApplyNotify(stub,{message:'Сейчас выполняется другой отклик. Дождитесь результата и повторите.'});return;}
   browserAutopilotRunning=true;
   let plan,tabId;
   try {
+    await reconcileApplicationState(api);
+    const previous=await applicationNeedsReview({vacancyId});
+    if(previous)throw new Error(previous.reason);
     const active=await chrome.storage.local.get(['vjaBrowserAutopilotActivePlan','vjaPendingSiteApply']);
-    if (active.vjaBrowserAutopilotActivePlan || active.vjaPendingSiteApply) throw new Error('Предыдущая отправка ещё не завершена. Проверьте её результат перед новым откликом.');
+    if (active.vjaBrowserAutopilotActivePlan || active.vjaPendingSiteApply) {
+      const current=active.vjaBrowserAutopilotActivePlan || active.vjaPendingSiteApply;
+      throw new Error(`Ещё выполняется отклик «${current.jobTitle || 'предыдущая вакансия'}». Дождитесь проверки письма; если вкладка закрыта, повторите запрос для восстановления.`);
+    }
     const prepared=await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(vacancyId)}/prepare-dashboard-apply`,{method:'POST'});
     if(!prepared.ready || prepared.candidate?.vacancyId!==vacancyId || !prepared.draft?.coverLetter) throw new Error(prepared.message||'Вакансия не готова к отправке.');
+    const priorUrl=await applicationNeedsReview(prepared.candidate);
+    if(priorUrl)throw new Error(priorUrl.reason);
     plan={...self.vjaBrowserAutopilot.buildPlan(prepared.candidate,prepared.draft),...stub,automatic:false};
     await chrome.storage.local.remove('vjaSiteApplyResult');
     await chrome.storage.local.set({vjaPendingSiteApply:plan,vjaBrowserAutopilotActivePlan:plan});
@@ -31,8 +82,12 @@ async function runDashboardApply(api, vacancyId, sender, requestId) {
       await chrome.storage.local.remove(['vjaPendingSiteApply','vjaBrowserAutopilotActivePlan']);
       plan=null;
     }
-    // If a plan exists, keep it for receipt/letter recovery rather than risk a repeated submission.
-    await dashboardApplyNotify(plan||stub,{retry:Boolean(plan),message:error?.message||String(error)});
+    if(plan) {
+      // A lost execution channel has an unknown result. Quarantine this vacancy,
+      // release the worker, and do not send the same plan again on the next heartbeat.
+      const message=`Связь с откликом «${plan.jobTitle}» прервалась. Проверьте результат и письмо на HH. Другие вакансии доступны. ${error?.message || ''}`;
+      await archiveApplicationReview(api,plan,await browserAutopilotStoredResult(plan.id),message);
+    } else await dashboardApplyNotify(stub,{message:error?.message||String(error)});
   } finally {browserAutopilotRunning=false;}
 }
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
