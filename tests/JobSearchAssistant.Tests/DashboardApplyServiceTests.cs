@@ -15,6 +15,21 @@ public sealed class DashboardApplyServiceTests
     private static Vacancy Job() => new() { Source = "hh", Url = "https://volgograd.hh.ru/vacancy/123", Title = "Junior .NET Developer", DescriptionText = "Required: C#, ASP.NET Core, SQL. Remote Russia.", IsRemote = true, Experience = "between1And3", LocationText = "Russia", Company = new() { Name = "Example Studio" }, MatchScore = 0, EligibilityStatus = "Verify" };
 
     [TestMethod]
+    public async Task UnknownHiringCountryHasActionableReviewWithAutopilotOnOrOff()
+    {
+        foreach (var enabled in new[] { false, true })
+        {
+            using var db = Database(); var job = Job();
+            job.DescriptionText = "Required: C#, ASP.NET Core, SQL. Remote B2B.";
+            job.LocationText = "Almaty, KZ";
+            db.Add(job); db.Add(new AppState { Id = 1, AutoApplyEnabled = enabled, AutoApplyMinimumScore = 50 }); await db.SaveChangesAsync();
+            var result = await Service(db).PrepareAsync(job.Id, default);
+            Assert.IsFalse(result.Ready); StringAssert.Contains(result.Message, "можно ли работать удалённо из России");
+            Assert.IsFalse(result.Message.Contains("payroll scope")); Assert.AreEqual(0, await db.Applications.CountAsync());
+        }
+    }
+
+    [TestMethod]
     public async Task PreparesFreshEvidenceLetterWithAutopilotOffWithoutRecordingSubmission()
     {
         using var db = Database(); var job = Job(); db.Add(job); db.Add(new AppState { Id = 1, AutoApplyEnabled = false, AutoApplyMinimumScore = 50 }); await db.SaveChangesAsync();

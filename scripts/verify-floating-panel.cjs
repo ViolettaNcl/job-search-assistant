@@ -42,6 +42,15 @@ const http = require('node:http');
     catch(error){console.error('Dashboard bridge diagnostic',await dashboard.evaluate(()=>window.dashboardResults),{dashboardPreparations});throw error;}
     assert.equal(dashboardPreparations,1,'alias request must reach backend preparation, not fail origin validation');
     assert.equal(dashboard.url(),base+'/index.html');
+    // An expired task from a previous browser session must not block a different job.
+    await worker.evaluate(async()=>{
+      const plan={id:'stale-browser-fixture',trackedId:'22222222-2222-4222-8222-222222222222',jobTitle:'Old fixture vacancy',sourceUrl:'https://hh.ru/vacancy/456',expiresAt:Date.now()-1000};
+      await chrome.storage.local.set({vjaBrowserAutopilotActivePlan:plan,vjaPendingSiteApply:plan});
+    });
+    await dashboard.evaluate(()=>window.postMessage({type:'vjaDashboardApplyRequest',vacancyId:'11111111-1111-4111-8111-111111111111',requestId:'stale-recovery'},location.origin));
+    await dashboard.waitForFunction(()=>window.dashboardResults.some(x=>x.requestId==='stale-recovery'&&x.message==='Synthetic preparation gate reached'));
+    assert.equal(dashboardPreparations,2,'stale plan must release another vacancy');
+    assert(await worker.evaluate(async()=>Boolean((await chrome.storage.local.get('vjaApplicationReview')).vjaApplicationReview?.['22222222-2222-4222-8222-222222222222'])));
     // Remove the bridge from an already open document, then recover without reloading it.
     await worker.evaluate(async()=>{
       const tab=(await chrome.tabs.query({})).find(t=>t.url?.endsWith('/index.html'));
@@ -57,7 +66,7 @@ const http = require('node:http');
     await dashboard.waitForFunction(()=>window.bridgeReady?.ok);
     await dashboard.evaluate(()=>window.postMessage({type:'vjaDashboardApplyRequest',vacancyId:'11111111-1111-4111-8111-111111111111',requestId:'recovered-apply'},location.origin));
     await dashboard.waitForFunction(()=>window.dashboardResults.some(x=>x.requestId==='recovered-apply'&&x.message==='Synthetic preparation gate reached'));
-    assert.equal(dashboardPreparations,2,'one request after recovery, no duplicate listeners');
+    assert.equal(dashboardPreparations,3,'one request after recovery, no duplicate listeners');
     assert.equal(dashboard.url(),base+'/index.html');
     await dashboard.close();
     await worker.evaluate(async base=>chrome.storage.sync.set({apiBase:base}),base);

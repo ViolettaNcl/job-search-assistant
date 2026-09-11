@@ -4,7 +4,7 @@ const id='11111111-1111-4111-8111-111111111111';
 async function fixture({letter=true,pending=false,createFails=false,apiBase='http://localhost:8080'}={}) {
   const data={},trace=[],messages=[],listeners=[],tabs=new Map();
   const event={addListener:()=>{}},local={get:async()=>({...data}),set:async x=>Object.assign(data,x),remove:async keys=>[].concat(keys).forEach(k=>delete data[k]),setAccessLevel:async()=>{}};
-  const context={console,URL,Date,Promise,AbortController,setTimeout,clearTimeout,self:{},chrome:{runtime:{onInstalled:event,onStartup:event,onMessage:{addListener:f=>listeners.push(f)},getManifest:()=>({version:'2.7.10'}),getURL:p=>'chrome-extension://test/'+p},alarms:{create:async()=>{},onAlarm:event},storage:{local,sync:{get:async()=>({apiBase})}},tabs:{
+  const context={console,URL,Date,Promise,AbortController,setTimeout,clearTimeout,self:{},chrome:{runtime:{onInstalled:event,onStartup:event,onMessage:{addListener:f=>listeners.push(f)},getManifest:()=>({version:'2.7.11'}),getURL:p=>'chrome-extension://test/'+p},alarms:{create:async()=>{},onAlarm:event},storage:{local,sync:{get:async()=>({apiBase})}},tabs:{
     create:async p=>{trace.push(['create',p]);if(createFails)throw Error('tab unavailable');const tab={id:2,status:'complete',url:p.url};tabs.set(2,tab);return tab;},
     get:async n=>tabs.get(n),remove:async n=>{trace.push(['close',n]);tabs.delete(n);},update:async(n,p)=>trace.push(['activate',p]),
     sendMessage:async(n,m)=>{if(n===1){messages.push(m);return;}assert.equal(m.plan.automatic,false);assert.equal(m.plan.trackedId,id);assert.equal(m.plan.coverLetter,'Verified letter for selected vacancy');trace.push(['send',m.plan]);return pending?{status:'submitted-needs-letter'}:{submitted:true,status:'confirmed',coverLetterFilled:letter};}
@@ -19,7 +19,7 @@ async function fixture({letter=true,pending=false,createFails=false,apiBase='htt
   vm.runInContext(fs.readFileSync(__dirname+'/background.js','utf8'),context);
   await new Promise(r=>setImmediate(r));context.browserAutopilotWait=async()=>{};trace.length=0;
   const sender={tab:{id:1},frameId:0,url:'http://localhost:8080/'};
-  return {context,data,trace,messages,sender,listeners,setPending:value=>{pending=value;},request:async(overrides={})=>new Promise(resolve=>listeners[0]({type:'vjaDashboardApply',vacancyId:id,requestId:'test',...overrides.message},{...sender,...overrides.sender},resolve))};
+  return {context,data,trace,messages,sender,listeners,tabs,setPending:value=>{pending=value;},request:async(overrides={})=>new Promise(resolve=>listeners[0]({type:'vjaDashboardApply',vacancyId:id,requestId:'test',...overrides.message},{...sender,...overrides.sender},resolve))};
 }
 (async()=>{
   const f=await fixture();await f.context.runDashboardApply('http://localhost:8080',id,f.sender,'one');
@@ -55,5 +55,40 @@ async function fixture({letter=true,pending=false,createFails=false,apiBase='htt
   await occupied.context.runDashboardApply('http://localhost:8080',id,occupied.sender,'busy');assert.equal(occupied.messages.at(-1).status,'review');assert(!occupied.trace.some(x=>x[0]==='send'));
   const valid=await fixture();assert.equal((await valid.request()).ok,true);await new Promise(r=>setImmediate(r));assert.equal(valid.messages.at(-1).status,'confirmed');
   const failed=await fixture({createFails:true});await failed.context.runDashboardApply('http://localhost:8080',id,failed.sender,'failed');assert(!failed.data.vjaPendingSiteApply);assert(!failed.data.vjaBrowserAutopilotActivePlan);assert.equal(failed.messages.at(-1).status,'review');
+  const oldId='22222222-2222-4222-8222-222222222222';
+  for(const kind of ['expired','closed','orphan','popup']) {
+    const stale=await fixture();
+    const plan={id:'old',trackedId:oldId,jobTitle:'Old vacancy',sourceUrl:'https://hh.ru/vacancy/456',expiresAt:Date.now()+(kind==='expired'||kind==='popup'?-1000:600000)};
+    stale.data.vjaPendingSiteApply=plan;
+    if(kind!=='popup')stale.data.vjaBrowserAutopilotActivePlan=plan;
+    if(kind!=='orphan'&&kind!=='popup')stale.data.vjaBrowserAutopilotTabId=99;
+    if(kind==='expired')stale.tabs.set(99,{id:99,status:'complete'});
+    await stale.context.runDashboardApply('http://localhost:8080',id,stale.sender,'recover-'+kind);
+    assert.equal(stale.messages.at(-1).status,'confirmed',kind+' must not lock another vacancy');
+    assert(stale.data.vjaApplicationReview[oldId],kind+' keeps uncertain result for review');
+    const sends=stale.trace.filter(x=>x[0]==='send').length;
+    await stale.context.runDashboardApply('http://localhost:8080',oldId,stale.sender,'same-old');
+    assert.equal(stale.messages.at(-1).status,'review');
+    assert.equal(stale.trace.filter(x=>x[0]==='send').length,sends,'never retry uncertain same vacancy');
+  }
+  const receipt=await fixture();
+  const oldPlan={id:'receipt',trackedId:oldId,jobTitle:'Closed confirmed vacancy',dashboard:true,coverLetter:'Recorded letter',expiresAt:Date.now()-1000};
+  receipt.data.vjaBrowserAutopilotActivePlan=oldPlan;
+  receipt.data.vjaSiteApplyResult={id:'receipt',result:{submitted:true,status:'confirmed',coverLetterFilled:true}};
+  await receipt.context.reconcileApplicationState('http://localhost:8080');
+  assert(receipt.trace.some(x=>x[0]==='http'&&x[1].endsWith('/browser-applied')),'persist receipt even with closed tab');
+  assert(!receipt.data.vjaApplicationReview);assert(!receipt.trace.some(x=>x[0]==='send'));
+  const paused=await fixture();
+  paused.data.vjaBrowserAutopilotActivePlan={...oldPlan,dashboard:false};
+  await paused.context.runBrowserAutopilot();
+  assert(paused.data.vjaApplicationReview[oldId],'stale autopilot plan is recovered even while autopilot off');
+  assert(!paused.trace.some(x=>x[0]==='send'),'pause never starts another submission');
+  const timeout=await fixture();let attempts=0;
+  timeout.context.chrome.tabs.sendMessage=async()=>{attempts++;throw Error('lost channel');};
+  await assert.rejects(()=>timeout.context.browserAutopilotSendPlan(2,{id:'timeout'}),/lost channel/);
+  assert.equal(attempts,1,'unknown dispatch must not be repeated five times');
+  const priority=await fixture();vm.runInContext('dashboardApplyWaiting=1',priority.context);
+  assert.equal((await priority.context.browserAutopilotApplyNext('http://localhost:8080')).stopped,true);
+  assert(!priority.trace.some(x=>x[0]==='send'));
   console.log('Dashboard manual apply: exact vacancy/letter, inactive tab, verified receipt, no-letter stop, duplicate prevention, continuation and origin restriction passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});
