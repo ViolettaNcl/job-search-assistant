@@ -12,7 +12,7 @@ namespace JobSearchAssistant.Tests;
 public sealed class ApplicationQueueServiceTests
 {
     [TestMethod]
-    public async Task Queue_RanksFreshStrongEligibleVacancyFirst_AndExcludesIneligible()
+    public async Task Queue_RanksFreshStrongVacancyFirst_AndKeepsCountryAdvice()
     {
         await using var db = CreateDb();
         var company = new Company { Name = "Example", Source = "global", ExternalId = "example" };
@@ -28,11 +28,11 @@ public sealed class ApplicationQueueServiceTests
         var sut = new ApplicationQueueService(db, drafts);
         var queue = await sut.GetAsync(20, 65, CancellationToken.None);
 
-        Assert.AreEqual(2, queue.Count);
+        Assert.AreEqual(3, queue.Count);
         Assert.AreEqual(freshStrong.Id, queue[0].VacancyId);
         Assert.AreEqual("Apply now", queue[0].Priority);
         Assert.IsTrue(queue[0].PriorityScore > queue[1].PriorityScore);
-        Assert.IsFalse(queue.Any(x => x.VacancyId == ineligible.Id));
+        Assert.AreEqual("Likely ineligible", queue.Single(x => x.VacancyId == ineligible.Id).EligibilityStatus);
         Assert.IsFalse(string.IsNullOrWhiteSpace(queue[0].RecommendedCv));
     }
 

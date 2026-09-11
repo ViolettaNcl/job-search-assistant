@@ -50,7 +50,7 @@ const http = require('node:http');
     await dashboard.evaluate(()=>window.postMessage({type:'vjaDashboardApplyRequest',vacancyId:'11111111-1111-4111-8111-111111111111',requestId:'stale-recovery'},location.origin));
     await dashboard.waitForFunction(()=>window.dashboardResults.some(x=>x.requestId==='stale-recovery'&&x.message==='Synthetic preparation gate reached'));
     assert.equal(dashboardPreparations,2,'stale plan must release another vacancy');
-    assert(await worker.evaluate(async()=>Boolean((await chrome.storage.local.get('vjaApplicationReview')).vjaApplicationReview?.['22222222-2222-4222-8222-222222222222'])));
+    assert(await worker.evaluate(async()=>(await applicationJobs()).some(job=>job.plan.trackedId==='22222222-2222-4222-8222-222222222222'&&job.review)));
     // Remove the bridge from an already open document, then recover without reloading it.
     await worker.evaluate(async()=>{
       const tab=(await chrome.tabs.query({})).find(t=>t.url?.endsWith('/index.html'));

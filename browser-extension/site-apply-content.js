@@ -389,6 +389,8 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
     }
     const receiptBeforeStart = vjaSiteReceipt();
     startChoice.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    plan = {...plan,startClicked:true};
+    await vjaSiteStorageSet('vjaPendingSiteApply', plan);
     startChoice.candidate.el.click();
     applicationUiFound = await vjaSiteWaitForApplicationUi(9000, { acceptReceipt: true });
 
@@ -541,9 +543,25 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
   return result;
 }
 
+// Navigation recovery and the worker command can arrive together. Share one run.
+const vjaSiteRuns = new Map();
+function vjaRunSiteApplyOnce(plan, options = {}) {
+  if (!vjaSiteRuns.has(plan.id)) {
+    const run = (async () => {
+      const saved = await vjaSiteStorageGet('vjaSiteApplyResult');
+      if (saved?.id === plan.id && saved.result?.submitted && saved.result.status === 'confirmed') return saved.result;
+      const pending = await vjaSiteStorageGet('vjaPendingSiteApply');
+      const current = pending?.id === plan.id ? {...plan,...pending} : plan;
+      return vjaRunSiteApply(current, {...options,resumed:Boolean(options.resumed || current.startClicked)});
+    })().finally(() => vjaSiteRuns.delete(plan.id));
+    vjaSiteRuns.set(plan.id,run);
+  }
+  return vjaSiteRuns.get(plan.id);
+}
+
 async function vjaResumePendingSiteApply() {
   const pending = await vjaSiteStorageGet('vjaPendingSiteApply');
-  if (!pending) return;
+  if (!pending || (!pending.startClicked && !pending.finalClicked)) return;
   const expiresAt = Number(pending.expiresAt || 0);
   if (expiresAt && Date.now() > expiresAt) {
     await vjaSiteStorageRemove('vjaPendingSiteApply');
@@ -557,12 +575,12 @@ async function vjaResumePendingSiteApply() {
   });
   if (!continuation?.ok) return;
   await vjaSiteWait(700);
-  await vjaRunSiteApply(pending, { resumed: true });
+  await vjaRunSiteApplyOnce(pending, { resumed: true });
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== 'siteApplyNow') return false;
-  vjaRunSiteApply(message.plan || {})
+  vjaRunSiteApplyOnce(message.plan || {}, {resumed:Boolean(message.plan?.startClicked)})
     .then(sendResponse)
     .catch(error => sendResponse({ submitted: false, status: 'error', error: error?.message || String(error) }));
   return true;

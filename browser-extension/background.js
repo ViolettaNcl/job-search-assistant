@@ -1,4 +1,4 @@
-importScripts("browser-autopilot.js", "hh-discovery-navigation.js", "hh-discovery-background.js", "dashboard-apply-background.js");
+importScripts("browser-autopilot.js", "hh-discovery-navigation.js", "hh-discovery-background.js", "application-executor.js", "dashboard-apply-background.js");
 
 async function restrictLocalStorageAccess() {
   try {
@@ -31,19 +31,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   (async () => {
-    if (message.operation === "get") {
-      const value = await chrome.storage.local.get(key);
-      return { ok: true, value: value[key] };
-    }
-    if (message.operation === "set") {
-      await chrome.storage.local.set({ [key]: message.value });
-      return { ok: true };
-    }
-    if (message.operation === "remove") {
-      await chrome.storage.local.remove(key);
-      return { ok: true };
-    }
-    return { ok: false, error: "storage-operation-not-allowed" };
+    return applicationTabStorage(message, sender);
   })().then(sendResponse).catch(error => sendResponse({ ok: false, error: error?.message || String(error) }));
   return true;
 });
@@ -102,15 +90,14 @@ async function browserAutopilotWaitForTab(tabId, timeoutMs = 30000) {
 }
 
 async function browserAutopilotStoredResult(planId) {
-  const stored = await chrome.storage.local.get("vjaSiteApplyResult");
-  const envelope = stored.vjaSiteApplyResult;
-  return envelope?.id === planId ? envelope.result : null;
+  const job = await applicationJob(planId);
+  return job?.result?.id === planId ? job.result.result : null;
 }
 
 async function browserAutopilotSendPlan(tabId, plan) {
   let lastError = null;
   const storedResult = await browserAutopilotStoredResult(plan.id);
-  if (storedResult) return storedResult;
+  if (storedResult && !['submitted-needs-letter','clicked-unverified','verification-needed'].includes(storedResult.status)) return storedResult;
   try {
     const result = await browserAutopilotWithTimeout(
       chrome.tabs.sendMessage(tabId, { type: "siteApplyNow", plan }),
@@ -124,20 +111,20 @@ async function browserAutopilotSendPlan(tabId, plan) {
 
   for (let attempt = 0; attempt < 15; attempt++) {
     const result = await browserAutopilotStoredResult(plan.id);
-    if (result) return result;
+    if (result && result.status !== storedResult?.status) return result;
     await browserAutopilotWait(1000);
   }
   throw lastError || new Error("The HH application page did not respond to the extension.");
 }
 
 async function browserAutopilotComplete(api, plan, result, tabId) {
-  await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(plan.trackedId)}/${plan.dashboard ? "browser-applied" : "browser-auto-applied"}`, {
+  await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(plan.trackedId)}/${plan.automatic ? "browser-auto-applied" : "browser-applied"}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ coverLetter: plan.coverLetter, resumeLabel: result.resumeLabel || plan.resumeHint, vacancyTitle: plan.jobTitle })
   });
-  await chrome.storage.local.remove(["vjaBrowserAutopilotActivePlan", "vjaBrowserAutopilotTabId", "vjaPendingSiteApply", "vjaSiteApplyResult"]);
-  try { await chrome.tabs.remove(tabId); } catch { }
+  await updateApplicationJob(plan.id,{completed:true,pending:null});
+  if (!plan.popup) { try { await chrome.tabs.remove(tabId); } catch { } }
 }
 
 async function browserAutopilotDefer(api, plan, reason) {
@@ -158,59 +145,70 @@ async function browserAutopilotProcess(api, plan, tabId) {
     return {completed:true,message:`Отклик и письмо отправлены: ${plan.jobTitle}.`};
   }
   await browserAutopilotWaitForTab(tabId);
-  const pendingState = await chrome.storage.local.get("vjaPendingSiteApply");
-  const continuationPlan = pendingState.vjaPendingSiteApply?.id === plan.id
-    ? pendingState.vjaPendingSiteApply
-    : plan;
-  const result = await browserAutopilotSendPlan(tabId, continuationPlan);
+  const job = await applicationJob(plan.id);
+  let continuationPlan = job?.pending || plan;
+  // The first command is persisted before dispatch. A restart can only inspect or
+  // continue known progress; it must never repeat an unknown initial click.
+  if (job?.dispatched && !continuationPlan.finalClicked && !continuationPlan.startClicked && !job.result)
+    throw new Error('Результат предыдущей команды неизвестен');
+  await updateApplicationJob(plan.id,{dispatched:true});
+  if (continuationPlan.cvKey) {
+    const files = await chrome.storage.local.get(continuationPlan.cvKey);
+    continuationPlan = {...continuationPlan,fileData:files[continuationPlan.cvKey]};
+  }
+  let result = await browserAutopilotSendPlan(tabId, continuationPlan);
+  const latest = await browserAutopilotStoredResult(plan.id);
+  if (latest?.submitted && latest.status === 'confirmed' && latest.coverLetterFilled) result = latest;
+  if(result) await updateApplicationJob(plan.id,{result:{id:plan.id,trackedId:plan.trackedId,sourceUrl:plan.sourceUrl,coverLetter:plan.coverLetter,createdAt:Date.now(),result}});
   if (result?.submitted && result?.status === "confirmed" && result?.coverLetterFilled) {
     await browserAutopilotComplete(api, plan, result, tabId);
     return { completed: true, message: `Отклик и письмо отправлены: ${plan.jobTitle}.` };
   }
 
   if (result?.status === "submitted-needs-letter" || result?.status === "clicked-unverified" || result?.status === "verification-needed") {
-    await chrome.storage.local.remove("vjaSiteApplyResult");
     return { completed: false, retry: true, message: `Продолжаю проверять письмо для «${plan.jobTitle}».` };
   }
 
-  const message = await browserAutopilotDefer(api, plan, result?.reason || result?.error);
+  const message = result?.reason || result?.error || 'Форма требует проверки.';
   await archiveApplicationReview(api,plan,result,message);
   if (!plan.dashboard) { try { await chrome.tabs.update(tabId, { active: true }); } catch { } }
   return { completed: false, retry: false, message };
 }
 
 async function browserAutopilotApplyNext(api) {
-  if(dashboardApplyWaiting)return {stopped:true};
-  const pending=await chrome.storage.local.get(['vjaBrowserAutopilotActivePlan','vjaPendingSiteApply']);
-  if(pending.vjaBrowserAutopilotActivePlan || pending.vjaPendingSiteApply)return {stopped:true};
   const status = await browserAutopilotJson(`${api}/api/automation/status`);
-  if (!self.vjaBrowserAutopilot.shouldRun(status)) return { stopped: true };
-    const queue = await browserAutopilotJson(`${api}/api/application-queue?limit=50&source=hh&automaticOnly=true&minScore=${encodeURIComponent(status.autoApplyMinimumScore || 75)}`);
-    const available=[];
-    for(const item of queue)if(!await applicationNeedsReview(item))available.push(item);
-    const candidate = self.vjaBrowserAutopilot?.selectCandidate?.(available, status.autoApplyMinimumScore || 75);
-    if (!candidate) return null;
-    // Recheck after queue preparation so Pause/quota changes do not start another job.
-    const live = await browserAutopilotJson(`${api}/api/automation/status`);
-    if (!self.vjaBrowserAutopilot.shouldRun(live)) return { stopped: true };
-    const draft = await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(candidate.vacancyId)}/application-draft`);
-    const current = await browserAutopilotJson(`${api}/api/automation/status`);
-    if (!self.vjaBrowserAutopilot.shouldRun(current) || !self.vjaBrowserAutopilot.selectCandidate([candidate], current.autoApplyMinimumScore)) return { stopped: true };
-    const plan = self.vjaBrowserAutopilot.buildPlan(candidate, draft);
-    if (!plan.coverLetter) throw new Error("Персональное сопроводительное письмо не было создано.");
-
-    await chrome.storage.local.remove("vjaSiteApplyResult");
-    await chrome.storage.local.set({ vjaPendingSiteApply: plan, vjaBrowserAutopilotActivePlan: plan });
-    const tab = await chrome.tabs.create({ url: plan.sourceUrl, active: false });
-    if (!tab?.id) throw new Error("Не удалось открыть HH-вакансию.");
-    await chrome.storage.local.set({ vjaBrowserAutopilotTabId: tab.id });
-    const result = await browserAutopilotProcess(api, plan, tab.id);
-    await browserAutopilotHeartbeat(api, Boolean(result.retry), result.message, plan.jobTitle);
-    return result;
+  if (!self.vjaBrowserAutopilot.shouldRun(status)) return {stopped:true};
+  const jobs = await applicationJobs();
+  const active = jobs.filter(job=>!job.review && !job.completed);
+  const capacity = Math.min(2-active.filter(job=>job.plan.automatic).length,
+    Number(status.remainingToday)-active.length);
+  if(capacity<=0)return {stopped:true};
+  const queue = await browserAutopilotJson(`${api}/api/application-queue?limit=50&source=hh&automaticOnly=true&minScore=${encodeURIComponent(status.autoApplyMinimumScore || 75)}`);
+  const tasks=[];
+  for(const candidate of queue) {
+    if(tasks.length>=capacity)break;
+    if(applicationClaims.has(candidate.vacancyId) || jobs.some(job=>sameApplication(job.plan,{trackedId:candidate.vacancyId,sourceUrl:candidate.url})) || await applicationNeedsReview(candidate))continue;
+    if(!self.vjaBrowserAutopilot.selectCandidate([candidate],status.autoApplyMinimumScore))continue;
+    applicationClaims.add(candidate.vacancyId);
+    try {
+      const draft=await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(candidate.vacancyId)}/application-draft`);
+      const live=await browserAutopilotJson(`${api}/api/automation/status`);
+      const reservations=(await applicationJobs()).filter(job=>!job.review&&!job.completed).length;
+      if(!self.vjaBrowserAutopilot.shouldRun(live) || Number(live.remainingToday)<=reservations)break;
+      if(!self.vjaBrowserAutopilot.selectCandidate([candidate],live.autoApplyMinimumScore))continue;
+      const plan=self.vjaBrowserAutopilot.buildPlan(candidate,draft);
+      if(!plan.coverLetter)throw new Error('Не удалось подготовить письмо.');
+      await registerApplication(plan);
+      tasks.push(executeApplication(api,plan));
+    } finally {applicationClaims.delete(candidate.vacancyId);}
+  }
+  if(!tasks.length)return null;
+  const results=await Promise.all(tasks);
+  return {completed:results.some(r=>r?.completed),retry:results.some(r=>r?.retry),message:'Проверка текущих откликов завершена.'};
 }
 
 async function runBrowserAutopilot() {
-  if (browserAutopilotRunning || dashboardApplyWaiting) return;
+  if (browserAutopilotRunning) return;
   browserAutopilotRunning = true;
   let api = "";
   try {
@@ -218,25 +216,10 @@ async function runBrowserAutopilot() {
     await browserAutopilotHeartbeat(api, false, "Расширение Chrome подключено и готово к браузерному автопилоту.");
     let status = await browserAutopilotJson(`${api}/api/automation/status`);
     await reconcileApplicationState(api);
-    const active = await chrome.storage.local.get(["vjaBrowserAutopilotActivePlan", "vjaBrowserAutopilotTabId"]);
-    if (!active.vjaBrowserAutopilotActivePlan?.dashboard && !self.vjaBrowserAutopilot?.shouldRun?.(status)) return;
-    if (active.vjaBrowserAutopilotActivePlan && active.vjaBrowserAutopilotTabId) {
-      try {
-        const continuation = await browserAutopilotProcess(api, active.vjaBrowserAutopilotActivePlan, active.vjaBrowserAutopilotTabId);
-        await browserAutopilotHeartbeat(api, Boolean(continuation.retry), continuation.message, active.vjaBrowserAutopilotActivePlan.jobTitle);
-        await dashboardApplyNotify(active.vjaBrowserAutopilotActivePlan, continuation);
-        return;
-      } catch (error) {
-        const message = await browserAutopilotDefer(api, active.vjaBrowserAutopilotActivePlan, error?.message || String(error));
-        const stalled={...active.vjaBrowserAutopilotActivePlan,expiresAt:Date.now()-1};
-        await chrome.storage.local.set({vjaBrowserAutopilotActivePlan:stalled});
-        await reconcileApplicationState(api);
-        await browserAutopilotHeartbeat(api, false, message, active.vjaBrowserAutopilotActivePlan.jobTitle);
-        await dashboardApplyNotify(active.vjaBrowserAutopilotActivePlan, { message, completed: false });
-        if (!active.vjaBrowserAutopilotActivePlan.dashboard) { try { await chrome.tabs.update(active.vjaBrowserAutopilotTabId, { active: true }); } catch { } }
-        return;
-      }
-    }
+    const active = (await applicationJobs()).filter(job=>!job.completed&&!job.review);
+    await Promise.all(active.filter(job=>!job.plan.automatic || self.vjaBrowserAutopilot.shouldRun(status))
+      .map(job=>executeApplication(api,job.plan)));
+    if(!self.vjaBrowserAutopilot.shouldRun(status))return;
 
     // Finish useful work already queued before spending time on another search.
     const queuedResult = await browserAutopilotApplyNext(api);

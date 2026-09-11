@@ -15,7 +15,7 @@ public sealed class DashboardApplyServiceTests
     private static Vacancy Job() => new() { Source = "hh", Url = "https://volgograd.hh.ru/vacancy/123", Title = "Junior .NET Developer", DescriptionText = "Required: C#, ASP.NET Core, SQL. Remote Russia.", IsRemote = true, Experience = "between1And3", LocationText = "Russia", Company = new() { Name = "Example Studio" }, MatchScore = 0, EligibilityStatus = "Verify" };
 
     [TestMethod]
-    public async Task UnknownHiringCountryHasActionableReviewWithAutopilotOnOrOff()
+    public async Task UnknownHiringCountryDoesNotBlockManualApplyWithAutopilotOnOrOff()
     {
         foreach (var enabled in new[] { false, true })
         {
@@ -24,7 +24,7 @@ public sealed class DashboardApplyServiceTests
             job.LocationText = "Almaty, KZ";
             db.Add(job); db.Add(new AppState { Id = 1, AutoApplyEnabled = enabled, AutoApplyMinimumScore = 50 }); await db.SaveChangesAsync();
             var result = await Service(db).PrepareAsync(job.Id, default);
-            Assert.IsFalse(result.Ready); StringAssert.Contains(result.Message, "можно ли работать удалённо из России");
+            Assert.IsTrue(result.Ready, result.Message); Assert.AreEqual("Verify", result.Candidate!.EligibilityStatus);
             Assert.IsFalse(result.Message.Contains("payroll scope")); Assert.AreEqual(0, await db.Applications.CountAsync());
         }
     }
@@ -38,7 +38,7 @@ public sealed class DashboardApplyServiceTests
         Assert.IsTrue(result.Candidate.MatchScore > job.MatchScore); StringAssert.Contains(result.Draft!.CoverLetter, "Example Studio");
         Assert.AreEqual(0, await db.Applications.CountAsync()); Assert.IsFalse(job.HasExistingHhResponse);
         var state = await db.AppStates.SingleAsync(); state.AutoApplyMinimumScore = 100; await db.SaveChangesAsync();
-        Assert.IsFalse((await Service(db).PrepareAsync(job.Id, default)).Ready, "Configured threshold must be honored.");
+        Assert.IsTrue((await Service(db).PrepareAsync(job.Id, default)).Ready, "Manual choice is independent of the autopilot threshold.");
     }
 
     [TestMethod]
@@ -58,21 +58,37 @@ public sealed class DashboardApplyServiceTests
     }
 
     [TestMethod]
-    public async Task RejectsUntrustedDestinationsAndUnverifiedRequirements()
+    public async Task RejectsUntrustedDestinations()
     {
-        foreach (var kind in new[] { "source", "http", "spoof", "path", "onsite", "hybrid", "missing", "senior", "employment" })
+        foreach (var kind in new[] { "source", "http", "spoof", "path" })
         {
             using var db = Database(); var job = Job();
             if (kind == "source") job.Source = "other";
             if (kind == "http") job.Url = "http://hh.ru/vacancy/123";
             if (kind == "spoof") job.Url = "https://hh.ru.example.com/vacancy/123";
             if (kind == "path") job.Url = "https://hh.ru/account";
+            db.Add(job); await db.SaveChangesAsync(); Assert.IsFalse((await Service(db).PrepareAsync(job.Id, default)).Ready, kind);
+        }
+    }
+    [TestMethod]
+    public async Task ManualChoiceAcceptsFitGapsWithoutChangingCandidateFacts()
+    {
+        foreach (var kind in new[] { "onsite", "hybrid", "missing", "senior", "employment", "degree", "country" })
+        {
+            using var db = Database(); var job = Job();
             if (kind == "onsite") job.IsRemote = false;
             if (kind == "hybrid") job.DescriptionText += " Required to visit the office every week.";
             if (kind == "missing") job.DescriptionText += " Required: Azure.";
             if (kind == "senior") job.Title = "Senior .NET Developer";
-            if (kind == "employment") job.DescriptionText += "2 years commercial experience required.";
-            db.Add(job); await db.SaveChangesAsync(); Assert.IsFalse((await Service(db).PrepareAsync(job.Id, default)).Ready, kind);
+            if (kind == "employment") job.DescriptionText += " 2 years commercial experience required.";
+            if (kind == "degree") job.DescriptionText += " University degree required.";
+            if (kind == "country") job.DescriptionText += " US only.";
+            db.Add(job); await db.SaveChangesAsync();
+            var result = await Service(db).PrepareAsync(job.Id, default);
+            Assert.IsTrue(result.Ready, kind + ": " + result.Message);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(result.Draft!.CoverLetter));
+            Assert.AreEqual(0, await db.Applications.CountAsync(), "Preparation does not claim a submission.");
         }
     }
+
 }

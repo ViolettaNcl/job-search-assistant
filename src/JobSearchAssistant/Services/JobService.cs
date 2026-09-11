@@ -361,7 +361,7 @@ public sealed class JobService(
         if (vacancy.Source != "hh") return new HhApplyResult(false, "external_apply_required", "Open the official application page, submit there, then mark the vacancy as applied in Job Assistant.");
         var state = await GetStateAsync(ct);
         var fresh = scoring.Score(vacancy.Title, vacancy.DescriptionText, vacancy.IsRemote, vacancy.Experience, vacancy.LocationText, vacancy.RemoteScope, automatic ? state.AutoApplyMinimumScore : 75);
-        if (fresh.Assessment?.Decision != "APPLY")
+        if (automatic && fresh.Assessment?.Decision != "APPLY")
             return new HhApplyResult(false, "operator_review_required", fresh.Why);
         vacancy.EligibilityStatus = fresh.EligibilityStatus;
         vacancy.MatchScore = fresh.Score;
@@ -481,7 +481,7 @@ public sealed class JobService(
             .ToListAsync(ct);
 
         foreach (var v in rows) RefreshQualification(v, minimumScore);
-        var eligible = rows.Where(v => RemoteWorkPolicy.IsFullyRemote(v.IsRemote, v.DescriptionText) && AutomaticSubmissionPolicy.IsVerifiedEligible(v)).ToArray();
+        var eligible = rows.Where(v => RemoteWorkPolicy.IsFullyRemote(v.IsRemote, v.DescriptionText)).ToArray();
         var safe = eligible.Where(x => AutomaticSubmissionPolicy.HasSafeSeniority(x.Title)).ToArray();
         var aboveScore = safe.Where(x => x.MatchScore >= minimumScore).ToArray();
         var coolingDown = aboveScore.Count(x => x.Events.Any(e => e.Type == "AutoApplyFailed" && e.CreatedAt >= retryAfter));

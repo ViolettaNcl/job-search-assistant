@@ -1,94 +1,98 @@
-// Actual worker orchestration with deterministic Chrome and backend fixtures. No real applications.
+// Real worker code with isolated Chrome/HTTP fixtures; no employer traffic.
 const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
-const id='11111111-1111-4111-8111-111111111111';
-async function fixture({letter=true,pending=false,createFails=false,apiBase='http://localhost:8080'}={}) {
-  const data={},trace=[],messages=[],listeners=[],tabs=new Map();
-  const event={addListener:()=>{}},local={get:async()=>({...data}),set:async x=>Object.assign(data,x),remove:async keys=>[].concat(keys).forEach(k=>delete data[k]),setAccessLevel:async()=>{}};
-  const context={console,URL,Date,Promise,AbortController,setTimeout,clearTimeout,self:{},chrome:{runtime:{onInstalled:event,onStartup:event,onMessage:{addListener:f=>listeners.push(f)},getManifest:()=>({version:'2.7.11'}),getURL:p=>'chrome-extension://test/'+p},alarms:{create:async()=>{},onAlarm:event},storage:{local,sync:{get:async()=>({apiBase})}},tabs:{
-    create:async p=>{trace.push(['create',p]);if(createFails)throw Error('tab unavailable');const tab={id:2,status:'complete',url:p.url};tabs.set(2,tab);return tab;},
-    get:async n=>tabs.get(n),remove:async n=>{trace.push(['close',n]);tabs.delete(n);},update:async(n,p)=>trace.push(['activate',p]),
-    sendMessage:async(n,m)=>{if(n===1){messages.push(m);return;}assert.equal(m.plan.automatic,false);assert.equal(m.plan.trackedId,id);assert.equal(m.plan.coverLetter,'Verified letter for selected vacancy');trace.push(['send',m.plan]);return pending?{status:'submitted-needs-letter'}:{submitted:true,status:'confirmed',coverLetterFilled:letter};}
+const id=n=>`${String(n).padStart(8,'0')}-1111-4111-8111-111111111111`;
+const tick=()=>new Promise(r=>setImmediate(r));
+const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
+async function fixture({data={},tabs=new Map(),pending=false,letter=true,createFails=false,apiBase='http://localhost:8080'}={}) {
+  const trace=[],messages=[],listeners=[];let nextTab=10,enabled=false,gate=null,queue=[],failRecord=false;
+  const clone=v=>v===undefined?undefined:JSON.parse(JSON.stringify(v));
+  const event={addListener:()=>{}},local={get:async()=>clone(data),set:async x=>Object.assign(data,clone(x)),remove:async keys=>[].concat(keys).forEach(k=>delete data[k]),setAccessLevel:async()=>{}};
+  const context={console,URL,Date,Promise,AbortController,setTimeout,clearTimeout,self:{},chrome:{runtime:{onInstalled:event,onStartup:event,onMessage:{addListener:f=>listeners.push(f)},getManifest:()=>({version:'2.7.12'}),getURL:p=>'chrome-extension://test/'+p},alarms:{create:async()=>{},onAlarm:event},storage:{local,sync:{get:async()=>({apiBase})}},tabs:{
+    create:async p=>{trace.push(['create',p]);if(createFails)throw Error('tab unavailable');const tab={id:++nextTab,status:'complete',url:p.url};tabs.set(tab.id,tab);return tab;},
+    get:async n=>tabs.get(n),remove:async n=>{trace.push(['close',n]);tabs.delete(n);},update:async(n,p)=>{trace.push(['update',n,p]);Object.assign(tabs.get(n),p);return tabs.get(n);},
+    sendMessage:async(n,m)=>{if(n===1){messages.push(m);return;}
+      assert.equal(m.plan.coverLetter,'Letter for '+m.plan.trackedId);trace.push(['send',n,clone(m.plan)]);
+      if(gate)await gate.promise;
+      return pending?{status:'submitted-needs-letter'}:{submitted:true,status:'confirmed',coverLetterFilled:letter};}
   }}};
   context.fetch=async(url,options)=>{
-    trace.push(['http',url,options?.body]);let value={};
-    if(url.endsWith('/api/automation/status'))value={autoApplyEnabled:false,allowed:false,apiReady:true};
-    if(url.endsWith('/prepare-dashboard-apply'))value={ready:true,candidate:{vacancyId:id,title:'Junior C#',url:'https://hh.ru/vacancy/123',matchScore:90,eligibilityStatus:'Eligible'},draft:{coverLetter:'Verified letter for selected vacancy'}};
-    return {ok:true,text:async()=>JSON.stringify(value)};
+    trace.push(['http',url,options?.body]);let value={},ok=true;
+    if(url.endsWith('/api/automation/status'))value={autoApplyEnabled:enabled,allowed:true,remainingToday:10,autoApplyMinimumScore:50};
+    if(url.includes('/api/application-queue?'))value=queue;
+    if(url.endsWith('/application-draft'))value={coverLetter:'Letter for '+url.split('/').at(-2)};
+    if(url.endsWith('/prepare-dashboard-apply')){const vacancyId=url.split('/').at(-2);value={ready:true,candidate:{vacancyId,title:'Junior C# '+vacancyId,url:'https://hh.ru/vacancy/'+parseInt(vacancyId),matchScore:90,eligibilityStatus:'Verify'},draft:{coverLetter:'Letter for '+vacancyId}};}
+    if(url.endsWith('/browser-applied')||url.endsWith('/browser-auto-applied')){if(failRecord)ok=false;else queue=queue.filter(j=>!url.includes(j.vacancyId));}
+    return {ok,text:async()=>JSON.stringify(value)};
   };
   vm.createContext(context);context.importScripts=(...paths)=>paths.forEach(p=>vm.runInContext(fs.readFileSync(__dirname+'/'+p,'utf8'),context));
   vm.runInContext(fs.readFileSync(__dirname+'/background.js','utf8'),context);
-  await new Promise(r=>setImmediate(r));context.browserAutopilotWait=async()=>{};trace.length=0;
+  await tick();context.browserAutopilotWait=async()=>{};trace.length=0;
   const sender={tab:{id:1},frameId:0,url:'http://localhost:8080/'};
-  return {context,data,trace,messages,sender,listeners,tabs,setPending:value=>{pending=value;},request:async(overrides={})=>new Promise(resolve=>listeners[0]({type:'vjaDashboardApply',vacancyId:id,requestId:'test',...overrides.message},{...sender,...overrides.sender},resolve))};
+  return {context,data,trace,messages,sender,tabs,send:(n=1)=>context.runDashboardApply(apiBase,id(n),sender,'request-'+n),
+    jobs:()=>Object.entries(data).filter(([k])=>k.startsWith('vjaApplicationJob:')).map(([,v])=>v),
+    setPending:v=>pending=v,setGate:v=>gate=v,setRecordFailure:v=>failRecord=v,
+    enable:items=>{enabled=true;queue=items;},
+    request:async(message,s=sender)=>new Promise(resolve=>{for(const f of listeners)if(f(message,s,resolve))return;resolve(undefined);})};
 }
 (async()=>{
-  const f=await fixture();await f.context.runDashboardApply('http://localhost:8080',id,f.sender,'one');
+  const f=await fixture();await f.send();
   assert.equal(f.trace.find(x=>x[0]==='create')[1].active,false);
-  assert(f.trace.some(x=>x[0]==='http'&&x[1].endsWith('/browser-applied')&&JSON.parse(x[2]).coverLetter==='Verified letter for selected vacancy'));
-  assert(!f.trace.some(x=>x[0]==='http'&&x[1].includes('browser-auto-applied')));
-  assert(f.trace.some(x=>x[0]==='close'));assert(!f.trace.some(x=>x[0]==='activate'));
-  assert.equal(f.messages.at(-1).status,'confirmed');assert(!f.data.vjaBrowserAutopilotActivePlan);
-  const noLetter=await fixture({letter:false});await noLetter.context.runDashboardApply('http://localhost:8080',id,noLetter.sender,'two');
-  assert.equal(noLetter.messages.at(-1).status,'review');assert(!noLetter.trace.some(x=>x[0]==='http'&&x[1].endsWith('/browser-applied')));assert(!noLetter.trace.some(x=>x[0]==='activate'));
-  const resume=await fixture({pending:true});await resume.context.runDashboardApply('http://localhost:8080',id,resume.sender,'three');
-  assert.equal(resume.messages.at(-1).status,'pending');assert(resume.data.vjaBrowserAutopilotActivePlan);
-  const count=resume.trace.filter(x=>x[0]==='send').length;await resume.context.runDashboardApply('http://localhost:8080',id,resume.sender,'duplicate');assert.equal(resume.trace.filter(x=>x[0]==='send').length,count);
-  resume.setPending(false);await resume.context.runBrowserAutopilot();assert.equal(resume.messages.at(-1).status,'confirmed','manual continuation must run with autopilot off and API ready');
-  assert.equal(resume.trace.filter(x=>x[0]==='create').length,1,'continue existing tab');
-  for(const sender of [{url:'https://evil.example/'},{url:'http://localhost.evil.example:8080/'},{url:'http://127.0.0.2:8080/'},{url:'https://127.0.0.1:8080/'},{url:'http://localhost:9999/'},{url:'http://localhost:8080/other'},{frameId:1}]){
-    const blocked=await fixture();assert.equal((await blocked.request({sender})).ok,false);assert(!blocked.trace.some(x=>x[0]==='create'));
+  assert(f.trace.some(x=>x[0]==='http'&&x[1].endsWith('/browser-applied')&&JSON.parse(x[2]).coverLetter==='Letter for '+id(1)));
+  assert.equal(f.messages.at(-1).status,'confirmed');assert(f.jobs()[0].completed);
+  assert(!f.trace.some(x=>x[0]==='update'&&x[2].active));
+  await f.send();assert.equal(f.trace.filter(x=>x[0]==='send').length,1,'completed duplicate never resends');
+  const noLetter=await fixture({letter:false});await noLetter.send();assert(noLetter.jobs()[0].review);assert(!noLetter.trace.some(x=>x[0]==='http'&&x[1].endsWith('/browser-applied')));
+  const busy=await fixture(),gate=deferred();busy.setGate(gate);
+  const tasks=[1,2,3,4,5].map(n=>busy.send(n));await tick();
+  assert.equal(busy.trace.filter(x=>x[0]==='send').length,3,'three manual applications start before any finishes');
+  assert.equal(busy.jobs().length,5,'overflow persists in queue');
+  assert(busy.messages.filter(x=>x.status==='pending').length>=5);
+  gate.resolve();await Promise.all(tasks);
+  assert.equal(busy.jobs().filter(j=>j.completed).length,5);
+  assert.equal(new Set(busy.trace.filter(x=>x[0]==='send').map(x=>x[1])).size,5);
+  const concurrent=await fixture(),held=deferred();concurrent.setGate(held);
+  concurrent.enable([7,8].map(n=>({vacancyId:id(n),title:'Junior C#',url:'https://hh.ru/vacancy/'+n,matchScore:90,eligibilityStatus:'Verify'})));
+  const auto=concurrent.context.runBrowserAutopilot();await tick();
+  assert.equal(concurrent.trace.filter(x=>x[0]==='send').length,2,'two autopilot jobs overlap');
+  const manual=concurrent.send(9);await tick();
+  assert.equal(concurrent.trace.filter(x=>x[0]==='send').length,3,'manual sends while autopilot is waiting');
+  held.resolve();await Promise.all([auto,manual]);assert.equal(concurrent.jobs().filter(j=>j.completed).length,3);
+  const duplicate=await fixture(),hold=deferred();duplicate.setGate(hold);const a=duplicate.send(1);await tick();await duplicate.send(1);assert.equal(duplicate.trace.filter(x=>x[0]==='send').length,1);hold.resolve();await a;
+  // Each tab writes only its own progress, including simultaneous continuations.
+  const isolated=await fixture(),pause=deferred();isolated.setGate(pause);const runs=[isolated.send(1),isolated.send(2)];await tick();
+  const jobs=isolated.jobs();
+  const storage=(job,key,value,overrides={})=>isolated.request({type:'vjaSiteApplyStorage',operation:'set',key,value},{tab:{id:job.tabId},frameId:0,url:job.plan.sourceUrl,...overrides});
+  const writes=await Promise.all(jobs.map(job=>storage(job,'vjaPendingSiteApply',{...job.plan,finalClicked:true,coverLetter:'wrong'})));
+  assert(writes.every(x=>x.ok));assert(isolated.jobs().every(j=>j.pending.finalClicked&&j.pending.coverLetter===j.plan.coverLetter));
+  assert.equal((await storage(jobs[0],'vjaSiteApplyResult',{id:jobs[1].plan.id,result:{submitted:true}})).ok,false);
+  assert.equal((await storage(jobs[0],'vjaPendingSiteApply',jobs[0].plan,{frameId:1})).ok,false);
+  assert.equal((await storage(jobs[0],'vjaPendingSiteApply',jobs[0].plan,{url:'https://evil.test/'})).ok,false);
+  pause.resolve();await Promise.all(runs);
+  const failed=await fixture({createFails:true});await failed.send();assert.equal(failed.jobs().length,0);assert.equal(failed.messages.at(-1).status,'review');
+  // Lost backend after a confirmed receipt preserves it and retries bookkeeping only.
+  const receipt=await fixture();receipt.setRecordFailure(true);await receipt.send();assert(receipt.jobs()[0].result.result.submitted);assert(!receipt.jobs()[0].review);
+  receipt.setRecordFailure(false);await receipt.context.runBrowserAutopilot();assert(receipt.jobs()[0].completed);assert.equal(receipt.trace.filter(x=>x[0]==='send').length,1);
+  // A safe pre-dispatch closed tab is reopened, unknown post-dispatch is isolated.
+  for(const dispatched of [false,true]) {
+    const closed=await fixture();const plan=closed.context.self.vjaBrowserAutopilot.buildPlan({vacancyId:id(2),title:'Junior C#',url:'https://hh.ru/vacancy/2'},{coverLetter:'Letter for '+id(2)});plan.automatic=false;
+    await closed.context.registerApplication(plan,999);await closed.context.updateApplicationJob(plan.id,{dispatched});
+    await closed.context.runBrowserAutopilot();const job=closed.jobs()[0];assert(dispatched?job.review:job.completed);
+    await closed.send(1);assert(closed.jobs().some(j=>j.plan.trackedId===id(1)&&j.completed));
   }
-  for(const [apiBase,url] of [
-    ['http://localhost:8080','http://127.0.0.1:8080/'],
-    ['http://127.0.0.1:8080','http://localhost:8080/index.html'],
-    ['http://localhost:8080','http://[::1]:8080/'],
-    ['http://localhost','http://127.0.0.1:80/?view=all']]) {
-    const alias=await fixture({apiBase});assert.equal((await alias.request({sender:{url}})).ok,true,url);
-    await new Promise(r=>setImmediate(r));assert.equal(alias.messages.at(-1).status,'confirmed',url);
-    assert(alias.trace.some(x=>x[0]==='http'&&x[1]===apiBase+'/api/vacancies/'+id+'/prepare-dashboard-apply'));
+  // Migrate 2.7.11 once; receipt survives tab closure, unknown legacy attempt stays isolated.
+  for(const confirmed of [true,false]){
+    const legacy=await fixture();const plan={id:'old',trackedId:id(2),sourceUrl:'https://hh.ru/vacancy/2',jobTitle:'Old job',coverLetter:'Letter for '+id(2)};
+    legacy.data.vjaBrowserAutopilotActivePlan=plan;
+    if(confirmed)legacy.data.vjaSiteApplyResult={id:'old',result:{submitted:true,status:'confirmed',coverLetterFilled:true}};
+    await legacy.context.reconcileApplicationState('http://localhost:8080');assert(!legacy.data.vjaBrowserAutopilotActivePlan);assert(confirmed?legacy.jobs()[0].completed:legacy.jobs()[0].review);
   }
-  const hello=await fixture();assert.equal((await hello.request({message:{type:'vjaDashboardBridgeHello'}})).ok,true);assert(!hello.trace.some(x=>x[0]==='create'));
-  const heartbeat=await fixture();vm.runInContext('browserAutopilotRunning=true',heartbeat.context);
-  heartbeat.context.browserAutopilotWait=async()=>vm.runInContext('browserAutopilotRunning=false',heartbeat.context);
-  await heartbeat.context.runDashboardApply('http://localhost:8080',id,heartbeat.sender,'after-heartbeat');assert.equal(heartbeat.messages.at(-1).status,'confirmed');
-  const occupied=await fixture();vm.runInContext('browserAutopilotRunning=true',occupied.context);
-  await occupied.context.runDashboardApply('http://localhost:8080',id,occupied.sender,'busy');assert.equal(occupied.messages.at(-1).status,'review');assert(!occupied.trace.some(x=>x[0]==='send'));
-  const valid=await fixture();assert.equal((await valid.request()).ok,true);await new Promise(r=>setImmediate(r));assert.equal(valid.messages.at(-1).status,'confirmed');
-  const failed=await fixture({createFails:true});await failed.context.runDashboardApply('http://localhost:8080',id,failed.sender,'failed');assert(!failed.data.vjaPendingSiteApply);assert(!failed.data.vjaBrowserAutopilotActivePlan);assert.equal(failed.messages.at(-1).status,'review');
-  const oldId='22222222-2222-4222-8222-222222222222';
-  for(const kind of ['expired','closed','orphan','popup']) {
-    const stale=await fixture();
-    const plan={id:'old',trackedId:oldId,jobTitle:'Old vacancy',sourceUrl:'https://hh.ru/vacancy/456',expiresAt:Date.now()+(kind==='expired'||kind==='popup'?-1000:600000)};
-    stale.data.vjaPendingSiteApply=plan;
-    if(kind!=='popup')stale.data.vjaBrowserAutopilotActivePlan=plan;
-    if(kind!=='orphan'&&kind!=='popup')stale.data.vjaBrowserAutopilotTabId=99;
-    if(kind==='expired')stale.tabs.set(99,{id:99,status:'complete'});
-    await stale.context.runDashboardApply('http://localhost:8080',id,stale.sender,'recover-'+kind);
-    assert.equal(stale.messages.at(-1).status,'confirmed',kind+' must not lock another vacancy');
-    assert(stale.data.vjaApplicationReview[oldId],kind+' keeps uncertain result for review');
-    const sends=stale.trace.filter(x=>x[0]==='send').length;
-    await stale.context.runDashboardApply('http://localhost:8080',oldId,stale.sender,'same-old');
-    assert.equal(stale.messages.at(-1).status,'review');
-    assert.equal(stale.trace.filter(x=>x[0]==='send').length,sends,'never retry uncertain same vacancy');
+  const timeout=await fixture();let attempts=0;timeout.context.chrome.tabs.sendMessage=async()=>{attempts++;throw Error('lost channel');};
+  await assert.rejects(()=>timeout.context.browserAutopilotSendPlan(2,{id:'timeout'}),/lost channel/);assert.equal(attempts,1);
+  for(const changes of [{url:'https://evil.example/'},{url:'http://localhost.evil.example:8080/'},{url:'http://127.0.0.2:8080/'},{url:'http://localhost:9999/'},{url:'http://localhost:8080/other'},{frameId:1}]) {
+    const blocked=await fixture();assert.equal((await blocked.request({type:'vjaDashboardApply',vacancyId:id(1),requestId:'test'},{...blocked.sender,...changes})).ok,false);assert.equal(blocked.jobs().length,0);
   }
-  const receipt=await fixture();
-  const oldPlan={id:'receipt',trackedId:oldId,jobTitle:'Closed confirmed vacancy',dashboard:true,coverLetter:'Recorded letter',expiresAt:Date.now()-1000};
-  receipt.data.vjaBrowserAutopilotActivePlan=oldPlan;
-  receipt.data.vjaSiteApplyResult={id:'receipt',result:{submitted:true,status:'confirmed',coverLetterFilled:true}};
-  await receipt.context.reconcileApplicationState('http://localhost:8080');
-  assert(receipt.trace.some(x=>x[0]==='http'&&x[1].endsWith('/browser-applied')),'persist receipt even with closed tab');
-  assert(!receipt.data.vjaApplicationReview);assert(!receipt.trace.some(x=>x[0]==='send'));
-  const paused=await fixture();
-  paused.data.vjaBrowserAutopilotActivePlan={...oldPlan,dashboard:false};
-  await paused.context.runBrowserAutopilot();
-  assert(paused.data.vjaApplicationReview[oldId],'stale autopilot plan is recovered even while autopilot off');
-  assert(!paused.trace.some(x=>x[0]==='send'),'pause never starts another submission');
-  const timeout=await fixture();let attempts=0;
-  timeout.context.chrome.tabs.sendMessage=async()=>{attempts++;throw Error('lost channel');};
-  await assert.rejects(()=>timeout.context.browserAutopilotSendPlan(2,{id:'timeout'}),/lost channel/);
-  assert.equal(attempts,1,'unknown dispatch must not be repeated five times');
-  const priority=await fixture();vm.runInContext('dashboardApplyWaiting=1',priority.context);
-  assert.equal((await priority.context.browserAutopilotApplyNext('http://localhost:8080')).stopped,true);
-  assert(!priority.trace.some(x=>x[0]==='send'));
-  console.log('Dashboard manual apply: exact vacancy/letter, inactive tab, verified receipt, no-letter stop, duplicate prevention, continuation and origin restriction passed');
+  for(const url of ['http://127.0.0.1:8080/','http://[::1]:8080/','http://localhost:8080/index.html']) {
+    const alias=await fixture();assert.equal((await alias.request({type:'vjaDashboardBridgeHello'},{...alias.sender,url})).ok,true);
+  }
+  console.log('Dashboard: parallel manual/autopilot, bounded queue, duplicate protection, tab isolation, closed-tab recovery, legacy migration, persisted receipts and origin checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

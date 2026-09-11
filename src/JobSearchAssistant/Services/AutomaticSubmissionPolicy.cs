@@ -23,7 +23,6 @@ public static partial class AutomaticSubmissionPolicy
            && !vacancy.Company.IsBlacklisted
            && vacancy.MatchScore >= minimumScore
            && RemoteWorkPolicy.IsFullyRemote(vacancy.IsRemote, vacancy.DescriptionText)
-           && IsVerifiedEligible(vacancy)
            && HasSafeSeniority(vacancy.Title);
 
     public static IReadOnlyList<Vacancy> SelectCandidates(

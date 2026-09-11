@@ -48,10 +48,16 @@ public sealed class OpportunityScoringService(IOptions<CandidateProfileOptions> 
         var career = u.CareerLane switch { "primary" => 95, "secondary" => 75, "experimental" => 45, _ => 0 };
         var evidence = technical; // Project coverage only, never length of employment.
         var overall = (int)Math.Round(technical * .4 + exp * .2 + seniority * .15 + evidence * .15 + career * .1);
-        if (eligibility.Status == "Likely ineligible" || u.Seniority == "Senior" || u.CareerLane == "excluded") overall = Math.Min(overall, 39);
-        if (u.RequiredYears > 0 || u.MandatoryDegree) overall = Math.Min(overall, 64);
+        if ((!remote && eligibility.Status == "Likely ineligible") || u.Seniority == "Senior" || u.CareerLane == "excluded") overall = Math.Min(overall, 39);
+        if (u.RequiredYears > 0) overall = Math.Min(overall, 64);
         if (families.Length < 2) overall = Math.Min(overall, 64);
-        var decision = overall < 50 ? "SKIP" : review.Count > 0 || overall < Math.Clamp(minimumScore, 50, 100) ? "REVIEW" : "APPLY";
+        // Candidate fit observations stay truthful in the detailed assessment,
+        // but education, hiring country and missing skills do not veto applications.
+        var blockingReview = review.Where(reason =>
+            reason != "Mandatory university degree is not evidenced by the programming diploma." &&
+            reason != "Missing must-have evidence." &&
+            !(remote && reason == eligibility.Reason)).ToArray();
+        var decision = overall < 50 ? "SKIP" : blockingReview.Length > 0 || overall < Math.Clamp(minimumScore, 50, 100) ? "REVIEW" : "APPLY";
         return new("operator-v1", "deterministic-fallback", u, overall,
             "Uncalibrated opportunity priority index, not percentage of requirements met or probability of being hired.",
             decision, eligibility.Status, eligibility.Reason,

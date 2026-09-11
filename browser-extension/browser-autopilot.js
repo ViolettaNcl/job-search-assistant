@@ -17,7 +17,7 @@
   function isHhVacancy(value) {
     try {
       const url = new URL(String(value || ""));
-      return (url.hostname === "hh.ru" || url.hostname.endsWith(".hh.ru")) && /\/vacancy\/\d+/i.test(url.pathname);
+      return url.protocol === 'https:' && (url.hostname === "hh.ru" || url.hostname.endsWith(".hh.ru")) && /^\/vacancy\/\d+\/?$/i.test(url.pathname);
     } catch {
       return false;
     }
@@ -38,7 +38,6 @@
       const url = normalizeUrl(item?.url);
       if (!isHhVacancy(url)) return false;
       if (Number(item?.matchScore || 0) < Number(minimumScore || 75)) return false;
-      if (String(item?.eligibilityStatus || "").trim().toLowerCase() !== "eligible") return false;
       if (!hasSafeSeniority(item?.title)) return false;
       return true;
     }) || null;
@@ -47,7 +46,7 @@
   function buildPlan(item = {}, draft = {}, now = Date.now()) {
     const sourceUrl = normalizeUrl(item.url);
     return {
-      id: `browser-auto-${now}-${String(item.vacancyId || "").slice(0, 8)}`,
+      id: `browser-auto-${now}-${String(item.vacancyId || "")}`,
       trackedId: String(item.vacancyId || ""),
       sourceUrl,
       sourceHost: sourceUrl ? new URL(sourceUrl).hostname : "",

@@ -29,7 +29,7 @@ async function scenario({queued=false,pauseAfterImport=false,pending=false,lette
   const diverse=await scenario({roles:['Junior QA Automation','Frontend Intern']});assert.equal(diverse.trace.filter(x=>x==='receipt').length,2);assert(diverse.trace.includes('role:Junior QA Automation'));assert(diverse.trace.includes('role:Frontend Intern'));
   const backlog=await scenario({queued:true});assert(backlog.trace.includes('receipt'));assert(!backlog.trace.some(x=>x.includes('/search/')),'queued applications come before more discovery');
   const paused=await scenario({pauseAfterImport:true});assert(!paused.trace.some(x=>x.startsWith('submit:')));assert(!paused.trace.includes('read:https://hh.ru/vacancy/2'));
-  const unresolved=await scenario({pending:true});assert(!unresolved.trace.includes('receipt'));assert(!unresolved.trace.includes('read:https://hh.ru/vacancy/2'));assert(unresolved.data.vjaBrowserAutopilotActivePlan,'unverified submission retains continuation, not a duplicate');
+  const unresolved=await scenario({pending:true});assert(!unresolved.trace.includes('receipt'));assert(!unresolved.trace.includes('read:https://hh.ru/vacancy/2'));assert(Object.entries(unresolved.data).some(([key,job])=>key.startsWith('vjaApplicationJob:')&&job.pending&&!job.completed),'unverified submission retains continuation, not a duplicate');
   const noLetter=await scenario({letter:false});assert(!noLetter.trace.includes('receipt'));assert(noLetter.trace.includes('review'));
   console.log('Autopilot discovery -> immediate apply + letter -> confirmed receipt; queue priority, pause and review passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});
