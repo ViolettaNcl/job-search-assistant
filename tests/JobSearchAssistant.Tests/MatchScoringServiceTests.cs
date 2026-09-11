@@ -97,7 +97,7 @@ public sealed class MatchScoringServiceTests
     }
 
     [TestMethod]
-    public void MultiYearAndMandatoryDegreeRequirements_LowerRecruitmentPriority()
+    public void EmploymentLowersPriorityButDegreeDoesNotVetoApplication()
     {
         var realisticJunior = _sut.Score(
             "Junior .NET Developer",
@@ -129,6 +129,7 @@ public sealed class MatchScoringServiceTests
             remoteScope: "Worldwide");
 
         Assert.IsTrue(fourYears.Score < realisticJunior.Score);
-        Assert.IsTrue(mandatoryDegree.Score < equivalentExperience.Score);
+        Assert.AreEqual(equivalentExperience.Score, mandatoryDegree.Score);
+        Assert.IsTrue(mandatoryDegree.Assessment!.Understanding.MandatoryDegree);
     }
 }

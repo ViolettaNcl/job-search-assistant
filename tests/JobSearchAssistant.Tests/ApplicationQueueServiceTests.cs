@@ -12,7 +12,7 @@ namespace JobSearchAssistant.Tests;
 public sealed class ApplicationQueueServiceTests
 {
     [TestMethod]
-    public async Task Queue_RanksFreshStrongEligibleVacancyFirst_AndExcludesIneligible()
+    public async Task Queue_RanksFreshStrongVacancyFirst_AndKeepsCountryAdvice()
     {
         await using var db = CreateDb();
         var company = new Company { Name = "Example", Source = "global", ExternalId = "example" };
@@ -28,11 +28,11 @@ public sealed class ApplicationQueueServiceTests
         var sut = new ApplicationQueueService(db, drafts);
         var queue = await sut.GetAsync(20, 65, CancellationToken.None);
 
-        Assert.AreEqual(2, queue.Count);
+        Assert.AreEqual(3, queue.Count);
         Assert.AreEqual(freshStrong.Id, queue[0].VacancyId);
         Assert.AreEqual("Apply now", queue[0].Priority);
         Assert.IsTrue(queue[0].PriorityScore > queue[1].PriorityScore);
-        Assert.IsFalse(queue.Any(x => x.VacancyId == ineligible.Id));
+        Assert.AreEqual("Likely ineligible", queue.Single(x => x.VacancyId == ineligible.Id).EligibilityStatus);
         Assert.IsFalse(string.IsNullOrWhiteSpace(queue[0].RecommendedCv));
     }
 
@@ -140,18 +140,19 @@ public sealed class ApplicationQueueServiceTests
     }
 
     [TestMethod]
-    public async Task AutomaticQueue_FiltersReviewAndSeniorBeforeLimit()
+    public async Task AutomaticQueue_KeepsCountryAdviceButFiltersSeniorityAndOfficeWorkBeforeLimit()
     {
         await using var db = CreateDb();
         var company = new Company { Name = "Queue fixture", Source = "hh", ExternalId = "auto" };
         for (var i = 0; i < 55; i++)
         {
-            var review = CreateVacancy(company, "Junior .NET", 99, "Verify", DateTimeOffset.UtcNow);
+            var review = CreateVacancy(company, "Senior .NET", 99, "Verify", DateTimeOffset.UtcNow);
             review.Source = "hh";
             db.Add(review);
         }
         var senior = CreateVacancy(company, "Senior C#", 100, "Eligible", DateTimeOffset.UtcNow);
         var eligible = CreateVacancy(company, "Junior C#", 75, "Eligible", DateTimeOffset.UtcNow);
+        eligible.EligibilityStatus = "Verify";
         senior.Source = eligible.Source = "hh";
         var onsite = CreateVacancy(company, "Junior onsite C#", 100, "Eligible", DateTimeOffset.UtcNow);
         onsite.Source = "hh"; onsite.IsRemote = false;
@@ -163,6 +164,7 @@ public sealed class ApplicationQueueServiceTests
         var automatic = await service.GetAsync(1, 50, "hh", true, CancellationToken.None);
         Assert.AreEqual(1, automatic.Count);
         Assert.AreEqual(eligible.Id, automatic[0].VacancyId);
+        Assert.AreEqual("Verify", automatic[0].EligibilityStatus, "Country advice does not remove a qualifying junior vacancy.");
         var manual = await service.GetAsync(50, 50, "hh", CancellationToken.None);
         Assert.IsTrue(manual.Any(x => x.EligibilityStatus == "Verify"), "Review queue stays available for manual decisions");
     }

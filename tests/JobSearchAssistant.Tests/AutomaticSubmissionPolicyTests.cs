@@ -24,15 +24,15 @@ public sealed class AutomaticSubmissionPolicyTests
     }
 
     [TestMethod]
-    public void AutoSubmit_RequiresVerifiedEligibleJuniorHhVacancy()
+    public void AutoSubmit_UsesJuniorHhScoreAndTreatsEligibilityAsAdvice()
     {
         var vacancy = EligibleVacancy();
         Assert.IsTrue(AutomaticSubmissionPolicy.CanSubmit(vacancy, 95));
 
         vacancy.EligibilityStatus = "Verify";
-        Assert.IsFalse(AutomaticSubmissionPolicy.CanSubmit(vacancy, 95));
+        Assert.IsTrue(AutomaticSubmissionPolicy.CanSubmit(vacancy, 95));
         vacancy.EligibilityStatus = "Likely ineligible";
-        Assert.IsFalse(AutomaticSubmissionPolicy.CanSubmit(vacancy, 95));
+        Assert.IsTrue(AutomaticSubmissionPolicy.CanSubmit(vacancy, 95));
 
         vacancy = EligibleVacancy();
         vacancy.Title = "Senior .NET Developer";

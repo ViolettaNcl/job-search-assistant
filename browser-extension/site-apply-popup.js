@@ -51,9 +51,9 @@ function vjaSiteApplyReason(result) {
 async function vjaHandleSiteApplyResult(envelope, cvName = "") {
   const result = envelope?.result || envelope || {};
   const note = $("fillNote");
-  if (result.submitted && result.status === "confirmed") {
+  if (result.submitted && result.status === "confirmed" && result.coverLetterFilled) {
     const resumeLabel = result.resumeLabel || cvName || result?.cvResult?.filename || "";
-    const recorded = await vjaRecordConfirmedSiteApply(envelope, resumeLabel);
+    const recorded = envelope.recorded || await vjaRecordConfirmedSiteApply(envelope, resumeLabel);
     if (note) note.textContent = recorded
       ? "Application submitted with the tailored letter and selected resume/CV, then recorded as Applied."
       : "Application submitted on the employer site. The local tracker could not be updated automatically.";
@@ -85,15 +85,10 @@ async function vjaApplyNowOnSite() {
   clearError();
   if (!latest || !latestPage?.url) return showError("Analyze the vacancy first.");
 
-  const fit = Number(latest.match?.score || 0);
-  if (fit < 65) {
-    const proceed = window.confirm(`This vacancy is currently scored ${fit}/100 (${latest.recommendation || "low fit"}).\n\nSubmit anyway?`);
-    if (!proceed) return;
-  }
-
   const hhWebsite = Boolean(window.vjaSiteApply?.isHhUrl?.(latestPage.url)) || isHhVacancy(latestPage.url);
-  const previous = await chrome.storage.local.get("vjaSiteApplyResult");
-  const previousEnvelope = previous?.vjaSiteApplyResult;
+  const applyTab = await activeTab();
+  const previous = await chrome.runtime.sendMessage({type:"vjaGetSiteApply",tabId:applyTab.id});
+  const previousEnvelope = previous?.job?.result;
   if (previousEnvelope?.result?.submitted && previousEnvelope?.result?.status === "confirmed" && window.vjaSiteApply?.sameJobUrl?.(previousEnvelope.sourceUrl, latestPage.url)) {
     const note = $("fillNote");
     if (note) note.textContent = "Этот отклик уже был подтверждён и сохранён. Повторная отправка заблокирована.";
@@ -143,15 +138,17 @@ async function vjaApplyNowOnSite() {
     expiresAt: Date.now() + 10 * 60 * 1000,
     finalClicked: false
   };
-  await chrome.storage.local.set({ vjaPendingSiteApply: pending });
+
 
   try {
-    const plan = fileData ? { ...pending, fileData } : pending;
-    const result = await sendToPage({ type: "siteApplyNow", plan });
-    const envelope = { id: pending.id, trackedId, sourceUrl: pending.sourceUrl, coverLetter: pending.coverLetter, result };
+    const registered = await chrome.runtime.sendMessage({type:'vjaRegisterSiteApply',tabId:applyTab.id,plan:pending});
+    if(!registered?.ok)throw new Error(registered?.error || 'Не удалось сохранить задание.');
+    const job = registered.job;
+    const result = job?.result?.result || {status:'needs-review',reason:job?.reason || 'Ожидаю результат отклика.'};
+    const envelope = {...job?.result,recorded:job?.completed,result};
     await vjaHandleSiteApplyResult(envelope, result?.resumeLabel || fileData?.name || "");
   } catch (error) {
-    if (note) note.textContent = "Application flow started. If the employer site navigated to a new step, the extension will resume there automatically.";
+    if (note) note.textContent = error.message || "Ожидаю результат отклика. Остальные вакансии доступны.";
   } finally {
     if (button && !button.textContent.includes("Applied")) {
       button.disabled = false;
@@ -200,8 +197,9 @@ async function vjaOneClickApply() {
 }
 
 async function vjaRestoreSiteApplyResult() {
-  const stored = await chrome.storage.local.get("vjaSiteApplyResult");
-  const envelope = stored.vjaSiteApplyResult;
+  const tab = await activeTab();
+  const stored = await chrome.runtime.sendMessage({type:"vjaGetSiteApply",tabId:tab.id});
+  const envelope = stored?.job?.result;
   if (!envelope || Date.now() - Number(envelope.createdAt || 0) > 15 * 60 * 1000) return;
   await vjaHandleSiteApplyResult(envelope, envelope?.result?.resumeLabel || envelope?.result?.cvResult?.filename || "");
 }

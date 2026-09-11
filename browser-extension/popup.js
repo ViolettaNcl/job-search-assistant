@@ -99,7 +99,7 @@ async function sendToPage(message) {
 }
 
 async function vjaResetHungOperation() {
-  await chrome.storage.local.remove("vjaPendingSiteApply");
+  // Keep persisted application progress; resetting the panel must not allow duplicates.
   window.vjaResetPreparationState?.();
   window.vjaResetOneClickState?.();
   setBusy(false);
@@ -108,11 +108,7 @@ async function vjaResetHungOperation() {
 }
 
 async function vjaRecoverStaleManualOperation() {
-  const stored = await chrome.storage.local.get("vjaPendingSiteApply");
-  const pending = stored.vjaPendingSiteApply;
-  if (!pending || pending.automatic) return;
-  const age = Date.now() - Number(pending.createdAt || 0);
-  if (age > 2 * 60 * 1000) await chrome.storage.local.remove("vjaPendingSiteApply");
+  // Progress is owned by the background worker per vacancy, including closed panels.
 }
 
 function chips(container, values) {

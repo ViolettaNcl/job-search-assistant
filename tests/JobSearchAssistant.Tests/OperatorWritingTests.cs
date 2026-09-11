@@ -111,10 +111,14 @@ public sealed class OperatorWritingTests
     }
 
     [TestMethod]
-    public void MandatoryEducationLanguageAndSeniorExperienceCannotPassSilently()
+    public void EducationRemainsAdviceWhileLanguageAndSeniorExperienceNeedReview()
     {
         var scoring = new OpportunityScoringService(Profile);
-        foreach (var text in new[] { "Requirements: C#, SQL. Bachelor's degree.", "Requirements: C#, SQL. German B2." })
+        var degree = scoring.Assess("Junior .NET Developer", "Requirements: C#, SQL. Bachelor's degree.", true, location: "Worldwide");
+        Assert.AreEqual("APPLY", degree.Decision);
+        Assert.IsTrue(degree.Understanding.MandatoryDegree);
+        Assert.IsTrue(degree.ReviewReasons.Any(reason => reason.Contains("degree")));
+        foreach (var text in new[] { "Requirements: C#, SQL. German B2." })
             Assert.AreEqual("REVIEW", scoring.Assess("Junior .NET Developer", text, true, location: "Worldwide").Decision);
         Assert.AreEqual("SKIP", scoring.Assess(".NET Developer", "C#, SQL", true, "moreThan6", "Worldwide").Decision);
     }

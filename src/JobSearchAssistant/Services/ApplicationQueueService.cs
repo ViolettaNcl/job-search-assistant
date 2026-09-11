@@ -52,7 +52,7 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
                         !x.Company.IsBlacklisted &&
                         x.Application == null &&
                         !x.HasExistingHhResponse &&
-                        (scoring != null || (x.MatchScore >= minimumScore && x.EligibilityStatus != "Likely ineligible")) &&
+                        (scoring != null || x.MatchScore >= minimumScore) &&
                         (string.IsNullOrWhiteSpace(source) || x.Source == source))
             .OrderByDescending(x => x.MatchScore)
             .ToListAsync(ct);
@@ -62,11 +62,13 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
             .ToListAsync(ct);
 
         var now = DateTimeOffset.UtcNow;
+        var recommended = new HashSet<Guid>();
         if (scoring is not null)
         {
             foreach (var v in rows)
             {
                 var match = scoring.Score(v.Title, v.DescriptionText, v.IsRemote, v.Experience, v.LocationText, v.RemoteScope, minimumScore);
+                if (match.Assessment?.Decision == "APPLY") recommended.Add(v.Id);
                 v.MatchScore = match.Score;
                 v.WhyMatch = match.Why;
                 v.MatchLevel = match.Level;
@@ -78,9 +80,9 @@ public sealed class ApplicationQueueService(AppDbContext db, ApplicationDraftSer
             }
         }
         return rows
-            .Where(v => v.MatchScore >= minimumScore && v.EligibilityStatus != "Likely ineligible")
+            .Where(v => v.MatchScore >= minimumScore)
             // Filter before Take: review-only jobs must not crowd out safe auto-applications.
-            .Where(v => !automaticOnly || (v.Source == "hh" && RemoteWorkPolicy.IsFullyRemote(v.IsRemote, v.DescriptionText) && AutomaticSubmissionPolicy.IsVerifiedEligible(v) && AutomaticSubmissionPolicy.HasSafeSeniority(v.Title)))
+            .Where(v => !automaticOnly || (v.Source == "hh" && RemoteWorkPolicy.IsFullyRemote(v.IsRemote, v.DescriptionText) && (scoring == null || recommended.Contains(v.Id)) && AutomaticSubmissionPolicy.HasSafeSeniority(v.Title)))
             .Where(v => QueueDeferralPolicy.ShouldAppearInQueue(v, now))
             .Select(v =>
             {

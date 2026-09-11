@@ -36,9 +36,9 @@ public sealed class JuniorAutopilotTests
     }
 
     [TestMethod]
-    public void BandPreferenceDoesNotAuthorizeRequiredEmploymentOrOtherHardGaps()
+    public void BandPreferenceDoesNotInventEmploymentOrChangeSenioritySelection()
     {
-        foreach (var requirement in new[] { "2 years commercial experience required.", "Обязателен опыт работы от 2 лет.", "Required: Azure.", "University degree required.", "US only." })
+        foreach (var requirement in new[] { "2 years commercial experience required.", "Обязателен опыт работы от 2 лет." })
             Assert.AreNotEqual("APPLY", scoring.Assess("Junior .NET Developer", "Required: C#, SQL. Remote Russia. " + requirement, true, "between1And3", "Russia", minimumScore: 50).Decision, requirement);
         Assert.AreNotEqual("APPLY", scoring.Assess("Junior .NET Developer", "C#, SQL. Remote Russia.", true, "3 years commercial experience required", "Russia", minimumScore: 50).Decision);
         Assert.AreNotEqual("APPLY", scoring.Assess("Junior .NET Developer", "C#, SQL. Remote Russia.", true, "one year of employment required", "Russia", minimumScore: 50).Decision);

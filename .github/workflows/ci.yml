@@ -20,6 +20,7 @@ jobs:
           node --check src/JobSearchAssistant/wwwroot/dashboard-apply.js
           node --check browser-extension/dashboard-apply-content.js
           node --check browser-extension/dashboard-apply-background.js
+          node --check browser-extension/application-executor.js
           node --check browser-extension/background.js
           node --check browser-extension/browser-autopilot.js
           node --check browser-extension/runtime-guard.js
