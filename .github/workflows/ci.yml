@@ -16,6 +16,12 @@ jobs:
       - name: Verify SQLite HTTP workflows and restart persistence
         run: python scripts/verify-sqlite-runtime.py
       - name: Validate extension JavaScript
+        uses: actions/upload-artifact@v4
+        with:
+          name: letter-examples
+          path: artifacts/letter-examples.json
+          if-no-files-found: error
+      - name: Validate extension JavaScript
         run: |
           node --check src/JobSearchAssistant/wwwroot/dashboard-apply.js
           node --check browser-extension/dashboard-apply-content.js

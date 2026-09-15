@@ -35,6 +35,7 @@ def verify():
                 return json.loads(body) if body else None
 
         vacancy_id = None
+        receipt_id = None
         for restart in range(2):
             with open(Path(directory) / f"server-{restart}.log", "w+") as log:
                 command = [str(BACKEND)] if BACKEND.suffix == ".exe" else ["dotnet", str(BACKEND)]
@@ -69,6 +70,39 @@ def verify():
                             "company": "SQLite Pilot", "description": "C# .NET ASP.NET Core EF Core SQL REST Git. Junior paid internship. Remote Europe.",
                             "country": "Poland", "location": "Europe", "remoteScope": "Europe", "remote": True})
                         vacancy_id = vacancy["id"]
+                        # Synthetic receipts only: no employer requests or accounts.
+                        examples = []
+                        for title, description in [
+                            ("Junior .NET Developer", "C#, ASP.NET Core, SQL"),
+                            ("Junior QA Engineer", "C#, SQL, Testing"),
+                            ("Junior Frontend Developer", "React, TypeScript, Next.js"),
+                            ("Junior Implementation Engineer", "SQL, REST"),
+                            ("Junior Technical Support", "SQL, REST")]:
+                            draft = request("/api/extension/analyze", {"title": title, "company": "Example", "description": description, "country": "Russia", "source": "hh", "remote": True})["draft"]
+                            assert draft["letterVersion"] == "human-2.7.13"
+                            assert draft["coverLetter"].count("@Violet111") == 1
+                            assert len(draft["coverLetter"]) < 800
+                            examples.append({"role": title, "letter": draft["coverLetter"]})
+                        output = ROOT / "artifacts" / "letter-examples.json"
+                        output.parent.mkdir(exist_ok=True)
+                        output.write_text(json.dumps(examples, ensure_ascii=False, indent=2), encoding="utf-8")
+                        print("LETTER_EXAMPLES " + json.dumps(examples, ensure_ascii=True))
+                        receipt = request("/api/import/browser", {"url": "https://example.com/jobs/receipt-fixture", "title": "Junior QA Engineer", "company": "Receipt fixture", "description": "C#, SQL, Testing", "country": "Russia", "remote": True})
+                        receipt_id = receipt["id"]
+                        sent = {"coverLetter": examples[1]["letter"], "resumeLabel": "QA_CV_RU.pdf", "letterVersion": "human-2.7.13", "roleVariant": "QA Automation"}
+                        request(f"/api/vacancies/{receipt_id}/browser-applied", sent)
+                        request(f"/api/vacancies/{receipt_id}/status", {"status": "HrInterview", "note": "Synthetic interview"})
+                        request(f"/api/vacancies/{receipt_id}/status", {"status": "Rejected", "note": "Synthetic rejection"})
+                        request(f"/api/vacancies/{receipt_id}/browser-applied", {**sent, "coverLetter": "Wrong retry letter", "letterVersion": "wrong"})
+                        request(f"/api/vacancies/{receipt_id}/status", {"status": "Saved", "note": "QueueDeferredUntil=2099-01-01T00:00:00Z\nSynthetic lost channel"})
+                    exported = request("/api/analytics/application-history")
+                    saved = next(row for row in exported["applications"] if row["id"] == receipt_id)
+                    assert saved["status"] == "Rejected", "Retries must not erase employer outcomes"
+                    assert saved["letterVersion"] == "human-2.7.13" and saved["actualResume"] == "external/QA_CV_RU.pdf"
+                    assert "@Violet111" in saved["actualCoverLetter"] and "Wrong retry" not in saved["actualCoverLetter"]
+                    outcomes = request("/api/analytics/outcomes")
+                    assert outcomes["overall"]["interviews"] == 1 and outcomes["overall"]["rejections"] == 1
+                    assert outcomes["overall"]["positiveResponses"] == 1
                     settings = request('/api/automation/status')
                     assert settings['autoApplyMinimumScore'] == 50 and settings['dailyAutoApplyLimit'] == 90, 'Settings must survive restart'
                     rows = request("/api/vacancies?market=International&type=Internship")

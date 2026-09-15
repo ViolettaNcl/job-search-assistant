@@ -6,6 +6,19 @@ The project is built around one principle: find fewer but stronger opportunities
 
 ## Current capabilities
 
+### Version 2.7.13
+
+- Short Russian/English letters connect the vacancy to verified projects and include email plus Telegram **@Violet111**. No invented qualifications or employer-outcome promises.
+- HH resume selection uses the role-specific headline, replacing an unrelated previously selected resume when a clear match exists.
+- Confirmed receipts retain the sent letter, actual resume label, letter version and direction. Retries preserve existing interview/rejection states.
+- Analytics separates positive responses, rejections, withdrawn applications, closed vacancies, waiting and unfinished attempts; interview history survives later rejection. Download **application-history.json** from Analytics to inspect actual records. Older unrecorded letter versions remain unknown.
+- The 2.7.12 parallel executor remains: three manual and two automatic jobs, separate tabs/letters, closed-tab recovery and duplicate prevention. Education/country/skill fit warnings remain advisory.
+- Validation uses synthetic employer pages and an isolated SQLite database; it does not submit real applications. Generated letter examples are attached to the CI run.
+
+After downloading the Windows package, stop the old backend, extract the new package and reload the unpacked Chrome extension from its `browser-extension` folder. Keep your existing database and CV files when updating; do not delete your application history.
+
+### Features
+
 - Collects vacancies from **HeadHunter**, **Remotive**, and optionally **Adzuna**.
 - Focuses Violetta's search on Russia and Europe with Russia/EU work-authorization awareness.
 - Scores each vacancy for C#/.NET fit, junior suitability, eligibility and obvious skill gaps.

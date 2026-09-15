@@ -413,7 +413,8 @@ public sealed class JobService(
     public async Task MarkBrowserAppliedAsync(Guid vacancyId, string? coverLetter, string? resumeLabel, bool automatic, CancellationToken ct, string? letterVersion = null, string? roleVariant = null)
     {
         var vacancy = await db.Vacancies.Include(x => x.Application).Include(x => x.Events).SingleAsync(x => x.Id == vacancyId, ct);
-        if (vacancy.Application is null) vacancy.Status = VacancyStatus.Applied;
+        var firstReceipt = vacancy.Application is null;
+        if (firstReceipt) vacancy.Status = VacancyStatus.Applied;
         vacancy.HasExistingHhResponse = vacancy.Source == "hh" || vacancy.HasExistingHhResponse;
         vacancy.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -432,7 +433,7 @@ public sealed class JobService(
             vacancy.Application.CoverLetter = coverLetter.Trim();
         }
 
-        SubmissionDetails.Record(db, vacancy, letterVersion, roleVariant);
+        if (firstReceipt) SubmissionDetails.Record(db, vacancy, letterVersion, roleVariant);
         var eventType = automatic ? "AutoApplied" : "Applied";
         if (!vacancy.Events.Any(x => x.Type == eventType))
         {

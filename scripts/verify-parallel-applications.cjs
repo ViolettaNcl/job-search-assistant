@@ -14,8 +14,8 @@ async function until(check,message,timeout=45000){const end=Date.now()+timeout;w
     let result={};
     if(req.url==='/api/automation/status')result=status();
     else if(req.url.startsWith('/api/application-queue?'))result=[1,2].filter(n=>!receipts.some(r=>r.id===id(n))).map(candidate);
-    else if(req.url.endsWith('/prepare-dashboard-apply')){const n=parseInt(req.url.split('/')[3]);result={ready:true,candidate:candidate(n),draft:{coverLetter:'Letter for '+id(n)}};}
-    else if(req.url.endsWith('/application-draft'))result={coverLetter:'Letter for '+req.url.split('/')[3]};
+    else if(req.url.endsWith('/prepare-dashboard-apply')){const n=parseInt(req.url.split('/')[3]);result={ready:true,candidate:candidate(n),draft:{coverLetter:'Letter for '+id(n),resumeHint:'Junior QA Automation',letterVersion:'human-2.7.13',strategy:{cvVariant:'QA Automation'}}};}
+    else if(req.url.endsWith('/application-draft'))result={coverLetter:'Letter for '+req.url.split('/')[3],resumeHint:'Junior QA Automation',letterVersion:'human-2.7.13',strategy:{cvVariant:'QA Automation'}};
     else if(/\/browser-(auto-)?applied$/.test(req.url))receipts.push({id:req.url.split('/')[3],...JSON.parse(body)});
     else if(!req.url.startsWith('/api/')){res.setHeader('Content-Type','text/html');res.end('<!doctype html><title>Dashboard fixture</title><h1>Dashboard</h1>');return;}
     res.setHeader('Content-Type','application/json');res.end(JSON.stringify(result));
@@ -38,9 +38,9 @@ async function until(check,message,timeout=45000){const end=Date.now()+timeout;w
       if(!/^\/vacancy\/\d+$/.test(url.pathname))return route.abort();
       return route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><title>Junior C# ${n}</title>
         <h1>Junior C# ${n}</h1><form><label>Сопроводительное письмо<textarea required name="letter"></textarea></label>
-        <label><input name="resume" type="radio" checked>Резюме C#</label><button type="submit">Отправить отклик</button></form>
+        <label><input name="resume" type="radio" value="java" checked>Резюме Java Developer</label><label><input name="resume" type="radio" value="qa">Резюме QA Engineer</label><button type="submit">Отправить отклик</button></form>
         <script>window.sendCount=0;document.querySelector('form').addEventListener('submit',async e=>{e.preventDefault();window.sendCount++;
-        await fetch('/fixture-submit',{method:'POST',body:JSON.stringify({n:${n},letter:document.querySelector('textarea').value})});
+        await fetch('/fixture-submit',{method:'POST',body:JSON.stringify({n:${n},letter:document.querySelector('textarea').value,resume:document.querySelector('input[name=resume]:checked').value})});
         document.querySelector('form').remove();document.body.insertAdjacentHTML('beforeend','<p>Отклик отправлен</p>');});</script>`});
     });
     const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
@@ -61,9 +61,9 @@ async function until(check,message,timeout=45000){const end=Date.now()+timeout;w
     await until(()=>worker.evaluate(async()=>Boolean((await applicationJobs()).find(job=>job.plan.trackedId.startsWith('00000003'))?.review)),'closed uncertain application must be isolated');
     assert.equal(new Set(submissions.map(s=>s.n)).size,6);
     assert.equal(submissions.length,6,'one final click per vacancy');
-    for(const item of submissions)assert.equal(item.letter,'Letter for '+id(item.n),'letters must not cross tabs');
+    for(const item of submissions){assert.equal(item.letter,'Letter for '+id(item.n),'letters must not cross tabs');assert.equal(item.resume,'qa','role match must replace stale Java selection');}
     assert(!receipts.some(item=>item.id===id(3)),'closed page without receipt is not counted as success');
-    for(const item of receipts)assert.equal(item.coverLetter,'Letter for '+item.id);
+    for(const item of receipts){assert.equal(item.coverLetter,'Letter for '+item.id);assert.equal(item.letterVersion,'human-2.7.13');assert(item.resumeLabel.includes('QA'));}
     await send(7);await until(()=>receipts.length===6,'new manual vacancy remains usable with autopilot disabled');
     await send(1);
     await until(()=>dashboard.evaluate(()=>window.results.some(r=>r.requestId==='parallel-1'&&r.status==='confirmed')),'a completed automatic application is surfaced without resending');
