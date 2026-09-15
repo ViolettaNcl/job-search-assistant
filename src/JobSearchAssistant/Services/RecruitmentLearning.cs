@@ -8,11 +8,12 @@ public static class RecruitmentLearning
 
     public static int CalculateBoost(Vacancy candidate, IReadOnlyCollection<Vacancy> history)
     {
+        history = history.Where(v => v.Application is null || v.Status != VacancyStatus.Applied || v.Application.AppliedAt <= DateTimeOffset.UtcNow.AddDays(-7)).ToArray();
         if (history.Count < MinimumSegmentApplications) return 0;
 
-        var role = VacancyClassifier.OpportunityType(candidate);
+        var role = OutcomeAnalyticsService.Direction(candidate);
         var source = string.IsNullOrWhiteSpace(candidate.SourceLabel) ? candidate.Source : candidate.SourceLabel;
-        var roleRows = history.Where(v => VacancyClassifier.OpportunityType(v) == role).ToArray();
+        var roleRows = history.Where(v => OutcomeAnalyticsService.Direction(v) == role).ToArray();
         var sourceRows = history.Where(v => string.Equals(
             string.IsNullOrWhiteSpace(v.SourceLabel) ? v.Source : v.SourceLabel,
             source,
@@ -35,7 +36,7 @@ public static class RecruitmentLearning
     {
         if (rows.Count < MinimumSegmentApplications) return 0;
         var responses = rows.Count(v => v.Status is VacancyStatus.HrContact or VacancyStatus.HrInterview or VacancyStatus.TechInterview or VacancyStatus.TestTask or VacancyStatus.Offer);
-        var interviews = rows.Count(v => OutcomeAnalyticsService.HasInterview(v.Status));
+        var interviews = rows.Count(v => OutcomeAnalyticsService.Reached(v, OutcomeAnalyticsService.HasInterview));
 
         // Conservative Bayesian smoothing prevents a few early outcomes from dominating the queue.
         var responseRate = (responses + 1.0) / (rows.Count + 4.0);

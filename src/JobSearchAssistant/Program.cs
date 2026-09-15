@@ -107,6 +107,7 @@ app.MapGet("/api/candidate", (IOptions<CandidateProfileOptions> options, Candida
         c.RussianName,
         c.GreekName,
         c.Email,
+        c.Telegram,
         c.Phone,
         c.LinkedInUrl,
         c.CurrentCountry,
@@ -190,6 +191,9 @@ app.MapGet("/api/application-queue", async (int? limit, int? minScore, string? s
 
 app.MapGet("/api/followups", async (int? afterBusinessDays, int? limit, int? maxAttempts, FollowUpQueueService followUps, CancellationToken ct)
     => Results.Ok(await followUps.GetAsync(afterBusinessDays ?? 5, limit ?? 30, maxAttempts ?? 2, ct)));
+
+app.MapGet("/api/analytics/application-history", async (OutcomeAnalyticsService analytics, CancellationToken ct) =>
+    Results.File(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(await analytics.ExportHistoryAsync(ct), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true }), "application/json", "application-history.json"));
 
 app.MapGet("/api/analytics/outcomes", async (OutcomeAnalyticsService analytics, CancellationToken ct)
     => Results.Ok(await analytics.GetAsync(ct)));
@@ -405,14 +409,14 @@ app.MapPost("/api/vacancies/{id:guid}/mark-applied", async (Guid id, JobService 
 
 app.MapPost("/api/vacancies/{id:guid}/browser-auto-applied", async (Guid id, BrowserAutoAppliedRequest request, JobService jobs, BrowserAutopilotTracker browserAutopilot, CancellationToken ct) =>
 {
-    await jobs.MarkBrowserAppliedAsync(id, request.CoverLetter, request.ResumeLabel, true, ct);
+    await jobs.MarkBrowserAppliedAsync(id, request.CoverLetter, request.ResumeLabel, true, ct, request.LetterVersion, request.RoleVariant);
     browserAutopilot.RecordResult("Отклик и персональное письмо отправлены через расширение Chrome.", request.VacancyTitle);
     return Results.Ok(new { status = "recorded" });
 });
 
 app.MapPost("/api/vacancies/{id:guid}/browser-applied", async (Guid id, BrowserAutoAppliedRequest request, JobService jobs, CancellationToken ct) =>
 {
-    await jobs.MarkBrowserAppliedAsync(id, request.CoverLetter, request.ResumeLabel, false, ct);
+    await jobs.MarkBrowserAppliedAsync(id, request.CoverLetter, request.ResumeLabel, false, ct, request.LetterVersion, request.RoleVariant);
     return Results.Ok(new { status = "recorded" });
 });
 
@@ -493,7 +497,7 @@ public sealed record StatusRequest(string Status, string? Note);
 public sealed record FollowUpSentRequest(string? Note);
 public sealed record BoolRequest(bool Value);
 public sealed record ResumeRequest(string ResumeId);
-public sealed record BrowserAutoAppliedRequest(string? CoverLetter, string? ResumeLabel, string? VacancyTitle);
+public sealed record BrowserAutoAppliedRequest(string? CoverLetter, string? ResumeLabel, string? VacancyTitle, string? LetterVersion = null, string? RoleVariant = null);
 public sealed record BrowserAutopilotHeartbeat(bool Running, string? Message, string? VacancyTitle);
 public sealed record AutoApplyRequest(bool Enabled, int MinimumScore, int DailyLimit);
 public sealed record AutoApplyPreferencesRequest(int MinimumScore, int DailyLimit);

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -29,12 +29,13 @@
 <div class="shell">
   <header class="header">
     <div>
-      <h1>Outcome Analytics</h1>
-      <div class="sub">Learn which sources, markets, role types, match-score bands and CV variants actually produce recruiter responses and interviews. These are outcome metrics, not vacancy-volume metrics.</div>
+      <h1>Результаты откликов</h1>
+      <div class="sub">Сравните направления, резюме и версии писем по записанной истории. Отсутствие ответа, отказ работодателя и отмена отклика учитываются отдельно.</div>
     </div>
     <nav class="nav">
       <a class="btn" href="/">Dashboard</a>
-      <a class="btn" href="/queue.html">Daily Queue</a>
+      <a class="btn" href="/queue.html">Очередь</a>
+      <a class="btn" href="/api/analytics/application-history" download>Скачать историю для разбора</a>
       <a class="btn" href="/followups.html">Follow-ups</a>
       <a class="btn primary" href="#" onclick="event.preventDefault();load()">Refresh analytics</a>
     </nav>
@@ -44,7 +45,7 @@
   <section id="summary" class="summary"></section>
   <section id="signals" class="signals"></section>
   <div id="sections"></div>
-  <div class="foot">A “response” means the application advanced beyond waiting/applied status, including recruiter contact, interview, rejection or offer. “Interview” starts at HR interview and later stages. Small samples are shown, but recommendation signals require at least 3 applications in a segment.</div>
+  <div class="foot">Ответы включают отказы; положительные ответы — контакт HR, интервью, тестовое или оффер. Уже достигнутое интервью сохраняется в статистике после отказа. Последние 7 дней ожидания выделены отдельно. Проценты описывают историю, а не вероятность найма. Причина отказа неизвестна, если работодатель её не сообщил. Экспорт содержит ваши письма и контакты.</div>
 </div>
 <script>
 const $=id=>document.getElementById(id);
@@ -55,10 +56,10 @@ function summaryCard(label,value,note=''){
   return `<div class="stat"><span>${esc(label)}</span><strong>${esc(value)}</strong>${note?`<small>${esc(note)}</small>`:''}</div>`;
 }
 function qualifiedBest(rows,metric){
-  return (rows||[]).filter(x=>x.applications>=3).sort((a,b)=>(b[metric]||0)-(a[metric]||0)||b.applications-a.applications)[0]||null;
+  return (rows||[]).filter(x=>x.applications>=20).sort((a,b)=>(b[metric]||0)-(a[metric]||0)||b.applications-a.applications)[0]||null;
 }
 function signalCard(title,row,metric){
-  if(!row)return `<div class="signal"><b>${esc(title)}</b><strong>Not enough data</strong><span>Need at least 3 applications in one segment.</span></div>`;
+  if(!row)return `<div class="signal"><b>${esc(title)}</b><strong>Недостаточно данных</strong><span>Нужно минимум 20 откликов в одной группе; даже такая выборка не доказывает причину результата.</span></div>`;
   return `<div class="signal"><b>${esc(title)}</b><strong>${esc(row.label)}</strong><span>${pct(row[metric])} · ${row.applications} applications</span></div>`;
 }
 function renderTable(title,subtitle,rows){
@@ -68,13 +69,15 @@ function renderTable(title,subtitle,rows){
     <td><div class="label">${esc(row.label)}</div><div class="bar" aria-label="${row.applications} applications"><span style="width:${Math.max(5,row.applications/maxApps*100)}%"></span></div></td>
     <td class="num">${row.applications}</td>
     <td class="num">${row.responses}</td>
+    <td class="num">${row.positiveResponses||0}</td>
+    <td class="num">${row.waiting||0}</td>
     <td class="num rate">${pct(row.responseRate)}</td>
     <td class="num">${row.interviews}</td>
     <td class="num rate">${pct(row.interviewRate)}</td>
     <td class="num">${row.offers}</td>
     <td class="num">${row.rejections}</td>
   </tr>`).join('');
-  return `<section class="section"><div class="section-head"><h2>${esc(title)}</h2><span>${esc(subtitle)}</span></div><div class="table-wrap"><table><thead><tr><th>Segment</th><th class="num">Applied</th><th class="num">Responses</th><th class="num">Response rate</th><th class="num">Interviews</th><th class="num">Interview rate</th><th class="num">Offers</th><th class="num">Rejected</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
+  return `<section class="section"><div class="section-head"><h2>${esc(title)}</h2><span>${esc(subtitle)}</span></div><div class="table-wrap"><table><thead><tr><th>Segment</th><th class="num">Applied</th><th class="num">Все ответы</th><th class="num">Положительные</th><th class="num">Ожидают</th><th class="num">Response rate</th><th class="num">Interviews</th><th class="num">Interview rate</th><th class="num">Offers</th><th class="num">Rejected</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
 }
 async function load(){
   $('qualityNotice').className='notice';$('qualityNotice').textContent='Loading application outcomes…';
@@ -85,23 +88,29 @@ async function load(){
     const overall=data.overall||{};
     $('summary').innerHTML=[
       summaryCard('Applications',data.totalApplications||0,'tracked submissions'),
-      summaryCard('Response rate',pct(overall.responseRate),`${overall.responses||0} responses`),
+      summaryCard('Положительные ответы',overall.positiveResponses||0,pct(overall.positiveResponseRate)),
+      summaryCard('Отказы работодателей',overall.rejections||0),
+      summaryCard('Ожидают ответа',overall.waiting||0,`${overall.recentWaiting||0} — отправлены менее 7 дней назад`),
+      summaryCard('Отозваны / закрыты',`${overall.withdrawn||0} / ${overall.closed||0}`),
+      summaryCard('Незавершённые попытки',data.technicalFailures||0,'Сбои и формы, требующие проверки; это не отказы'),
       summaryCard('Interview rate',pct(overall.interviewRate),`${overall.interviews||0} interviews`),
       summaryCard('Offers',overall.offers||0,pct(overall.offerRate)),
       summaryCard('CV-attributed',data.attributedCvApplications||0,`${data.totalApplications?Math.round((data.attributedCvApplications||0)*100/data.totalApplications):0}% of applications`)
     ].join('');
 
-    const bestSource=qualifiedBest(data.bySource,'responseRate');
-    const bestMarket=qualifiedBest(data.byMarket,'responseRate');
+    const bestSource=qualifiedBest(data.bySource,'positiveResponseRate');
+    const bestMarket=qualifiedBest(data.byMarket,'positiveResponseRate');
     const bestScore=qualifiedBest(data.byScoreBand,'interviewRate');
-    $('signals').innerHTML=signalCard('Strongest source signal',bestSource,'responseRate')+signalCard('Strongest market signal',bestMarket,'responseRate')+signalCard('Best interview score band',bestScore,'interviewRate');
+    $('signals').innerHTML=signalCard('Положительные ответы по источникам',bestSource,'positiveResponseRate')+signalCard('Положительные ответы по рынкам',bestMarket,'positiveResponseRate')+signalCard('Best interview score band',bestScore,'interviewRate');
 
     $('sections').innerHTML=
       renderTable('By source','Where applications actually convert',data.bySource)+
       renderTable('By market','Russia vs international',data.byMarket)+
       renderTable('By role type','Full-time, internship, contractor, freelance',data.byRoleType)+
       renderTable('By match-score band','Does higher fit produce more interviews?',data.byScoreBand)+
-      renderTable('By CV variant','Only actual recorded uploads are named',data.byCvVariant);
+      renderTable('По резюме','Фактически записанное резюме, а не рекомендация',data.byCvVariant)+
+      renderTable('По направлению','Направление на момент отправки; для старых записей — по описанию',data.byDirection)+
+      renderTable('По версии письма','Старым откликам версия не назначается задним числом',data.byLetterVersion);
 
     const total=data.totalApplications||0;
     if(total<5){
@@ -109,8 +118,7 @@ async function load(){
     }else if(total<15){
       $('qualityNotice').textContent=`${total} tracked applications: useful early signals, but avoid major strategy changes from small segment samples.`;
     }else{
-      $('qualityNotice').className='notice good';
-      $('qualityNotice').textContent=`${total} tracked applications. Segment trends are becoming useful; prioritize patterns with at least 3 applications and keep watching response/interview rates.`;
+      $('qualityNotice').textContent=`${total} tracked applications. Сравнивайте группы с учётом числа откликов, срока ожидания и требований вакансий. Само число отказов не объясняет их причину.`;
     }
   }catch(error){
     $('summary').innerHTML='';$('signals').innerHTML='';$('sections').innerHTML=`<div class="error">${esc(error.message||String(error))}</div>`;

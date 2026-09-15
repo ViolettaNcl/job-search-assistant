@@ -39,6 +39,17 @@ public sealed class RecruitmentLearningTests
         Assert.IsTrue(RecruitmentLearning.CalculateBoost(candidate, rejected) <= 0);
     }
 
+    [TestMethod]
+    public void Learning_DoesNotTreatRecentWaitingAsUnsuccessfulHistory()
+    {
+        var candidate = Vacancy("Junior .NET Developer", "hh", "HeadHunter", VacancyStatus.New);
+        var recent = Enumerable.Range(0, 24).Select(_ => Vacancy("Junior .NET Developer", "hh", "HeadHunter", VacancyStatus.Applied)).ToArray();
+        foreach (var vacancy in recent) vacancy.Application!.AppliedAt = DateTimeOffset.UtcNow.AddDays(-1);
+        Assert.AreEqual(0, RecruitmentLearning.CalculateBoost(candidate, recent));
+        foreach (var vacancy in recent) vacancy.Application!.AppliedAt = DateTimeOffset.UtcNow.AddDays(-14);
+        Assert.IsTrue(RecruitmentLearning.CalculateBoost(candidate, recent) < 0);
+    }
+
     private static Vacancy Vacancy(string title, string source, string sourceLabel, VacancyStatus status)
     {
         var vacancy = new Vacancy
@@ -50,7 +61,7 @@ public sealed class RecruitmentLearningTests
             Company = new Company { Name = "Example" }
         };
         if (status != VacancyStatus.New)
-            vacancy.Application = new Application { Vacancy = vacancy, VacancyId = vacancy.Id };
+            vacancy.Application = new Application { Vacancy = vacancy, VacancyId = vacancy.Id, AppliedAt = DateTimeOffset.UtcNow.AddDays(-14) };
         return vacancy;
     }
 }

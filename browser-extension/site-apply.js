@@ -217,20 +217,31 @@
     if (!usable.length) return { found: false, ambiguous: false, count: 0 };
 
     const selected = usable.filter(item => item.metadata?.selected === true);
-    if (selected.length === 1) return { found: true, ambiguous: false, count: 1, candidate: selected[0], reason: "already-selected" };
+
     if (selected.length > 1) return { found: false, ambiguous: true, count: selected.length, reason: "multiple-selected" };
-    if (usable.length === 1) return { found: true, ambiguous: false, count: 1, candidate: usable[0], reason: "single-resume" };
+    if (usable.length === 1) return { found: true, ambiguous: false, count: 1, candidate: usable[0], reason: selected.length ? "already-selected" : "single-resume" };
 
     const preferred = normalizeResumeHint(preferredLabel);
     if (preferred) {
-      const preferredTokens = preferred.split(/\s+/).filter(token => token.length >= 3);
+      const roleWords = value => normalizeResumeHint(value)
+        .replace(/тестиров\S*|\btester\b|quality assurance/g, 'qa')
+        .replace(/фронтенд\S*|front.end/g, 'frontend')
+        .replace(/бэкенд\S*|back.end/g, 'backend')
+        .replace(/поддерж\S*|helpdesk/g, 'support')
+        .replace(/внедрен\S*/g, 'implementation')
+        .split(/[^a-zа-яё0-9+#.]+/i)
+        .filter(token => token.length >= 2 && !['junior','senior','developer','engineer','specialist','разработчик','младший','резюме','cv','pdf'].includes(token));
+      const preferredTokens = roleWords(preferred);
       const ranked = usable.map((item, index) => {
         const label = normalizeResumeHint(item.label);
         let score = label === preferred ? 100 : 0;
         if (!score && label && (label.includes(preferred) || preferred.includes(label))) score = 70;
         if (!score && preferredTokens.length) {
-          const matches = preferredTokens.filter(token => label.includes(token)).length;
-          score = Math.round(50 * (matches / preferredTokens.length));
+          const words = roleWords(label);
+          const matches = preferredTokens.filter(token => words.includes(token)).length;
+          score = preferredTokens.length ? Math.round(50 * (matches / preferredTokens.length)) : 0;
+          const families = ['qa','frontend','backend','support','implementation','wpf','.net','c#'];
+          if (families.some(token => preferredTokens.includes(token) && words.includes(token))) score = Math.max(score,60);
         }
         return { ...item, index, score };
       }).sort((a, b) => b.score - a.score || a.index - b.index);
@@ -239,6 +250,8 @@
       if (best.score >= 35 && ties.length === 1) return { found: true, ambiguous: false, count: 1, candidate: best, reason: "preferred-match" };
     }
 
+    // Keep an explicit selection only when no role preference was supplied.
+    if (!preferred && selected.length === 1) return { found:true, ambiguous:false, count:1, candidate:selected[0], reason:'already-selected' };
     return { found: false, ambiguous: true, count: usable.length, labels: usable.slice(0, 5).map(item => clean(item.label)), reason: "resume-choice-required" };
   }
 

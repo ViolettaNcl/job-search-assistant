@@ -138,3 +138,11 @@ assert.equal(apply.canResume({ sourceUrl: smartSource, currentUrl: smartForm, jo
 assert.equal(apply.canResume({ sourceUrl: smartSource, currentUrl: smartForm.replace('/SoftwareMind/', '/OtherCompany/'), jobTitle: '[RTC] Intern AI-Driven Software Engineer', pageText: matchingPage }).reason, 'different-ats-tenant');
 assert.equal(apply.canResume({ sourceUrl: smartSource, currentUrl: smartForm, jobTitle: '[RTC] Intern AI-Driven Software Engineer', pageText: 'Senior Java Engineer application' }).reason, 'different-job');
 console.log('site-apply tests passed');
+
+// A stale selected resume must not override a unique vacancy-specific match.
+for (const [hint,label] of [['Junior QA Automation','Тестировщик QA'],['Junior Frontend','Frontend Developer'],['Junior Technical Support','Специалист поддержки'],['Junior .NET Backend','C# .NET Developer']]) {
+  const choice=apply.chooseHhResumeChoice([{label:'Java Developer',metadata:{selected:true}},{label,metadata:{selected:false}}],hint);
+  assert.equal(choice.candidate?.label,label,hint);
+}
+const unclear=apply.chooseHhResumeChoice([{label:'Java Developer',metadata:{selected:true}},{label:'Sales Manager',metadata:{selected:false}}],'Junior QA Automation');
+assert.equal(unclear.found,false,'do not silently send a mismatched selected resume');

@@ -7,55 +7,56 @@ public sealed record GroundedApplication(string Letter, string ReasoningMode, st
 
 public sealed class ApplicationWritingService(IOptions<CandidateProfileOptions> candidate)
 {
-    public string AddContact(string letter, bool russian) => ApplicationContactFooter.Append(letter, candidate.Value.Email, russian);
+    public const string LetterVersion = "human-2.7.13";
+    public string AddContact(string letter, bool russian) => ApplicationContactFooter.Append(letter, candidate.Value.Email, russian, candidate.Value.Telegram);
 
     public GroundedApplication Write(ApplicationStrategy strategy, bool russian, string? title = null, string? company = null)
     {
-        var c = candidate.Value;
         var project = strategy.Projects.FirstOrDefault();
         if (project is null) return new("", "deterministic-fallback", [], true, ["No verified project evidence selected."]);
-        var skills = strategy.SkillsToEmphasize.Where(s => SkillCatalog.Proves(project.Skills, s)).Take(5).ToArray();
-        var evidence = string.Join(", ", skills);
-        var contribution = project.Id switch
-        {
-            "dental" => russian ? "API и работа с базой данных" : "APIs, data and databases",
-            "fleet" => russian ? "настольное приложение для управления автопарком" : "a desktop application for fleet workflows",
-            "route" => russian ? "алгоритмы маршрутизации и собственная нейросеть на PHP" : "route optimization and a neural network implemented in PHP",
-            _ => russian ? "многоязычный веб-интерфейс портфолио" : "a multilingual portfolio interface"
-        };
-        // Vacancy labels describe the employer's role, not a candidate claim. Keep them short and on one line.
+        var skills = strategy.SkillsToEmphasize.Where(s => SkillCatalog.Proves(project.Skills, s)).Take(3).ToArray();
         static string Label(string? value, int max)
         {
-            var normalized = string.Join(" ", (value ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-            return normalized[..Math.Min(normalized.Length, max)];
+            var clean = string.Join(" ", (value ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            return clean.Length > max ? clean[..max].TrimEnd() + "…" : clean;
         }
-        var role = Label(title, 140);
-        var employer = Label(company, 80);
+        var role = Label(title, 100);
+        var employer = Label(company, 60);
         var opening = role.Length == 0
-            ? (russian ? $"Меня заинтересовали задачи по направлению {strategy.CvVariant}." : $"The {strategy.CvVariant} work interests me.")
+            ? (russian ? $"Меня заинтересовала работа по направлению {strategy.CvVariant}." : $"I am interested in a {strategy.CvVariant} role.")
             : russian ? $"Откликаюсь на вакансию «{role}»{(employer.Length > 0 ? " в " + employer : "")}."
                 : $"I am applying for the {role} role{(employer.Length > 0 ? " at " + employer : "")}.";
+        var work = (project.Id, strategy.CvVariant) switch
+        {
+            ("dental", "QA Automation") => russian ? "писала автоматические тесты и работала с API и данными" : "wrote automated tests and worked with APIs and data",
+            ("dental", "Technical Support") => russian ? "работала с API, авторизацией и базой данных" : "worked with APIs, authentication and the database",
+            ("dental", _) => russian ? "разрабатывала API и связывала его с базой данных" : "built APIs and connected them to the database",
+            ("fleet", _) => russian ? "работала над настольным приложением для учёта транспорта и маршрутов" : "worked on a desktop application for vehicles and routes",
+            ("route", _) => russian ? "реализовала алгоритмы выбора маршрутов и нейросеть на PHP" : "implemented route optimization and a neural network in PHP",
+            _ => russian ? "создавала многоязычный интерфейс портфолио" : "built a multilingual portfolio interface"
+        };
+        var evidence = russian ? $"В своём проекте {project.Name} я {work}" : $"In my {project.Name} project, I {work}";
+        if (skills.Length > 0) evidence += russian ? $"; использовала {string.Join(", ", skills)}" : $", using {string.Join(", ", skills)}";
+        evidence += ".";
         var evidenceIds = new List<string> { project.Id };
-        var complement = "";
         var second = strategy.Projects.Skip(1).FirstOrDefault();
         if (second is not null)
         {
-            var extra = strategy.SkillsToEmphasize.Where(s => !SkillCatalog.Proves(project.Skills, s) && SkillCatalog.Proves(second.Skills, s)).Take(3).ToArray();
+            var extra = strategy.SkillsToEmphasize.Where(s => !SkillCatalog.Proves(project.Skills, s) && SkillCatalog.Proves(second.Skills, s)).Take(2).ToArray();
             if (extra.Length > 0)
             {
-                complement = russian ? $" В проекте {second.Name} также использовала {string.Join(", ", extra)}."
-                    : $" My {second.Name} project also uses {string.Join(", ", extra)}.";
+                evidence += russian ? $" В {second.Name} также использовала {string.Join(", ", extra)}." : $" I also used {string.Join(", ", extra)} in {second.Name}.";
                 evidenceIds.Add(second.Id);
             }
         }
         var source = project.Sources.FirstOrDefault();
-        var projectLink = source is null ? "" : "\n" + (russian ? "Проект: " : "Project: ") + "https://github.com/" + source.Repository;
-        var letter = russian
-            ? $"Здравствуйте! {opening} В проекте {project.Name} есть близкая работа: {contribution}. Использованные технологии: {evidence}.{complement}\n\nGitHub: {c.GitHubUrl}{projectLink}\n{c.RussianName}"
-            : $"Hello! {opening} My {project.Name} project includes relevant work on {contribution}, using {evidence}.{complement}\n\nGitHub: {c.GitHubUrl}{projectLink}\n{c.Name}";
+        var link = source is null ? "" : "\n\nGitHub: https://github.com/" + source.Repository;
+        var closing = russian ? "Буду рада обсудить задачи и ожидания от этой роли." : "I'd be glad to discuss the work and what you need from someone in this role.";
+        var letter = (russian ? "Здравствуйте! " : "Hello! ") + opening + "\n\n" + evidence + " " + closing + link;
         var conflicts = new CandidateKnowledgeService(candidate).Get().Identity.Conflicts;
         return new(AddContact(letter, russian), "deterministic-fallback", evidenceIds.ToArray(), conflicts.Length > 0, conflicts);
     }
+
 }
 
 // LLM text is always a suggestion. A lexical check cannot prove arbitrary prose true.
