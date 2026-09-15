@@ -15,7 +15,7 @@ The project is built around one principle: find fewer but stronger opportunities
 - The 2.7.12 parallel executor remains: three manual and two automatic jobs, separate tabs/letters, closed-tab recovery and duplicate prevention. Education/country/skill fit warnings remain advisory.
 - Validation uses synthetic employer pages and an isolated SQLite database; it does not submit real applications. Generated letter examples are attached to the CI run.
 
-After downloading the Windows package, stop the old backend, extract the new package and reload the unpacked Chrome extension from its `browser-extension` folder. Keep your existing database and CV files when updating; do not delete your application history.
+After downloading the Windows package, stop the old backend, replace the existing bundle's files with the extracted package, then reload the existing unpacked Chrome extension at `chrome://extensions` (the package folder is named `extension`). Run `start-assistant.cmd`. Preserve `user-settings.cmd` if configured. The default database lives outside the bundle at `%LOCALAPPDATA%\ViolettaApplyAssistant\jobassistant.db`; CV Vault PDFs remain in the existing extension's Chrome storage.
 
 ### Features
 

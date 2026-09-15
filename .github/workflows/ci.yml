@@ -15,7 +15,7 @@ jobs:
       - run: dotnet test tests/JobSearchAssistant.Tests/JobSearchAssistant.Tests.csproj -c Release
       - name: Verify SQLite HTTP workflows and restart persistence
         run: python scripts/verify-sqlite-runtime.py
-      - name: Validate extension JavaScript
+      - name: Save generated letter examples
         uses: actions/upload-artifact@v4
         with:
           name: letter-examples
