@@ -1,38 +1,73 @@
 # Violetta Apply Assistant 3.7.0
 
-## 🚀 Автопилот вынесен в главное окно
+## 🚀 Main-window Autopilot
 
-- В компактном окне расширения появилась отдельная заметная кнопка **`🚀 Запустить автопилот`**. Больше не нужно открывать прежнюю advanced-панель, чтобы включить агента.
-- Кнопка показывает состояние `работает / выключен / нет связи`, а также порог соответствия, лимит текущей сессии и дневной лимит.
-- Повторное нажатие останавливает автопилот.
-- Запуск остаётся **явным пользовательским действием**. Если backend не запущен, окно прямо предлагает запустить `start-assistant.cmd`.
-- При первом запуске browser-discovery теперь по умолчанию действительно включён, даже если старый профиль ещё не сохранил `vjaHhBrowserSearch`.
+A dedicated **🚀 Запустить автопилот** control is available in the compact extension popup.
 
-## Что делает агент после запуска
+The user explicitly starts/stops the agent. The popup shows current status plus match/session/day limits.
+
+Autopilot reuses the existing background automation pipeline and focuses by default on suitable remote IT roles, including C#/.NET, ASP.NET Core, Backend, Full-Stack .NET, QA / QA Automation and Technical Support.
+
+Explicit Middle/Senior/Lead/Principal/Staff/Architect/Head/Manager roles are filtered out by the junior-compatible guard.
+
+## ✦ Apply
+
+The main floating **✦ Apply** action starts the current-vacancy application workflow without redirecting to an internal extension page.
+
+The flow selects the RU/EN CV, builds a vacancy-specific short letter, handles supported form/application steps and records the result.
+
+## HH search-list quick apply
+
+After a real user click on HH.ru **Откликнуться**, the extension can attach a vacancy-specific cover letter for that exact vacancy card when the HH flow is unambiguous.
+
+## ✎ AI recruiter chat
+
+**✎ AI → 🧠 Проанализировать весь диалог и ответить** reads the accessible current conversation and prepares a reply draft for the latest recruiter message.
+
+The reply is reviewed by the user before Send.
+
+## Cover letters
+
+Technical letters are shorter and vacancy-first:
+
+- prioritize confirmed relevant skills/projects;
+- avoid repeating the whole CV;
+- avoid unrelated hospitality experience for developer/QA roles;
+- include `https://github.com/ViolettaNcl` for relevant IT vacancies.
+
+## CV
+
+The simplified resolver uses Russian or English bundled CV according to vacancy language/context.
+
+## Persistence
+
+Application Registry, Cover Letter Memory, timeline, follow-up and analytics remain available.
+
+## Backend startup
+
+The local extension/backend endpoint is standardized on:
 
 ```text
-🚀 пользователь запускает автопилот
-  → ищется очередь/HH search
-  → vacancy анализируется и получает match score
-  → проверяется уровень и IT-направление
-  → Middle/Senior/Lead/Manager и нерелевантные роли пропускаются
-  → проверяется remote-фильтр
-  → для подходящей vacancy создаётся короткое vacancy-specific письмо
-  → IT-письмо содержит https://github.com/ViolettaNcl
-  → вакансия открывается в фоновой вкладке
-  → existing application executor отправляет отклик
-  → подтверждённый результат записывается в Application Registry/Cover Letter Memory
-  → неоднозначные обязательные поля останавливают только текущую вакансию для проверки
+http://127.0.0.1:8080
 ```
 
-В дефолтный IT-target добавлены не только C#/.NET/Backend/Full-Stack/QA Automation, но также **Manual QA** и **Technical Support**. Match score и фактические требования вакансии по-прежнему используются как дополнительный фильтр.
+Launcher/diagnostic scripts are included for the Windows bundle.
 
-## Сохранено из 3.6.1
+## Repository cleanup
 
-- `✦ Apply` — автоотклик по текущей открытой вакансии без перехода на внутреннюю страницу расширения.
-- Native HH list quick apply: пользователь нажимает `Откликнуться`, после чего ассистент добавляет vacancy-specific cover letter без открытия detail page, если HH flow однозначен.
-- `✎ AI → 🧠 Проанализировать весь диалог и ответить` — current-chat analysis с DOM fallback для текущей HH-разметки.
-- Recruiter Send остаётся ручным.
-- RU/EN bundled CV, Cover Letter Memory, до пяти русских Quick Replies, follow-up/timeline/analytics.
-- High-risk salary/visa/legal/privacy/work-authorization поля не заполняются выдуманными значениями.
-- Backend startup fix: `127.0.0.1`, diagnostics, persistent SQLite и без auto-open dashboard.
+The Git repository now keeps source and documentation only:
+
+- `browser-extension/`
+- `src/`
+- `tests/`
+- `scripts/`
+- `tools/`
+- `docs/`
+
+Generated Windows runtime binaries, ZIP releases, `test-results/` and hash dumps are excluded from source control.
+
+## Limitations
+
+Live employer sites can change DOM/flow without notice. Synthetic regression tests do not replace live smoke testing.
+
+CAPTCHA/MFA and ambiguous legal/personal decisions are not bypassed or guessed.

@@ -1,84 +1,131 @@
 VIOLETTA APPLY ASSISTANT 3.7.0
 ==============================
 
-ОБНОВЛЕНИЕ СУЩЕСТВУЮЩЕЙ УСТАНОВКИ
----------------------------------
-1. Распакуйте весь ZIP в отдельную папку рядом со старой.
-2. Закройте старое окно/сервер JobSearchAssistant. При необходимости запустите STOP_ASSISTANT.cmd.
-3. НЕ удаляйте существующее расширение из Chrome.
-4. Запустите UPDATE_EXISTING.cmd из новой папки.
-5. Укажите путь к старой папке проекта (там должны быть extension и backend).
-6. В chrome://extensions нажмите Reload / «Обновить» у существующего Violetta Apply Assistant.
-7. Обновите открытые вкладки HH.ru и recruiter chat.
-8. Запустите start-assistant.cmd из обновлённой рабочей папки.
+SOURCE REPOSITORY
+-----------------
+Current source layout:
+
+browser-extension\             Chrome extension source
+src\JobSearchAssistant\        .NET backend source
+tests\                         tests
+scripts\                       release/source helpers
+tools\                         maintenance tools
+
+Generated Windows backend binaries are NOT stored in Git.
+GitHub Actions builds the Windows release package from source.
+
+WINDOWS RELEASE / EXISTING INSTALLATION
+---------------------------------------
+If you are using a packaged Windows release:
+
+1. Stop the old backend if it is running.
+2. Keep the existing unpacked Chrome extension if you want to preserve its local storage.
+3. Use UPDATE_EXISTING.cmd from the new release bundle.
+4. Reload the extension in chrome://extensions.
+5. Refresh already-open HH.ru / recruiter-chat tabs.
+6. Run start-assistant.cmd.
 
 BACKEND
 -------
-Используется http://127.0.0.1:8080. Launcher не должен сам открывать dashboard.
-Если readiness не становится green, запустите BACKEND_DIAGNOSTICS.cmd и проверьте:
-%LOCALAPPDATA%\ViolettaApplyAssistant\backend-diagnostic.txt
-Логи: %LOCALAPPDATA%\ViolettaApplyAssistant\logs
-Не удаляйте jobassistant.db для «исправления» startup.
+Local endpoint:
 
-✦ APPLY НА ОТКРЫТОЙ ВАКАНСИИ
-----------------------------
-Нажмите плавающую ✦ Apply. Расширение остаётся в текущем employer flow: анализирует vacancy, выбирает RU/EN CV, создаёт короткое письмо, заполняет форму и выполняет финальный отклик, если preflight однозначен.
+http://127.0.0.1:8080
 
-БЫСТРЫЙ ОТКЛИК ИЗ СПИСКА HH
----------------------------
-На странице поиска HH можно просто нажать штатную синюю кнопку «Откликнуться» на нужной карточке.
-Если HH подтверждает быстрый отклик и показывает «Приложить письмо», assistant автоматически создаёт письмо именно по этой карточке, открывает форму письма, вставляет его и отправляет — без открытия vacancy detail.
+If readiness does not become green, use:
 
-Функция запускается только после реального пользовательского клика по native кнопке и может быть отключена в Settings → Автоотклик.
-Если HH открывает сложную форму или UI неоднозначен, assistant прекращает этот shortcut, а не кликает случайно.
+BACKEND_DIAGNOSTICS.cmd
 
-СОПРОВОДИТЕЛЬНОЕ ПИСЬМО
------------------------
-Письмо короткое и строится вокруг конкретной вакансии. Для Developer/QA/Implementation/Technical Support и других IT-вакансий добавляется:
+Default local SQLite data is stored outside the bundle under:
+%LOCALAPPDATA%\ViolettaApplyAssistant
+
+SOURCE DEVELOPMENT
+------------------
+From a source clone use:
+
+START_FROM_SOURCE.cmd
+
+Backend source:
+src\JobSearchAssistant\
+
+Extension source:
+browser-extension\
+
+✦ APPLY
+-------
+On an opened supported vacancy press ✦ Apply.
+
+Expected flow:
+vacancy analysis
+→ RU/EN CV selection
+→ short vacancy-specific cover letter
+→ supported application handling
+→ confirmed / review required / failed
+
+Normal Apply should stay on the employer site.
+
+HH QUICK APPLY
+--------------
+On an HH.ru search-results page you can press the native blue «Откликнуться».
+
+For supported unambiguous flows the assistant can prepare and attach a cover letter for that exact vacancy without requiring you to open the detail page manually.
+
+✎ AI — CURRENT RECRUITER CHAT
+------------------------------
+Open the recruiter conversation you want to answer.
+
+Press:
+✎ AI → «🧠 Проанализировать весь диалог и ответить»
+
+The assistant reads the accessible current conversation and prepares a draft for the latest recruiter message.
+
+You review the draft and send it yourself.
+
+🚀 AUTOPILOT
+------------
+Open the compact extension popup and press:
+
+🚀 Запустить автопилот
+
+The agent starts only after your click.
+
+Default focus:
+- remote IT roles
+- C# / .NET
+- ASP.NET Core
+- Backend
+- Full-Stack .NET
+- QA / QA Automation
+- Technical Support
+
+Clearly unsuitable Middle/Senior/Lead/Manager roles are skipped.
+
+The agent respects match/session/day limits and stops on ambiguous high-risk required fields.
+
+COVER LETTERS
+-------------
+Technical cover letters are short and vacancy-specific.
+
+For relevant IT roles they may include:
 https://github.com/ViolettaNcl
 
-Используются подтверждённые skills/projects. Нерелевантный Front Desk / Crowne Plaza опыт в developer-письма не вставляется.
+Developer/QA letters prioritize relevant technical projects/skills instead of repeating unrelated hospitality experience.
 
-CV
---
-Используются две версии:
-- English: Violetta_Nicolaou_CV_EN.pdf
-- Русское: Violetta_Nicolaou_CV_RU.pdf
+IMPORTANT
+---------
+- Do not invent candidate experience or years.
+- Ambiguous salary/visa/legal/privacy/work-authorization questions require review.
+- Recruiter Send is manual.
+- CAPTCHA/MFA is not bypassed.
+- Employer sites change their UI; run a live smoke test after major site changes.
 
-✎ AI — ТЕКУЩИЙ ЧАТ
--------------------
-Ручка должна отображаться в detected recruiter chat, включая старые/unlinked chats.
-Нажмите ✎ AI → «🧠 Проанализировать весь диалог и ответить».
-Assistant читает доступную историю именно открытого сейчас чата, определяет latest recruiter message и незакрытые вопросы и готовит один draft.
+TESTING
+-------
+See TESTING_GUIDE.md.
 
-Также доступны: ответить на последнее сообщение, улучшить мой текст, вопрос работодателю, быстрые ответы.
-AI draft только вставляется. Recruiter Send нажимаете вы.
+PLATFORM SUPPORT
+----------------
+See SUPPORTED_SITES.md.
 
-БЫСТРЫЕ ОТВЕТЫ
----------------
-Не больше пяти русских built-in действий. Основной editable reply содержит @Violet111 и violettanicolaou@gmail.com.
-Сложные вопросы лучше передавать ✎ AI, а не выбирать из десятков шаблонов.
-
-🚀 АВТОПИЛОТ
-------------
-Откройте обычное компактное окно расширения и нажмите «🚀 Запустить автопилот».
-Агент начинает только после вашего нажатия. Кнопка меняется на «⏹ Остановить автопилот».
-
-По умолчанию он:
-- ищет remote IT-вакансии через HH в Chrome;
-- использует match score и Candidate Truth Profile;
-- ориентируется на C#/.NET/Backend/Full-Stack/QA/Technical Support;
-- пропускает явные Middle/Senior/Lead/Manager роли;
-- открывает подходящие вакансии в фоновых вкладках;
-- отправляет короткое vacancy-specific письмо и отклик;
-- останавливает конкретную вакансию на salary/visa/legal/privacy и других неоднозначных обязательных полях.
-
-Под кнопкой видны threshold, счётчик сессии и дневной лимит. Расширенные search queries/limits доступны через «Дополнительно → Настройки автопилота».
-
-ВАЖНО
------
-- Не удаляйте старое unpacked extension до UPDATE_EXISTING.cmd, если хотите сохранить local storage.
-- Recruiter Send не автоматизирован.
-- CAPTCHA/MFA не обходятся.
-- Реальные ATS меняют DOM; synthetic tests не заменяют smoke test live HH.
-- TEST_REPORT.md описывает автоматические проверки текущего ZIP.
+CURRENT IMPLEMENTATION STATUS
+-----------------------------
+See IMPLEMENTATION_STATUS.md.

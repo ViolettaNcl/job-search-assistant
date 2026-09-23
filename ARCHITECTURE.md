@@ -1,70 +1,127 @@
 # Architecture — Violetta Apply Assistant 3.7.0
 
-## Existing-system reuse
+## Source-of-truth layout
 
-`extension/` остаётся MV3 plain JavaScript без build step. `backend/` — существующий опубликованный Windows .NET пакет. Backend EXE/DLL не переписываются; расширение использует существующие endpoints/storage и добавляет поведение поверх них.
+The maintained source tree is:
 
-## Main-window Autopilot control
+```text
+browser-extension/            Manifest V3 Chrome extension
+src/JobSearchAssistant/       .NET 10 backend source
+tests/                        backend and browser/integration tests
+scripts/                      source/release verification scripts
+tools/                        maintenance/update helpers
+docs/                         requirements/history
+.github/workflows/             CI and Windows packaging
+```
 
-`home.html` / `home.js` теперь являются простым control surface для user-started agent:
+The repository does **not** store the generated self-contained Windows backend, ZIP releases or generated test-result folders. Those are build/release artifacts.
+
+## Chrome extension
+
+`browser-extension/` is the current extension source. It remains plain Manifest V3 JavaScript with no mandatory frontend build step.
+
+Main surfaces:
+
+- `home.html` / `home.js` — compact user control surface
+- `background.js` — service worker and orchestration
+- `site-apply*.js` — application execution
+- `hh-list-quick-apply*.js` — HH search-list quick cover-letter flow
+- `recruiter-chat*.js` — current recruiter-chat reading and AI draft UI
+- `copilot-*.js` — context, profile and AI helper logic
+- `site-adapters.js` — provider-specific/generic detection
+- `application-state-machine.js` — application workflow state
+- `application-analytics.js` / follow-up modules — local tracking and follow-up logic
+
+## Local backend
+
+Source: `src/JobSearchAssistant/`
+
+Runtime endpoint:
+
+```text
+http://127.0.0.1:8080
+```
+
+The backend owns the existing vacancy/application pipeline, match scoring, HH integration, queueing, tracking and local persistence.
+
+The installed Windows bundle uses a persistent SQLite database outside the release folder so upgrades do not require deleting user data.
+
+## Autopilot control
 
 ```text
 home popup
-  → GET /api/automation/status
+  → read automation status
   → 🚀 start / ⏹ stop
-  → POST /api/settings/autoapply
-  → vjaAutopilotControlWake
-  → background.js:runBrowserAutopilot()
+  → update auto-apply settings
+  → wake background worker
+  → background discovery / queue
+  → match + seniority + role guards
+  → application executor
 ```
 
-Popup не выполняет сам application flow. Он только явно включает/выключает существующий background agent и показывает status/limits. `background.js` принимает wake только от extension-owned `home.html` или `popup.html`.
+Autopilot is user-started. The popup is a control surface; it does not create a second automation engine.
 
-Если `vjaHhBrowserSearch` ещё отсутствует в старом профиле, 3.7 трактует browser discovery как включённый по умолчанию. Это устраняет ситуацию, когда UI показывал «искать через HH в Chrome», но background фактически не запускал discovery до первого ручного сохранения settings.
+Default target families are remote IT roles such as C#/.NET, ASP.NET Core, Backend, Full-Stack .NET, QA / QA Automation and Technical Support.
 
-## Autopilot selection and execution
+## Current-vacancy Apply
 
 ```text
-User starts 🚀 Autopilot
-  → HH discovery / existing queue
-  → backend match score
-  → junior-compatible seniority guard
-  → remote guard
-  → IT target guard (development / QA / technical support)
-  → Candidate Truth Profile + vacancy context
-  → short local cover letter
-  → background application pool (max 2 automatic jobs)
-  → inactive HH vacancy tab
-  → existing site-apply executor
-  → confirmed receipt OR review stop
-  → Application Registry + Cover Letter Memory
+JOB_DESCRIPTION
+→ ✦ Apply
+→ vacancy context
+→ RU/EN CV resolver
+→ cover-letter engine
+→ supported form/application executor
+→ CONFIRMED / REVIEW_REQUIRED / FAILED
 ```
 
-Default target queries include C#/.NET, ASP.NET Core, Backend, Full-Stack .NET, QA Automation, Manual QA and Technical Support. Explicit Middle/Senior/Lead/Principal/Staff/Architect/Head/Manager titles are rejected by the local seniority guard. Backend match score remains required, so a title keyword alone is not sufficient.
-
-## Current vacancy Apply
-
-```text
-JOB_DESCRIPTION → ✦ Apply → universal-content.js:autoApply → copilot-background.js → CV + cover letter → existing application executor → unique safe final action → CONFIRMED / REVIEW_REQUIRED / FAILED
-```
-
-The main `✦ Apply` stays on the employer flow; it does not open an internal application page.
+The user stays in the employer flow. Internal extension pages are not part of the normal Apply path.
 
 ## HH search-list quick apply
 
-A **trusted native user click** on HH `Откликнуться` can prepare and attach a cover letter for exactly that vacancy card. It is separate from Autopilot and intentionally ignores programmatic clicks to avoid double-running an automatic application.
+A trusted native user click on HH.ru **Откликнуться** can pin the exact vacancy card, prepare the cover letter and continue through the supported HH cover-letter modal.
+
+Programmatic/autopilot clicks do not reuse that trusted-click shortcut, preventing duplicate execution.
 
 ## Recruiter chat
 
-`✎ AI` uses the active conversation DOM, linked Application/Vacancy when available, CV + submitted cover-letter memory, recent thread and latest recruiter message. Full-dialog analysis can load older messages and uses HH current-DOM fallback if stable message wrappers are absent. The generated text is inserted/drafted; recruiter Send remains manual.
+`✎ AI` operates on the currently active conversation.
 
-## CV / cover letter
+Context can include:
 
-Vacancy language selects RU or EN bundled CV. Cover letters use only confirmed facts, prioritize technologies/requirements present in the vacancy, prefer a relevant technical project, add `https://github.com/ViolettaNcl` for IT roles and avoid irrelevant hospitality history in technical letters.
+```text
+active chat DOM
++ latest recruiter message
++ linked Application/Vacancy when available
++ CV used
++ submitted Cover Letter Memory
++ recent thread memory
+```
 
-## Safety stops
+Full-dialog analysis uses DOM-first extraction with HH-specific fallbacks. Stale responses are discarded when the user actually changes conversations.
 
-Unknown/ambiguous required salary, work authorization, visa, legal/privacy declarations, contractual acceptance and similar personal decisions are not guessed. That vacancy is stopped for review while unrelated queued work can continue.
+The assistant prepares/inserts a draft. Recruiter Send is manual.
 
-## Persistence
+## CV and cover-letter memory
 
-The existing `vjaApplicationJob:*` registry stores execution state, receipt, vacancy/CV association, timeline and Cover Letter Memory. No parallel database was introduced.
+The extension contains Russian and English CV assets. Vacancy language selects the base CV.
+
+Each application can retain the exact generated/submitted cover letter and associated vacancy/CV metadata so later recruiter-chat drafts can refer to what was actually sent.
+
+## Safety gates
+
+The application workflow must stop rather than guess on ambiguous required decisions such as:
+
+- salary expectations;
+- visa/work authorization;
+- legal/privacy declarations;
+- contractual commitments;
+- other unknown mandatory candidate facts.
+
+CAPTCHA/MFA and browser security restrictions are not bypassed.
+
+## Packaging
+
+`.github/workflows/package-windows.yml` publishes the .NET backend and combines it with `browser-extension/` and Windows launcher files.
+
+Generated runtime binaries are release artifacts, not Git source files.

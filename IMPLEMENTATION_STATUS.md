@@ -1,33 +1,37 @@
-# Статус большого ТЗ — 3.7.0
+# Implementation status — 3.7.0
 
-| Направление | Статус |
+| Area | Status |
 |---|---|
-| Existing architecture reuse | Выполнено; новый repository/backend/database не создавался |
-| Candidate Truth Profile | Выполнено: CONFIRMED / TRANSFERABLE / INFERENCE / UNKNOWN |
-| RU/EN CV resolver | Выполнено: две версии по языку вакансии; role-CV UI удалён |
-| Bundled CV | Выполнено: оба пользовательских PDF встроены |
-| Vacancy/role detection | Выполнено для существующих DOM/JSON-LD/adapters; generic mode best-effort |
-| Cover letter | Short vacancy-first, matched confirmed skills + relevant project; IT letters include GitHub |
-| Irrelevant hospitality exclusion | Выполнено и покрыто тестом для developer letters |
-| Cover Letter Memory | Выполнено: exact generated/submitted text per Application |
-| `✦ Apply` | Выполнено: current-vacancy auto-apply без internal page navigation |
-| Native HH list quick apply | Выполнено для synthetic current HH card/modal flow; trusted user click only |
-| `✦ Fill` | Выполнено: безопасное заполнение открытой формы |
-| **🚀 Main-window Autopilot** | **3.7.0:** отдельная start/stop кнопка в компактном popup + live status + score/session/day counters |
-| Autopilot browser discovery | **3.7.0:** browser search default = on when preference ещё не сохранён |
-| Autopilot target profile | Remote IT: development + QA + Technical Support; match threshold + junior-compatible seniority guard |
-| Autopilot limits | Score threshold + daily limit + session limit; bounded concurrency |
-| Autopilot high-risk stop | Salary/visa/legal/privacy/work-authorization + ambiguous required controls |
-| Application registry / duplicate protection | Выполнено через существующие `vjaApplicationJob:*` |
-| Live recruiter chat | Выполнено для доступного DOM; old/unlinked active chat fallback |
-| Full-dialog AI action | HH current-DOM fallback reads active right-side chat; explicit user click can run one-shot AI |
-| Chat SPA context stability | Harmless HH query/hash churn не считается сменой conversation |
-| Recruiter Send | Всегда ручной |
-| Quick Replies | Максимум пять русских built-ins + один editable primary reply |
-| Follow-up / timeline / analytics | Сохранено |
-| Dedicated live adapters | Частично; см. `SUPPORTED_SITES.md` |
-| CAPTCHA/MFA bypass | Не реализуется |
-| Encrypted backup/restore | Ещё не реализовано |
-| Automated tests | См. `TEST_REPORT.md` |
+| Source architecture cleanup | Complete: source uses `browser-extension/` + `src/`; generated backend/test output removed from Git |
+| Candidate Truth Profile | Implemented: confirmed / transferable / inference / unknown distinctions |
+| RU/EN CV resolver | Implemented: language-based built-in CV selection |
+| Bundled CV assets | Implemented |
+| Vacancy / role detection | Implemented for current adapters and semantic fallback; live DOM still requires smoke testing |
+| Human cover-letter engine | Implemented: short vacancy-first text using confirmed relevant projects/skills |
+| IT GitHub portfolio link | Implemented for relevant technical roles |
+| Unrelated hospitality suppression | Implemented for developer/QA technical letters |
+| Cover Letter Memory | Implemented per application |
+| `✦ Apply` | Implemented for supported current-vacancy flows |
+| HH search-list quick apply | Implemented for supported HH card/modal flow |
+| `✦ Fill` | Retained for safe form filling/review |
+| 🚀 main-window Autopilot | Implemented: explicit start/stop + status/limits |
+| Autopilot target profile | Remote IT focus with match/seniority/role guards |
+| Autopilot limits | Match threshold, session/day limits and bounded execution |
+| High-risk application stops | Implemented for ambiguous salary/visa/legal/privacy/work-authorization decisions |
+| Application registry / duplicate protection | Implemented through existing storage |
+| Recruiter chat AI | Implemented for accessible active DOM with old/unlinked-chat fallback |
+| Full-dialog analysis | Implemented with current HH DOM fallback |
+| Chat stale-response protection | Implemented |
+| Recruiter Send | Manual |
+| Quick Replies | Capped to a small Russian set + editable primary reply |
+| Timeline / follow-up / analytics | Retained |
+| Dedicated live adapters | Partial; see `SUPPORTED_SITES.md` |
+| CAPTCHA/MFA bypass | Not implemented |
+| Encrypted backup/restore | Not implemented |
+| Live-site certification | Not claimed; synthetic tests are not permanent live-DOM guarantees |
 
-Live production DOM каждой площадки требует smoke test после изменений сайта.
+## Repository/runtime note
+
+The source repository intentionally does not contain the generated self-contained Windows backend, ZIP release archives or `test-results/`. Windows packages are produced from source by GitHub Actions.
+
+See `TESTING_GUIDE.md` for current verification steps.
