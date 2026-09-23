@@ -1,160 +1,284 @@
+<p align="center">
+  <img src="docs/assets/hero.svg" alt="Violetta Apply Assistant" width="100%">
+</p>
+
+<p align="center">
+  <img alt="version" src="https://img.shields.io/badge/version-3.7.0-7968F2?style=for-the-badge">
+  <img alt="Chrome MV3" src="https://img.shields.io/badge/Chrome-MV3-3A3F58?style=for-the-badge&logo=googlechrome&logoColor=white">
+  <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white">
+  <img alt="Windows" src="https://img.shields.io/badge/Windows-11-0078D4?style=for-the-badge&logo=windows11&logoColor=white">
+</p>
+
+<p align="center">
+  <a href="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/ci.yml">
+    <img alt="CI" src="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/ci.yml/badge.svg">
+  </a>
+  <a href="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/site-apply-regression.yml">
+    <img alt="Application regression" src="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/site-apply-regression.yml/badge.svg">
+  </a>
+  <a href="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/package-windows.yml">
+    <img alt="Windows package" src="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/package-windows.yml/badge.svg">
+  </a>
+</p>
+
 # Violetta Apply Assistant
 
-**Current version: 3.7.0**
+**AI copilot for job discovery, tailored applications and recruiter conversations.**
 
-Personal Windows + Chrome job-application assistant for Violetta Nicolaou. The project combines a local .NET backend, a Manifest V3 Chrome extension, vacancy matching, vacancy-specific cover letters, recruiter-chat assistance, application tracking and a user-started HH.ru autopilot.
+Violetta Apply Assistant combines a local .NET backend with a Manifest V3 Chrome extension. It helps discover suitable vacancies, tailor short application letters, run supported HH.ru application flows, keep application context, and prepare replies inside the active recruiter chat.
 
-> The repository contains source code and documentation. Generated Windows runtime binaries, ZIP release bundles and test-output folders are intentionally excluded from Git.
+The product is designed around three rules:
 
-## Core workflows
+> **Relevant over random. Truthful over impressive. Fast without losing context.**
 
-### 🚀 Autopilot
+---
 
-The compact extension popup contains a dedicated **🚀 Запустить автопилот** control.
+## ✨ Product experience
 
-After the user starts it, the agent can:
+<table>
+<tr>
+<td width="25%" align="center"><b>🚀 Autopilot</b><br><sub>Discover, score and apply to suitable roles after explicit start.</sub></td>
+<td width="25%" align="center"><b>✦ Apply</b><br><sub>Run the application workflow for the vacancy already open.</sub></td>
+<td width="25%" align="center"><b>✎ Chat AI</b><br><sub>Read the active recruiter conversation and draft a contextual reply.</sub></td>
+<td width="25%" align="center"><b>🧠 Memory</b><br><sub>Remember the vacancy, CV and exact cover letter used.</sub></td>
+</tr>
+</table>
+
+<p align="center">
+  <img src="docs/assets/autopilot-flow.gif" alt="Autopilot workflow" width="95%">
+</p>
+
+---
+
+## 🚀 Autopilot
+
+Autopilot starts **only when the user presses the rocket button**.
+
+It can:
 
 - discover vacancies through the existing HH.ru browser workflow;
-- evaluate match score and seniority;
+- score fit and seniority;
 - prioritize remote IT roles;
 - skip clearly unsuitable Middle / Senior / Lead / Principal / Staff / Architect / Head / Manager roles;
+- select the appropriate RU/EN CV;
 - prepare a short vacancy-specific cover letter;
 - open suitable vacancies in background tabs;
 - execute supported application flows;
-- keep session and daily limits.
+- keep per-session and daily limits.
 
-Default target areas include C#/.NET, ASP.NET Core, Backend, Full-Stack .NET, QA / QA Automation and Technical Support.
+### Default target families
 
-Autopilot is never started silently. The user starts and stops it from the extension UI.
+`C# / .NET` · `ASP.NET Core` · `Backend` · `Full-Stack .NET` · `QA / QA Automation` · `Technical Support`
 
-### ✦ Apply
+<details>
+<summary><b>Why the Autopilot is conservative</b></summary>
 
-On an opened vacancy, **✦ Apply** launches the application workflow for that vacancy:
+The goal is not blind mass application. A title keyword alone is not enough. Matching, seniority, role family and existing candidate facts are considered together.
 
-```text
-vacancy analysis
-→ language / CV selection
-→ vacancy-specific cover letter
-→ supported form handling
-→ application execution
-→ confirmed / review required / failed
+Unknown or ambiguous required fields — salary expectations, visa/work authorization, legal/privacy declarations, contractual commitments — stop that application for review rather than inventing an answer.
+
+</details>
+
+---
+
+## ✦ One-click Apply
+
+On an opened supported vacancy, press **✦ Apply**.
+
+```mermaid
+flowchart LR
+    A[Open vacancy] --> B[Analyze role & requirements]
+    B --> C[Select RU / EN CV]
+    C --> D[Generate short cover letter]
+    D --> E[Handle supported application flow]
+    E --> F{Safe to continue?}
+    F -->|Yes| G[Submit + record context]
+    F -->|Needs review| H[Stop on the current page]
 ```
 
-The workflow stays on the employer site instead of redirecting to an internal extension page.
+The normal Apply path stays in the employer flow instead of redirecting to an internal extension screen.
 
-### HH.ru quick apply from search results
+---
 
-When the user presses HH.ru's native **Откликнуться** button on a vacancy card, the extension can prepare and attach a cover letter for that exact vacancy without requiring the detail page to be opened manually.
+## ⚡ HH.ru quick apply from search results
 
-If HH.ru opens an ambiguous or unsupported flow, the shortcut stops instead of guessing a different action.
+When the user presses HH.ru's native **Откликнуться** button on a vacancy card, the extension can attach a vacancy-specific cover letter for that exact vacancy without forcing the user to open the detail page first.
 
-### ✎ AI recruiter chat
+The shortcut is intentionally bound to the trusted user click. If HH.ru opens an ambiguous or unsupported form, the assistant stops rather than guessing another control.
 
-Inside the currently opened recruiter conversation:
+---
+
+## ✎ Recruiter Chat AI
+
+Open the recruiter conversation you want to answer and use:
 
 **✎ AI → 🧠 Проанализировать весь диалог и ответить**
 
-The assistant reads the accessible active conversation, considers the latest recruiter message, linked vacancy/application context when available, the CV used and Cover Letter Memory, then prepares a reply draft.
+The assistant can combine:
 
-Recruiter **Send remains manual**.
+- accessible active chat history;
+- the latest recruiter message;
+- linked vacancy/application context when available;
+- CV used for the application;
+- the exact submitted Cover Letter Memory;
+- recent thread context.
 
-Additional chat actions include:
+It then prepares a **draft** for the current conversation.
+
+> Recruiter **Send remains manual**.
+
+Other actions include:
 
 - answer the latest message;
-- improve the user's draft;
 - answer all visible questions;
-- suggest a relevant question to the recruiter;
-- concise quick replies.
+- improve the user's draft;
+- suggest a relevant recruiter question;
+- compact Russian quick replies.
 
-### CV and cover letters
+---
 
-The extension ships with Russian and English CV versions and selects the language version from vacancy context.
+## 📝 Human-style cover letters
 
-Technical cover letters are intentionally short and vacancy-first. They prioritize relevant confirmed skills/projects and may include:
+Technical cover letters are intentionally:
 
-`https://github.com/ViolettaNcl`
+- short;
+- vacancy-first;
+- grounded in confirmed experience;
+- focused on matching projects and skills;
+- free from irrelevant CV repetition.
 
-For developer / QA / technical roles, unrelated hospitality experience is not used as the main selling point.
+For relevant IT roles they may include:
 
-## Repository structure
+**https://github.com/ViolettaNcl**
+
+Developer / QA letters prioritize real technical work instead of using unrelated hospitality experience as the main argument.
+
+---
+
+## 🧠 Application memory
+
+Each application can retain the exact context that matters later:
 
 ```text
-browser-extension/            Chrome Extension source (current 3.7.0)
-src/JobSearchAssistant/       .NET backend source
-tests/                        .NET + browser/integration tests
-scripts/                      source/release verification helpers
-tools/                        maintenance/update tools
-docs/                         project requirements/history
-.github/workflows/             CI, CodeQL and Windows packaging
-
-README.md
-ARCHITECTURE.md
-IMPLEMENTATION_STATUS.md
-SUPPORTED_SITES.md
-TESTING_GUIDE.md
-WHAT_CHANGED.md
-START_HERE.txt
+Vacancy
++ selected CV
++ exact cover letter
++ application state
++ timeline / follow-up
++ recruiter conversation link
 ```
 
-The generated self-contained Windows backend is built by GitHub Actions and is **not** stored in the source tree.
+That lets Chat AI answer later recruiter questions using what was actually sent for that vacancy instead of reconstructing the context from scratch.
 
-## Local backend
+---
 
-The extension communicates with the local backend at:
+## 🏗 Architecture
+
+```mermaid
+flowchart TB
+    UI[Chrome Extension<br/>Manifest V3]
+    BG[Background Orchestrator]
+    HH[HH.ru / employer site]
+    API[Local .NET 10 Backend<br/>127.0.0.1:8080]
+    DB[(Persistent SQLite)]
+    MEM[Application Registry<br/>Cover Letter Memory]
+
+    UI --> BG
+    UI <--> HH
+    BG <--> API
+    API <--> DB
+    BG <--> MEM
+    MEM --> UI
+```
+
+### Source layout
+
+```text
+browser-extension/            Chrome extension source
+src/JobSearchAssistant/       .NET backend source
+tests/                        .NET + browser/integration tests
+scripts/                      verification and packaging helpers
+tools/                        maintenance/update helpers
+docs/                         requirements, assets and history
+.github/workflows/             CI, CodeQL and Windows packaging
+```
+
+Generated Windows backend binaries, ZIP releases and test-output folders are **not source files** and are intentionally excluded from Git.
+
+---
+
+## 🖥 Local backend
+
+The extension communicates with:
 
 ```text
 http://127.0.0.1:8080
 ```
 
-For an installed Windows bundle use:
+For a packaged Windows release:
 
 ```text
 start-assistant.cmd
 ```
 
-If readiness fails, use:
+Diagnostics:
 
 ```text
 BACKEND_DIAGNOSTICS.cmd
 ```
 
-The default local SQLite database is stored outside the bundle under `%LOCALAPPDATA%\ViolettaApplyAssistant`.
+Local SQLite data is stored outside the release bundle under `%LOCALAPPDATA%\ViolettaApplyAssistant`.
 
-## Source build
+---
 
-The backend source lives in `src/JobSearchAssistant/` and targets .NET 10.
+## 🧪 Quality gates
 
-The packaged Windows release is assembled by `.github/workflows/package-windows.yml` from:
+| Layer | Coverage |
+|---|---|
+| Backend | .NET build + MSTest |
+| Extension | Node syntax + unit/regression tests |
+| Browser | Synthetic Chromium fixtures |
+| Packaging | Windows artifact build + verification |
+| Security | CodeQL |
+| Live sites | Manual smoke test after major DOM changes |
 
-- `src/JobSearchAssistant/`
-- `browser-extension/`
-- `scripts/`
+> Synthetic tests validate logic and known fixtures. They do **not** guarantee every future production DOM variant on HH.ru or another ATS.
 
-Use `START_FROM_SOURCE.cmd` when working from the source repository.
+---
 
-## Safety and truthfulness
+## 🔐 Safety model
 
-The assistant must not invent candidate experience, years of experience, employers, qualifications or legal status.
+The assistant does **not** invent:
 
-Unknown or ambiguous required fields such as salary expectations, visa/work authorization, legal/privacy declarations and contractual commitments are review stops rather than guessed answers.
+- employers;
+- years of commercial experience;
+- qualifications;
+- legal status;
+- salary expectations;
+- visa/work authorization answers.
+
+Ambiguous high-risk required fields are review stops.
 
 CAPTCHA/MFA bypass is not implemented.
 
-## Testing
+---
 
-Automated checks cover extension logic, backend services and synthetic browser fixtures. They do **not** log in to real employer accounts or guarantee compatibility with every future DOM variant.
+## 📚 Documentation
 
-See:
+| Document | Purpose |
+|---|---|
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | System architecture and execution flows |
+| [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) | Implemented / partial / pending areas |
+| [`SUPPORTED_SITES.md`](SUPPORTED_SITES.md) | Platform support and known limitations |
+| [`TESTING_GUIDE.md`](TESTING_GUIDE.md) | Local + CI verification |
+| [`WHAT_CHANGED.md`](WHAT_CHANGED.md) | 3.7.0 release changes |
+| [`START_HERE.txt`](START_HERE.txt) | Windows usage/update notes |
+| [`SECURITY.md`](SECURITY.md) | Security and privacy model |
+| [`ROADMAP.md`](ROADMAP.md) | Next engineering priorities |
 
-- `TESTING_GUIDE.md`
-- `SUPPORTED_SITES.md`
-- `IMPLEMENTATION_STATUS.md`
+---
 
-## Documentation
-
-- `ARCHITECTURE.md` — architecture and data flow
-- `IMPLEMENTATION_STATUS.md` — implemented / partial / pending areas
-- `SUPPORTED_SITES.md` — platform support and limitations
-- `TESTING_GUIDE.md` — local and CI verification
-- `WHAT_CHANGED.md` — 3.7.0 changes
-- `START_HERE.txt` — practical Windows usage/update notes
+<p align="center">
+  <b>Violetta Apply Assistant 3.7.0</b><br>
+  <sub>Small interface. Strong context. Human-readable applications.</sub>
+</p>

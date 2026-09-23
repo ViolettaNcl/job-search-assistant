@@ -1,95 +1,76 @@
 VIOLETTA APPLY ASSISTANT 3.7.0
 ==============================
 
+QUICK START
+-----------
+Packaged Windows release:
+
+1. Run start-assistant.cmd
+2. Reload Violetta Apply Assistant in chrome://extensions
+3. Refresh already-open HH.ru / recruiter-chat tabs
+4. Use:
+   🚀 Autopilot
+   ✦ Apply
+   ✎ AI
+
+LOCAL BACKEND
+-------------
+http://127.0.0.1:8080
+
+If readiness fails:
+BACKEND_DIAGNOSTICS.cmd
+
+Local SQLite data is stored outside the release folder under:
+%LOCALAPPDATA%\ViolettaApplyAssistant
+
 SOURCE REPOSITORY
 -----------------
-Current source layout:
-
 browser-extension\             Chrome extension source
 src\JobSearchAssistant\        .NET backend source
 tests\                         tests
-scripts\                       release/source helpers
-tools\                         maintenance tools
+scripts\                       verification / packaging helpers
+tools\                         maintenance helpers
+docs\                          docs + assets + history
 
-Generated Windows backend binaries are NOT stored in Git.
-GitHub Actions builds the Windows release package from source.
-
-WINDOWS RELEASE / EXISTING INSTALLATION
----------------------------------------
-If you are using a packaged Windows release:
-
-1. Stop the old backend if it is running.
-2. Keep the existing unpacked Chrome extension if you want to preserve its local storage.
-3. Use UPDATE_EXISTING.cmd from the new release bundle.
-4. Reload the extension in chrome://extensions.
-5. Refresh already-open HH.ru / recruiter-chat tabs.
-6. Run start-assistant.cmd.
-
-BACKEND
--------
-Local endpoint:
-
-http://127.0.0.1:8080
-
-If readiness does not become green, use:
-
-BACKEND_DIAGNOSTICS.cmd
-
-Default local SQLite data is stored outside the bundle under:
-%LOCALAPPDATA%\ViolettaApplyAssistant
-
-SOURCE DEVELOPMENT
-------------------
-From a source clone use:
-
-START_FROM_SOURCE.cmd
-
-Backend source:
-src\JobSearchAssistant\
-
-Extension source:
-browser-extension\
+Generated backend binaries are release artifacts and are not stored in Git.
 
 ✦ APPLY
 -------
-On an opened supported vacancy press ✦ Apply.
+Open a supported vacancy and press ✦ Apply.
 
-Expected flow:
-vacancy analysis
-→ RU/EN CV selection
-→ short vacancy-specific cover letter
-→ supported application handling
+Expected:
+analyze vacancy
+→ choose RU/EN CV
+→ generate short cover letter
+→ run supported application flow
 → confirmed / review required / failed
-
-Normal Apply should stay on the employer site.
 
 HH QUICK APPLY
 --------------
-On an HH.ru search-results page you can press the native blue «Откликнуться».
+On HH.ru search results, press the native «Откликнуться».
 
-For supported unambiguous flows the assistant can prepare and attach a cover letter for that exact vacancy without requiring you to open the detail page manually.
+For a supported unambiguous flow the assistant can prepare and attach the cover letter for that exact vacancy card.
 
-✎ AI — CURRENT RECRUITER CHAT
-------------------------------
+✎ AI
+----
 Open the recruiter conversation you want to answer.
 
 Press:
 ✎ AI → «🧠 Проанализировать весь диалог и ответить»
 
-The assistant reads the accessible current conversation and prepares a draft for the latest recruiter message.
+The assistant reads accessible context and prepares a draft for the latest recruiter message.
 
-You review the draft and send it yourself.
+You review and send the message yourself.
 
 🚀 AUTOPILOT
 ------------
-Open the compact extension popup and press:
+Open the compact extension popup.
 
+Press:
 🚀 Запустить автопилот
 
-The agent starts only after your click.
-
 Default focus:
-- remote IT roles
+- remote IT
 - C# / .NET
 - ASP.NET Core
 - Backend
@@ -97,35 +78,32 @@ Default focus:
 - QA / QA Automation
 - Technical Support
 
-Clearly unsuitable Middle/Senior/Lead/Manager roles are skipped.
-
-The agent respects match/session/day limits and stops on ambiguous high-risk required fields.
+Clearly unsuitable senior-level roles are skipped.
+Session/day limits are enforced.
+Ambiguous high-risk required fields stop the current application.
 
 COVER LETTERS
 -------------
-Technical cover letters are short and vacancy-specific.
+Technical letters are short and vacancy-specific.
 
-For relevant IT roles they may include:
+Relevant IT letters may include:
 https://github.com/ViolettaNcl
 
-Developer/QA letters prioritize relevant technical projects/skills instead of repeating unrelated hospitality experience.
+They prioritize technical projects/skills instead of repeating unrelated experience.
 
 IMPORTANT
 ---------
-- Do not invent candidate experience or years.
-- Ambiguous salary/visa/legal/privacy/work-authorization questions require review.
-- Recruiter Send is manual.
+- Do not invent candidate facts.
+- Salary / visa / legal / privacy ambiguity requires review.
+- Recruiter Send remains manual.
 - CAPTCHA/MFA is not bypassed.
-- Employer sites change their UI; run a live smoke test after major site changes.
+- External sites can change DOM; use a small live smoke test after major UI changes.
 
-TESTING
--------
-See TESTING_GUIDE.md.
-
-PLATFORM SUPPORT
-----------------
-See SUPPORTED_SITES.md.
-
-CURRENT IMPLEMENTATION STATUS
------------------------------
-See IMPLEMENTATION_STATUS.md.
+MORE
+----
+ARCHITECTURE.md
+IMPLEMENTATION_STATUS.md
+SUPPORTED_SITES.md
+TESTING_GUIDE.md
+SECURITY.md
+ROADMAP.md

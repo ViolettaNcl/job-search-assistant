@@ -1,73 +1,50 @@
 # Violetta Apply Assistant 3.7.0
 
-## 🚀 Main-window Autopilot
+## Release highlight
 
-A dedicated **🚀 Запустить автопилот** control is available in the compact extension popup.
+**The assistant now feels like one product rather than a collection of tools.**
 
-The user explicitly starts/stops the agent. The popup shows current status plus match/session/day limits.
+### 🚀 Autopilot in the main popup
 
-Autopilot reuses the existing background automation pipeline and focuses by default on suitable remote IT roles, including C#/.NET, ASP.NET Core, Backend, Full-Stack .NET, QA / QA Automation and Technical Support.
+The compact popup now exposes one clear start/stop control for the existing automation pipeline.
 
-Explicit Middle/Senior/Lead/Principal/Staff/Architect/Head/Manager roles are filtered out by the junior-compatible guard.
+Autopilot combines vacancy discovery, match score, junior-compatible seniority checks, role targeting, session/day limits and background application execution.
 
-## ✦ Apply
+### ✦ Apply became the direct action
 
-The main floating **✦ Apply** action starts the current-vacancy application workflow without redirecting to an internal extension page.
+The floating **✦ Apply** action now maps to the application workflow for the currently opened vacancy without redirecting through an internal extension page.
 
-The flow selects the RU/EN CV, builds a vacancy-specific short letter, handles supported form/application steps and records the result.
+### ⚡ Faster HH list applications
 
-## HH search-list quick apply
+A native user click on HH.ru **Откликнуться** can trigger a vacancy-specific cover-letter continuation for that exact card.
 
-After a real user click on HH.ru **Откликнуться**, the extension can attach a vacancy-specific cover letter for that exact vacancy card when the HH flow is unambiguous.
+### ✎ Chat AI became conversation-aware
 
-## ✎ AI recruiter chat
+`🧠 Проанализировать весь диалог и ответить` reads the accessible active recruiter conversation and drafts for the latest message while preserving stale-response protection.
 
-**✎ AI → 🧠 Проанализировать весь диалог и ответить** reads the accessible current conversation and prepares a reply draft for the latest recruiter message.
+### 📝 Better cover letters
 
-The reply is reviewed by the user before Send.
+Technical letters are now:
 
-## Cover letters
+- shorter;
+- vacancy-first;
+- based on matching confirmed projects/skills;
+- less repetitive;
+- free from unrelated hospitality emphasis;
+- able to include `https://github.com/ViolettaNcl` for relevant IT roles.
 
-Technical letters are shorter and vacancy-first:
+### 🧠 Cover Letter Memory
 
-- prioritize confirmed relevant skills/projects;
-- avoid repeating the whole CV;
-- avoid unrelated hospitality experience for developer/QA roles;
-- include `https://github.com/ViolettaNcl` for relevant IT vacancies.
+The system retains the exact cover letter and CV context for each application so later recruiter replies can be grounded in what was actually sent.
 
-## CV
+### 🧹 Repository cleanup
 
-The simplified resolver uses Russian or English bundled CV according to vacancy language/context.
+The source tree now has one extension source (`browser-extension/`). Generated Windows runtime files, release ZIPs and test-output folders are excluded from Git.
 
-## Persistence
+### 🔧 Backend startup consistency
 
-Application Registry, Cover Letter Memory, timeline, follow-up and analytics remain available.
+Local backend and extension use `http://127.0.0.1:8080`, with dedicated launcher/diagnostic scripts in Windows release bundles.
 
-## Backend startup
+---
 
-The local extension/backend endpoint is standardized on:
-
-```text
-http://127.0.0.1:8080
-```
-
-Launcher/diagnostic scripts are included for the Windows bundle.
-
-## Repository cleanup
-
-The Git repository now keeps source and documentation only:
-
-- `browser-extension/`
-- `src/`
-- `tests/`
-- `scripts/`
-- `tools/`
-- `docs/`
-
-Generated Windows runtime binaries, ZIP releases, `test-results/` and hash dumps are excluded from source control.
-
-## Limitations
-
-Live employer sites can change DOM/flow without notice. Synthetic regression tests do not replace live smoke testing.
-
-CAPTCHA/MFA and ambiguous legal/personal decisions are not bypassed or guessed.
+See `IMPLEMENTATION_STATUS.md` for detailed feature status and `ROADMAP.md` for next engineering priorities.

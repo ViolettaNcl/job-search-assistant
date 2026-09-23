@@ -1,127 +1,136 @@
 # Architecture — Violetta Apply Assistant 3.7.0
 
-## Source-of-truth layout
+> **Design goal:** keep the user interface small while the context model behind it remains explicit, testable and recoverable.
 
-The maintained source tree is:
+## 1. System map
 
-```text
-browser-extension/            Manifest V3 Chrome extension
-src/JobSearchAssistant/       .NET 10 backend source
-tests/                        backend and browser/integration tests
-scripts/                      source/release verification scripts
-tools/                        maintenance/update helpers
-docs/                         requirements/history
-.github/workflows/             CI and Windows packaging
+```mermaid
+flowchart TB
+    subgraph Chrome["Chrome Extension · Manifest V3"]
+      HOME[home.html / home.js]
+      SW[background.js]
+      APPLY[site-apply*]
+      CHAT[recruiter-chat*]
+      HHQ[hh-list-quick-apply*]
+      MEM[application-state / analytics / memory]
+    end
+
+    subgraph Backend["Local .NET 10 backend"]
+      API[HTTP API]
+      MATCH[Match / vacancy services]
+      QUEUE[Automation / queue services]
+      STORE[(SQLite persistence)]
+    end
+
+    SITE[HH.ru / employer site]
+
+    HOME --> SW
+    SW <--> APPLY
+    SW <--> CHAT
+    SW <--> HHQ
+    APPLY <--> SITE
+    CHAT <--> SITE
+    HHQ <--> SITE
+    SW <--> API
+    API --> MATCH
+    API --> QUEUE
+    API <--> STORE
+    MEM <--> SW
 ```
 
-The repository does **not** store the generated self-contained Windows backend, ZIP releases or generated test-result folders. Those are build/release artifacts.
-
-## Chrome extension
-
-`browser-extension/` is the current extension source. It remains plain Manifest V3 JavaScript with no mandatory frontend build step.
-
-Main surfaces:
-
-- `home.html` / `home.js` — compact user control surface
-- `background.js` — service worker and orchestration
-- `site-apply*.js` — application execution
-- `hh-list-quick-apply*.js` — HH search-list quick cover-letter flow
-- `recruiter-chat*.js` — current recruiter-chat reading and AI draft UI
-- `copilot-*.js` — context, profile and AI helper logic
-- `site-adapters.js` — provider-specific/generic detection
-- `application-state-machine.js` — application workflow state
-- `application-analytics.js` / follow-up modules — local tracking and follow-up logic
-
-## Local backend
-
-Source: `src/JobSearchAssistant/`
-
-Runtime endpoint:
+## 2. Source-of-truth layout
 
 ```text
-http://127.0.0.1:8080
+browser-extension/            current extension source
+src/JobSearchAssistant/       backend source
+tests/                        backend + browser fixtures
+scripts/                      CI/release verification
+tools/                        local maintenance helpers
+docs/                         project docs/assets/history
+.github/workflows/             CI + packaging
 ```
 
-The backend owns the existing vacancy/application pipeline, match scoring, HH integration, queueing, tracking and local persistence.
+Generated release binaries are intentionally excluded from Git.
 
-The installed Windows bundle uses a persistent SQLite database outside the release folder so upgrades do not require deleting user data.
+## 3. Autopilot
 
-## Autopilot control
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant H as Home popup
+    participant B as Background
+    participant A as Local backend
+    participant S as HH.ru
 
-```text
-home popup
-  → read automation status
-  → 🚀 start / ⏹ stop
-  → update auto-apply settings
-  → wake background worker
-  → background discovery / queue
-  → match + seniority + role guards
-  → application executor
+    U->>H: 🚀 Start Autopilot
+    H->>A: Enable auto-apply settings
+    H->>B: Wake worker
+    B->>S: Discover vacancies
+    B->>A: Import/analyze vacancy
+    A-->>B: Match score + eligibility
+    B->>B: Role + seniority + limits guard
+    B->>S: Open suitable vacancy in background
+    B->>S: Run supported application flow
+    B->>A: Persist outcome/context
 ```
 
-Autopilot is user-started. The popup is a control surface; it does not create a second automation engine.
+Autopilot is a **user-started control surface over the existing automation pipeline**, not a parallel second engine.
 
-Default target families are remote IT roles such as C#/.NET, ASP.NET Core, Backend, Full-Stack .NET, QA / QA Automation and Technical Support.
-
-## Current-vacancy Apply
+## 4. Current-vacancy Apply
 
 ```text
 JOB_DESCRIPTION
 → ✦ Apply
-→ vacancy context
-→ RU/EN CV resolver
-→ cover-letter engine
+→ vacancy extraction
+→ language / CV resolution
+→ vacancy-specific letter
 → supported form/application executor
-→ CONFIRMED / REVIEW_REQUIRED / FAILED
+→ CONFIRMED | REVIEW_REQUIRED | FAILED
 ```
 
-The user stays in the employer flow. Internal extension pages are not part of the normal Apply path.
+The application state machine prevents unrelated navigation from becoming the primary UX.
 
-## HH search-list quick apply
+## 5. HH search-list quick apply
 
-A trusted native user click on HH.ru **Откликнуться** can pin the exact vacancy card, prepare the cover letter and continue through the supported HH cover-letter modal.
+A trusted native user click on HH.ru **Откликнуться** pins the exact vacancy card and allows the helper to continue through a supported cover-letter modal.
 
-Programmatic/autopilot clicks do not reuse that trusted-click shortcut, preventing duplicate execution.
+Programmatic/autopilot clicks are intentionally separated from that trusted-click path to prevent duplicate execution.
 
-## Recruiter chat
+## 6. Recruiter chat
 
-`✎ AI` operates on the currently active conversation.
-
-Context can include:
+Context model:
 
 ```text
 active chat DOM
 + latest recruiter message
-+ linked Application/Vacancy when available
++ linked Application / Vacancy
 + CV used
-+ submitted Cover Letter Memory
++ Cover Letter Memory
 + recent thread memory
 ```
 
-Full-dialog analysis uses DOM-first extraction with HH-specific fallbacks. Stale responses are discarded when the user actually changes conversations.
+`✎ AI` uses DOM-first extraction and discards stale responses when the user changes conversation identity.
 
-The assistant prepares/inserts a draft. Recruiter Send is manual.
+Recruiter Send is manual.
 
-## CV and cover-letter memory
+## 7. Persistence
 
-The extension contains Russian and English CV assets. Vacancy language selects the base CV.
+The architecture preserves the existing application registry and backend persistence. The project does not introduce a second database for the newer extension features.
 
-Each application can retain the exact generated/submitted cover letter and associated vacancy/CV metadata so later recruiter-chat drafts can refer to what was actually sent.
+Key persisted context includes application identity, vacancy identity, CV selection, exact cover letter, timeline and follow-up state.
 
-## Safety gates
+## 8. Safety gates
 
-The application workflow must stop rather than guess on ambiguous required decisions such as:
+The executor stops rather than guesses on ambiguous required candidate decisions such as:
 
 - salary expectations;
 - visa/work authorization;
 - legal/privacy declarations;
-- contractual commitments;
-- other unknown mandatory candidate facts.
+- contractual acceptance;
+- unknown mandatory facts.
 
-CAPTCHA/MFA and browser security restrictions are not bypassed.
+## 9. Packaging
 
-## Packaging
+`.github/workflows/package-windows.yml` builds a self-contained Windows backend from `src/JobSearchAssistant/`, then assembles it with `browser-extension/` and launcher files.
 
-`.github/workflows/package-windows.yml` publishes the .NET backend and combines it with `browser-extension/` and Windows launcher files.
-
-Generated runtime binaries are release artifacts, not Git source files.
+The source repository remains small and reviewable; generated runtime files are release artifacts.

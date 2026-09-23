@@ -1,66 +1,69 @@
 # Supported sites — 3.7.0
 
-Support levels describe implemented behavior, not permanent certification of a live site's DOM.
+> Support is reported by behavior and confidence level, not by marketing labels.
 
-## HH.ru
+## HH.ru — primary integration
 
 ### Implemented
 
-- vacancy discovery / parsing helpers;
+- vacancy discovery and identity helpers;
 - current-vacancy **✦ Apply**;
-- native search-list quick apply with vacancy-specific cover letter for supported HH flows;
-- recruiter-chat detection and **✎ AI**;
-- full-dialog analysis with current-DOM fallbacks;
-- user-controlled **🚀 Autopilot**;
-- match-score, role, seniority and session/day limits;
+- native search-list quick apply + cover letter;
+- recruiter chat detection + **✎ AI**;
+- full-dialog analysis fallback;
+- user-started **🚀 Autopilot**;
+- match/seniority/role guards;
+- session/day limits;
 - duplicate/application tracking.
 
-### Important limitations
+### Confidence
 
-HH.ru can change card, chat, modal and resume-selection DOM at any time. A synthetic regression passing today is not a guarantee for every production account/UI variant.
+**High for tested local fixtures, medium for live DOM longevity.**
 
-Ambiguous high-risk fields must stop rather than be guessed.
+HH.ru can change vacancy cards, chat containers, modal editors and resume-selection UI. A release therefore still needs a small live smoke test after major site changes.
 
-## Partially supported platforms
+---
 
-| Platform | Current support | Limitations |
+## Other platforms
+
+| Platform | Current level | Notes |
 |---|---|---|
-| LinkedIn Jobs | selectors / IDs / generic form logic | Easy Apply variants, messaging and custom widgets require live validation |
-| Indeed | job identity + generic form handling | login/custom controls/chat not certified |
-| Greenhouse | semantic/native form support | custom widgets and cross-domain flows may require review |
-| Lever | semantic/native form support | custom controls may require review |
-| Ashby | semantic/native form support | live variants require smoke testing |
-| Workday | requisition/title/description detection + generic fields | complex wizards/custom controls require review |
-| SmartRecruiters | semantic fallback | live variants require validation |
-| Teamtailor | semantic fallback | live variants require validation |
-| Workable | semantic fallback | live variants require validation |
+| LinkedIn Jobs | ◐ Partial | IDs/selectors + generic form logic; Easy Apply variants need live validation |
+| Indeed | ◐ Partial | Vacancy identity + generic forms; chat/custom controls not certified |
+| Greenhouse | ◐ Partial | Strong semantic/native form compatibility; custom widgets may need review |
+| Lever | ◐ Partial | Semantic/native forms; custom flows may differ |
+| Ashby | ◐ Partial | Generic/native form support; live variants need smoke testing |
+| Workday | ◐ Partial | Vacancy/requisition detection + generic fields; wizard controls remain difficult |
+| SmartRecruiters | ◐ Partial | Semantic fallback |
+| Teamtailor | ◐ Partial | Semantic fallback |
+| Workable | ◐ Partial | Semantic fallback |
+
+---
 
 ## Generic mode
 
-The generic adapter can attempt to detect:
+For unknown career pages the extension can attempt to infer:
 
-- JobPosting/JSON-LD vacancy data;
-- title/company/description;
-- native inputs/selects/radios/checkboxes;
+- JobPosting / JSON-LD vacancy data;
+- title, company and description;
+- native form controls;
 - resume/CV uploads;
-- obvious intermediate controls;
-- recruiter reply fields where semantics are available.
+- obvious intermediate steps;
+- recruiter reply fields when semantics are accessible.
 
-Unknown sites are best-effort. The assistant should stop on ambiguity instead of guessing.
+Generic mode is **best-effort**. It should stop on ambiguity rather than inventing intent.
 
-## Needs a dedicated adapter / manual step
+---
 
-- canvas-rendered or inaccessible chat UIs;
+## Explicitly limited / manual
+
 - closed Shadow DOM;
-- cross-origin iframes without permission;
-- virtualized/custom ATS controls with weak semantics;
+- canvas/non-text recruiter UIs;
+- cross-origin frames without permission;
+- highly virtualized custom ATS controls;
 - nonstandard rich-text editors;
 - CAPTCHA / MFA / anti-bot challenges;
 - employer-specific legal declarations;
 - ambiguous final actions.
 
-## Permission model
-
-The extension requests HH.ru access by default and may request additional origins when the user enables support for another employer site.
-
-Browser security restrictions are not bypassed.
+Browser security boundaries are not bypassed.

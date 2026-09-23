@@ -1,37 +1,38 @@
 # Implementation status — 3.7.0
 
-| Area | Status |
-|---|---|
-| Source architecture cleanup | Complete: source uses `browser-extension/` + `src/`; generated backend/test output removed from Git |
-| Candidate Truth Profile | Implemented: confirmed / transferable / inference / unknown distinctions |
-| RU/EN CV resolver | Implemented: language-based built-in CV selection |
-| Bundled CV assets | Implemented |
-| Vacancy / role detection | Implemented for current adapters and semantic fallback; live DOM still requires smoke testing |
-| Human cover-letter engine | Implemented: short vacancy-first text using confirmed relevant projects/skills |
-| IT GitHub portfolio link | Implemented for relevant technical roles |
-| Unrelated hospitality suppression | Implemented for developer/QA technical letters |
-| Cover Letter Memory | Implemented per application |
-| `✦ Apply` | Implemented for supported current-vacancy flows |
-| HH search-list quick apply | Implemented for supported HH card/modal flow |
-| `✦ Fill` | Retained for safe form filling/review |
-| 🚀 main-window Autopilot | Implemented: explicit start/stop + status/limits |
-| Autopilot target profile | Remote IT focus with match/seniority/role guards |
-| Autopilot limits | Match threshold, session/day limits and bounded execution |
-| High-risk application stops | Implemented for ambiguous salary/visa/legal/privacy/work-authorization decisions |
-| Application registry / duplicate protection | Implemented through existing storage |
-| Recruiter chat AI | Implemented for accessible active DOM with old/unlinked-chat fallback |
-| Full-dialog analysis | Implemented with current HH DOM fallback |
-| Chat stale-response protection | Implemented |
-| Recruiter Send | Manual |
-| Quick Replies | Capped to a small Russian set + editable primary reply |
-| Timeline / follow-up / analytics | Retained |
-| Dedicated live adapters | Partial; see `SUPPORTED_SITES.md` |
-| CAPTCHA/MFA bypass | Not implemented |
-| Encrypted backup/restore | Not implemented |
-| Live-site certification | Not claimed; synthetic tests are not permanent live-DOM guarantees |
+## Product status
 
-## Repository/runtime note
+| Area | Status | Notes |
+|---|---|---|
+| Source cleanup | ✅ Complete | One extension source: `browser-extension/`; generated release files excluded |
+| Candidate Truth Profile | ✅ Implemented | Confirmed / transferable / inference / unknown |
+| RU/EN CV resolver | ✅ Implemented | Simplified language-based selection |
+| Bundled CV assets | ✅ Implemented | Stored as extension assets |
+| Vacancy / role detection | ✅ / ◐ | Adapter + semantic fallback; live DOM can change |
+| Human cover letters | ✅ Implemented | Short, vacancy-first, confirmed skills/projects |
+| IT GitHub portfolio link | ✅ Implemented | Added where relevant |
+| Unrelated hospitality suppression | ✅ Implemented | Technical letters avoid irrelevant repetition |
+| Cover Letter Memory | ✅ Implemented | Per-application exact text/context |
+| ✦ Apply | ✅ Implemented | Supported current-vacancy flow |
+| HH search-list quick apply | ✅ / ◐ | Supported HH flow; DOM-sensitive |
+| 🚀 Autopilot | ✅ Implemented | Explicit start/stop, status and limits |
+| Match / seniority guards | ✅ Implemented | Junior-compatible remote IT focus |
+| High-risk field stops | ✅ Implemented | Salary/visa/legal/privacy/etc. |
+| Recruiter Chat AI | ✅ / ◐ | Active DOM + fallback; live chat DOM can change |
+| Full-dialog analysis | ✅ Implemented | With stale-response protection |
+| Quick Replies | ✅ Implemented | Small Russian set + editable primary |
+| Timeline / follow-up / analytics | ✅ Retained | Existing system preserved |
+| Dedicated multi-site adapters | ◐ Partial | See `SUPPORTED_SITES.md` |
+| Encrypted backup/restore | ⏳ Planned | See `ROADMAP.md` |
+| CAPTCHA/MFA bypass | ❌ Out of scope | Not implemented |
+| Permanent live-site certification | ❌ Not claimed | Requires smoke tests |
 
-The source repository intentionally does not contain the generated self-contained Windows backend, ZIP release archives or `test-results/`. Windows packages are produced from source by GitHub Actions.
+## Release engineering
 
-See `TESTING_GUIDE.md` for current verification steps.
+The repository stores source and docs only. Windows runtime binaries, ZIP packages, screenshots/test-output and hash dumps are CI/release artifacts.
+
+## Confidence model
+
+**Green** means the feature exists and is covered by local/synthetic regression.
+
+It does **not** mean an external employer site cannot change its UI tomorrow.
