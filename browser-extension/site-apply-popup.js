@@ -6,8 +6,8 @@ function vjaEnsureSiteApplyButton() {
   button = document.createElement("button");
   button.id = "siteApplyNow";
   button.className = $("oneClickApply") ? "hidden" : "primary full";
-  button.textContent = "Отправить сейчас";
-  button.title = "Clicking this button is the confirmation to open the employer response, fill the tailored letter, select/attach the resume and submit when the form is clear.";
+  button.textContent = "⚡ Отправить отклик";
+  button.title = "Ваше нажатие запускает полный автоотклик: форма, CV, письмо и финальная отправка только при однозначно готовой форме.";
   anchor.insertAdjacentElement("beforebegin", button);
   return button;
 }
@@ -37,9 +37,10 @@ function vjaSiteApplyReason(result) {
     return names.length ? `Required fields still need you: ${names.join(", ")}.` : "Required fields still need your review before submission.";
   }
   if (reason === "cv-not-uploaded") return "The site exposes a CV upload field, but the CV could not be attached automatically.";
+  if (reason === "manual-risk-fields") { const names=(result?.unresolved||[]).filter(Boolean); return names.length?`Проверьте вручную юридические/визовые согласия перед отправкой: ${names.join(', ')}.`:'Проверьте вручную юридические, визовые или contractual согласия перед финальной отправкой.'; }
   if (reason === "cover-letter-not-persisted") return "The tailored cover letter did not stay in the employer form, so the assistant stopped before Send.";
-  if (reason === "hh-resume-choice-required") return "HH.ru shows several resumes and none is selected. Select the resume once, then press Apply + send now again.";
-  if (reason === "hh-resume-selection-not-persisted") return "HH.ru did not keep the selected resume. Select the resume once, then press Apply + send now again.";
+  if (reason === "hh-resume-choice-required") return "HH.ru shows several resumes and none is selected. Select the resume once, then press ✦ Apply again.";
+  if (reason === "hh-resume-selection-not-persisted") return "HH.ru did not keep the selected resume. Select the resume once, then press ✦ Apply again.";
   if (reason === "hh-cover-letter-action-not-found") return "HH.ru submitted the response, but its Add cover letter action was not available. Open the response and attach the prepared letter manually.";
   if (reason === "hh-cover-letter-action-ambiguous") return "HH.ru submitted the response, but showed several possible cover-letter actions. The assistant stopped instead of clicking the wrong one.";
   if (reason === "application-ui-not-found") return "The Apply action did not open a recognizable application form. The assistant stopped before any final click.";
@@ -95,12 +96,13 @@ async function vjaApplyNowOnSite() {
     return;
   }
   const language = latest.draft?.language === "ru" ? "ru" : "en";
-  const cvKey = hhWebsite ? "" : (language === "ru" ? "cvVaultRu" : "cvVaultEn");
-  let fileData = null;
+  let cvKey = "", fileData = null, resolvedRole = String(latest.draft?.strategy?.cvVariant || "unknown");
 
   if (!hhWebsite) {
-    const stored = await chrome.storage.local.get(cvKey);
-    fileData = stored[cvKey];
+    const recommended = typeof vjaGetRecommendedStoredCv === "function" ? await vjaGetRecommendedStoredCv() : null;
+    cvKey = recommended?.key || (language === "ru" ? "cvVaultRu" : "cvVaultEn");
+    fileData = recommended?.data || null;
+    resolvedRole = recommended?.role || resolvedRole;
     if (!fileData?.base64) {
       showError(`${language === "ru" ? "Russian" : "English"} CV is not stored in the CV Vault yet.`);
       await chrome.runtime.openOptionsPage();
@@ -134,7 +136,7 @@ async function vjaApplyNowOnSite() {
     cvKey,
     resumeHint: latest.draft?.resumeHint || latest.draft?.recommendedHeadline || latest.draft?.recommendedCv || "",
     letterVersion: latest.draft?.letterVersion || "unknown",
-    roleVariant: latest.draft?.strategy?.cvVariant || "unknown",
+    roleVariant: resolvedRole || latest.draft?.strategy?.cvVariant || "unknown",
     siteKind: hhWebsite ? "hh" : "generic",
     createdAt: Date.now(),
     expiresAt: Date.now() + 10 * 60 * 1000,
@@ -154,7 +156,7 @@ async function vjaApplyNowOnSite() {
   } finally {
     if (button && !button.textContent.includes("Applied")) {
       button.disabled = false;
-      button.textContent = "Отправить сейчас";
+      button.textContent = "⚡ Отправить отклик";
     }
   }
 }
@@ -224,11 +226,18 @@ function vjaPreferWebsiteApplyForHh() {
   // DOMTokenList.add can emit an attribute mutation even when the token exists.
   // This function observes that same attribute: writes must be idempotent.
   if (!button.classList.contains("hidden")) button.classList.add("hidden");
-  button.title = "Normal HH.ru applications use Apply + send now. Official HH API OAuth is not required.";
+  button.title = "Normal HH.ru applications use ✦ Apply. Official HH API OAuth is not required.";
 }
 
 vjaPreferWebsiteApplyForHh();
 const vjaHhApiButton = $("applyHh");
 if (vjaHhApiButton) {
   new MutationObserver(vjaPreferWebsiteApplyForHh).observe(vjaHhApiButton, { attributes: true, attributeFilter: ["class"] });
+}
+
+
+// Simple popup launcher: only an explicit click on “✦ Apply” adds auto=1.
+const vjaAutoApplyFromLauncher = new URLSearchParams(location.search).get('auto') === '1';
+if (vjaAutoApplyFromLauncher) {
+  setTimeout(() => vjaOneClickApply().catch(error => showError(error?.message || String(error))), 450);
 }

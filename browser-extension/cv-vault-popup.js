@@ -2,11 +2,16 @@ window.vjaLastUploadedCvName = null;
 window.vjaLastAttributedApplicationKey = null;
 
 async function vjaGetRecommendedStoredCv() {
-  if (!latest?.draft) return { key: null, data: null, language: null };
+  if (!latest?.draft) return { key: null, data: null, language: null, role: 'other' };
   const language = latest.draft.language === "ru" ? "ru" : "en";
-  const key = language === "ru" ? "cvVaultRu" : "cvVaultEn";
-  const stored = await chrome.storage.local.get(key);
-  return { key, data: stored[key] || null, language };
+  const core = window.vjaCopilotCore;
+  const title = latestPage?.title || latest?.draft?.title || '';
+  const description = latestPage?.description || latestPage?.text || latest?.draft?.summary || '';
+  const role = core?.classifyRole?.(title, description) || String(latest.draft?.strategy?.cvVariant || 'other');
+  const genericKey = language === "ru" ? "cvVaultRu" : "cvVaultEn";
+  const stored = await chrome.storage.local.get([genericKey]);
+  const key = core?.cvKey?.(role, language, stored) || (stored[genericKey]?.base64 ? genericKey : '');
+  return { key: key || null, data: key ? stored[key] || null : null, language, role };
 }
 
 async function vjaRefreshCvVaultStatus() {
@@ -17,7 +22,7 @@ async function vjaRefreshCvVaultStatus() {
     window.vjaRenderSubmissionReadiness?.();
     return;
   }
-  const { data, language } = await vjaGetRecommendedStoredCv();
+  const { data, language, role } = await vjaGetRecommendedStoredCv();
   if (data?.base64) {
     status.textContent = `${language === "ru" ? "Russian" : "English"} CV ready in local vault`;
   } else {

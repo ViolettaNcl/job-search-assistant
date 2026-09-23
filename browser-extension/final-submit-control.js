@@ -14,7 +14,7 @@
 
     let value = 0;
     if (/submit application|complete application|send application|finish application/i.test(text)) value += 12;
-    else if (/\bsubmit\b/i.test(text)) value += 9;
+    else if (/\b(submit|finish|complete)\b|завершить/i.test(text)) value += 9;
     else if (/\bapply now\b|^apply$/i.test(text)) {
       if (!metadata.inForm && !metadata.applicationRoute) return -100;
       value += 7;

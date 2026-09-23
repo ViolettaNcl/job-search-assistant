@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "2.7.13",
-  "description": "One-click vacancy analysis, tailored letter, CV/resume selection and verified submission, plus an optional all-day HH Apply Autopilot controlled from the local dashboard.",
+  "version": "3.7.0",
+  "description": "Violetta Apply Assistant: ✦ Apply отправляет текущий отклик с релевантным письмом; быстрый клик «Откликнуться» в списке HH автоматически добавляет письмо; ✎ AI анализирует весь активный recruiter-чат; 🚀 Autopilot после явного запуска сам ищет подходящие по уровню/CV IT-вакансии и отправляет отклики с письмами.",
   "permissions": [
     "activeTab",
     "storage",
@@ -12,9 +12,10 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost:8080/*",
-    "https://*/*",
-    "http://*/*"
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://hh.ru/*",
+    "https://*.hh.ru/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -22,17 +23,13 @@
   "options_page": "options.html",
   "action": {
     "default_title": "Violetta Apply Assistant",
-    "default_popup": "popup.html"
+    "default_popup": "home.html"
   },
   "content_scripts": [
     {
       "matches": [
         "http://localhost/*",
-        "http://127.0.0.1/*",
-        "http://[::1]/*",
-        "https://localhost/*",
-        "https://127.0.0.1/*",
-        "https://[::1]/*"
+        "http://127.0.0.1/*"
       ],
       "js": [
         "dashboard-apply-content.js"
@@ -41,13 +38,17 @@
     },
     {
       "matches": [
-        "https://*/*",
-        "http://*/*"
+        "https://hh.ru/*",
+        "https://*.hh.ru/*"
       ],
+      "all_frames": true,
       "js": [
+        "copilot-core.js",
         "ats-structured.js",
         "ats-controls.js",
         "field-verification.js",
+        "site-adapters.js",
+        "copilot-ui.js",
         "content.js",
         "hh-discovery-navigation.js",
         "hh-discovery-content.js",
@@ -59,21 +60,46 @@
         "submission-receipt-content.js",
         "site-apply.js",
         "site-apply-content.js",
-        "floating-panel.js",
-        "floating-panel-content.js"
+        "hh-list-quick-apply-core.js",
+        "hh-list-quick-apply.js",
+        "application-state-machine.js",
+        "universal-content.js",
+        "recruiter-chat.js",
+        "quick-replies.js",
+        "recruiter-chat-content.js"
       ],
       "run_at": "document_idle"
     }
   ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "popup.html"
-      ],
-      "matches": [
-        "http://*/*",
-        "https://*/*"
-      ]
+  "minimum_chrome_version": "120",
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "commands": {
+    "suggested-reply": {
+      "suggested_key": {
+        "default": "Alt+Shift+1"
+      },
+      "description": "Основной быстрый ответ (без отправки)"
+    },
+    "thank-you-reply": {
+      "suggested_key": {
+        "default": "Alt+Shift+2"
+      },
+      "description": "Спасибо / буду ждать (без отправки)"
+    },
+    "contacts-reply": {
+      "suggested_key": {
+        "default": "Alt+Shift+3"
+      },
+      "description": "Контакты (без отправки)"
+    },
+    "open-ai": {
+      "suggested_key": {
+        "default": "Alt+Shift+A"
+      },
+      "description": "Открыть ✎ AI в активном чате"
     }
-  ]
+  }
 }

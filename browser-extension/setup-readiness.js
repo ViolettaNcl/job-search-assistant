@@ -27,7 +27,7 @@
 
     let state = "ready";
     let title = "Ready to apply";
-    let detail = "Core setup is ready. Apply + send now can use employer-site forms, including the normal HH.ru website flow.";
+    let detail = "Core setup is ready. Apply / Fill prepares employer-site forms, including the normal HH.ru website flow. Final submission is manual.";
     if (!backendOk || !candidateOk) {
       state = "blocked"; title = "Setup blocked"; detail = "Fix the required setup items before relying on the application assistant.";
     } else if (!contactsReady || !bothCvs || !queueOk) {

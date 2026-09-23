@@ -49,7 +49,7 @@
     const value = String(error?.message || error || "Unknown error");
     if (error?.code === "VJA_TIMEOUT" || /timed out|timeout|aborted/i.test(value)) return "Операция не получила ответ вовремя. Обновите вкладку вакансии и нажмите ещё раз — удалять расширение не нужно.";
     if (/receiving end does not exist|could not establish connection|message port closed/i.test(value)) return "Расширение не подключилось к этой вкладке. Обновите страницу вакансии и повторите действие.";
-    if (/failed to fetch|networkerror|load failed/i.test(value)) return "Запущенная программа не отвечает. Проверьте окно терминала и адрес http://localhost:8080.";
+    if (/failed to fetch|networkerror|load failed/i.test(value)) return "Запущенная программа не отвечает. Проверьте окно терминала и адрес http://127.0.0.1:8080.";
     return value;
   }
 

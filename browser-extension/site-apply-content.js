@@ -145,6 +145,18 @@ function vjaSiteRequiredFields(container = document) {
   return window.vjaSiteApply?.unresolvedRequired?.(nodes) || [];
 }
 
+function vjaSiteSensitiveControls(container = document) {
+  const nodes=[...container.querySelectorAll('input[type="checkbox"], input[type="radio"]')].map(el=>({
+    label:vjaSiteLabel(el),disabled:Boolean(el.disabled),hidden:!vjaSiteVisible(el),checked:Boolean(el.checked),reviewed:el.dataset?.vjaUserReviewed==='1'
+  }));
+  return window.vjaSiteApply?.unreviewedSensitive?.(nodes) || [];
+}
+
+document.addEventListener('change',event=>{
+  const el=event.target;
+  if(event.isTrusted && el instanceof HTMLInputElement && /^(checkbox|radio)$/i.test(el.type))el.dataset.vjaUserReviewed='1';
+},true);
+
 function vjaSiteFinalChoice(container = document) {
   const applicationRoute = /application|candidate|apply|response|respond|negotiation|vacancy/i.test(location.pathname + location.search);
   const candidates = [...container.querySelectorAll('button, input[type="submit"], input[type="button"], [role="button"]')]
@@ -483,6 +495,7 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
   await vjaSiteWait(180);
   const unresolved = vjaSiteRequiredFields(scope);
   const finalChoice = vjaSiteFinalChoice(scope);
+  const sensitive = vjaSiteSensitiveControls(scope);
   const permission = window.vjaSiteApply?.canSubmit?.({
     applicationUiFound,
     coverLetterRequired,
@@ -490,6 +503,7 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
     unresolvedRequired: unresolved.length,
     cvFieldPresent: fileInputPresent,
     cvUploaded,
+    unreviewedSensitive: sensitive.length,
     finalFound: Boolean(finalChoice.found),
     finalAmbiguous: Boolean(finalChoice.ambiguous)
   }) || { ok: false, reason: 'site-apply-model-unavailable' };
@@ -499,7 +513,7 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
       submitted: false,
       status: 'needs-review',
       reason: permission.reason,
-      unresolved: unresolved.map(x => x.label).filter(Boolean).slice(0, 8),
+      unresolved: permission.reason==='manual-risk-fields'?sensitive.map(x=>x.label).filter(Boolean).slice(0,8):unresolved.map(x => x.label).filter(Boolean).slice(0, 8),
       coverLetterFilled,
       cvUploaded,
       cvResult,

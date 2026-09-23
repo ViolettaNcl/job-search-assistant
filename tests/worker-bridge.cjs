@@ -1,0 +1,17 @@
+// Test-only JSON-lines bridge. Real service worker code, fake Chrome/HTTP boundary.
+const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),crypto=require('node:crypto');
+const ROOT=path.resolve(__dirname,'../extension');const data={},session={},sync={apiBase:'http://127.0.0.1:8080'},listeners=[],http=[],tabs=new Map();
+const clone=x=>x===undefined?undefined:JSON.parse(JSON.stringify(x));
+function storage(obj){return {get:async keys=>{if(keys==null)return clone(obj);if(typeof keys==='string')keys=[keys];if(Array.isArray(keys))return Object.fromEntries(keys.filter(k=>k in obj).map(k=>[k,clone(obj[k])]));return Object.fromEntries(Object.entries(keys).map(([k,v])=>[k,clone(obj[k]??v)]));},set:async x=>Object.assign(obj,clone(x)),remove:async keys=>[].concat(keys).forEach(k=>delete obj[k]),setAccessLevel:async()=>{}};}
+const event={addListener:()=>{}},manifest=JSON.parse(fs.readFileSync(path.join(ROOT,'manifest.json')));let id=100;
+const context={console:{log(){},warn(){},error(){}},URL,Date,Promise,Map,Set,Object,JSON,crypto:crypto.webcrypto,AbortController,setTimeout,clearTimeout,self:{},chrome:{runtime:{onInstalled:event,onStartup:event,onMessage:{addListener:f=>listeners.push(f)},getURL:p=>'chrome-extension://fixture/'+p,getManifest:()=>manifest,openOptionsPage:async()=>{}},alarms:{create:async()=>{},onAlarm:event},commands:{onCommand:event},permissions:{onRemoved:event,contains:async()=>true},scripting:{getRegisteredContentScripts:async()=>[],registerContentScripts:async()=>{},executeScript:async()=>{}},storage:{local:storage(data),session:storage(session),sync:storage(sync)},tabs:{get:async n=>tabs.get(n),query:async()=>[...tabs.values()],create:async o=>{const t={id:++id,...o,status:'complete'};tabs.set(t.id,t);return t;},remove:async n=>tabs.delete(n),sendMessage:async()=>({ok:true}),update:async(n,o)=>Object.assign(tabs.get(n),o)}}};
+context.fetch=async(url,options={})=>{http.push({url,body:options.body||'',method:options.method||'GET'});let value={};if(url.endsWith('/api/operator/recruiter/triage')){const s=JSON.parse(options.body).text;if(s.includes('SLOW_TEST'))await new Promise(r=>setTimeout(r,800));value={suggestedReply:'Спасибо! Буду рада подробнее обсудить задачи.'};}return {ok:true,text:async()=>JSON.stringify(value)};};
+vm.createContext(context);context.importScripts=(...files)=>files.forEach(f=>vm.runInContext(fs.readFileSync(path.join(ROOT,f),'utf8'),context,{filename:f}));vm.runInContext(fs.readFileSync(path.join(ROOT,'background.js'),'utf8'),context,{filename:'background.js'});
+async function request(message,sender){tabs.set(sender.tab?.id||7,{id:sender.tab?.id||7,url:sender.url,status:'complete'});return new Promise(resolve=>{let handled=false;for(const f of listeners){let sent=false;const v=f(message,sender,result=>{sent=true;handled=true;resolve(clone(result));});if(v===true){handled=true;break;}if(sent)break;}if(!handled)resolve(null);});}
+require('node:readline').createInterface({input:process.stdin}).on('line',async line=>{let q;try{q=JSON.parse(line);let result;
+ if(q.op==='set'){await vm.runInContext('cpInitialize()',context);Object.assign(data,q.data||{});result=true;}
+ else if(q.op==='get')result={data:clone(data),http:clone(http)};
+ else if(q.op==='eval')result=await vm.runInContext(q.code,context);
+ else result=await request(q.message,q.sender);
+ process.stdout.write(JSON.stringify({id:q.id,result})+'\n');
+ }catch(e){process.stdout.write(JSON.stringify({id:q?.id,error:e.stack||e.message})+'\n');}});

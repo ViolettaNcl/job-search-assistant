@@ -121,6 +121,15 @@ assert.equal(apply.canSubmit({ ...ready, cvUploaded: false }).reason, 'cv-not-up
 assert.equal(apply.canSubmit({ ...ready, coverLetterRequired: true, coverLetterFilled: false }).reason, 'cover-letter-not-persisted');
 assert.deepEqual(apply.canSubmit({ ...ready, coverLetterRequired: true, coverLetterFilled: true }), { ok: true, reason: 'ready' });
 
+assert.equal(apply.unreviewedSensitive([
+  {label:'I agree to the Terms and Privacy Policy',checked:true,reviewed:false},
+  {label:'Newsletter',checked:true,reviewed:false}
+]).length,1,'a pre-checked legal consent must be reviewed before auto-submit');
+assert.equal(apply.unreviewedSensitive([
+  {label:'I agree to the Terms and Privacy Policy',checked:true,reviewed:true}
+]).length,0,'a legal control changed by the user is considered reviewed');
+assert.equal(apply.canSubmit({...ready,unreviewedSensitive:1}).reason,'manual-risk-fields');
+
 assert.equal(apply.finalSubmissionConfirmed({ receiptConfirmed: true, receiptAdvanced: true, coverLetterRequired: true }), true);
 assert.equal(apply.finalSubmissionConfirmed({ isHh: true, coverLetterRequired: true, startActionSubmitted: true, letterStepCompleted: true, receiptConfirmed: false }), true,
   'closing the HH post-response letter form after its Send action confirms the second step');

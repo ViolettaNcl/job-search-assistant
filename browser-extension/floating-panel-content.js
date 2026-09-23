@@ -38,5 +38,22 @@
     if (host && !hidden) {host.style.display = 'none';hidden = true;respond({ok:true});return false;}
     mount().then(() => respond({ok:true})).catch(() => respond({ok:false}));return true;
   });
-  if (self.vjaFloatingPanel.automatic(location.href)) void mount();
+  async function maybeAutoMount() {
+    // Keep the large operator panel automatic on vacancy pages only. Recruiter
+    // chats now use the compact on-page pencil copilot, opened explicitly by
+    // the user so it never covers the conversation unexpectedly.
+    if (self.vjaFloatingPanel.automatic(location.href)) return mount();
+    return null;
+  }
+  void maybeAutoMount();
+  // Job portals often render chats after an SPA navigation. Re-check briefly without
+  // opening the panel on ordinary pages.
+  let checks = 0, timer = null;
+  const observer = new MutationObserver(() => {
+    if (host || checks >= 12) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => { checks++; void maybeAutoMount(); }, 220);
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  setTimeout(() => observer.disconnect(), 12000);
 })();

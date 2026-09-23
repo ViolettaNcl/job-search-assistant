@@ -104,6 +104,15 @@ function inferCountry(ats, locationText, bodyText) {
 }
 
 function extractPage() {
+  if (window.vjaSiteAdapters) {
+    const adapter = window.vjaSiteAdapters.make(document, location.href);
+    const type = adapter.detectPageType();
+    if (['JOB_DESCRIPTION', 'APPLICATION_FORM'].includes(type)) {
+      const v = adapter.extractVacancy();
+      return {...v, ats:adapter.provider, source:location.hostname, pageType:type, country:'', remoteScope:v.remote?'Remote detected on page':''};
+    }
+  }
+
   const ats = detectAts();
   const structured = window.vjaAtsStructured?.readStructuredJobPosting?.(document) || null;
   const bodyRaw = textOf(document.body);
@@ -347,6 +356,11 @@ function setRadioOrCheckbox(el, value) {
 }
 
 function setFieldValue(el, value) {
+  // Central guard also protects older popup/server-generated fill plans.
+  const safetyLabel = labelFor(el);
+  if (window.vjaCopilotCore?.highRisk(safetyLabel) || /years?|лет|стаж|commercial|коммерческ/i.test(safetyLabel)) return false;
+  if (['checkbox','radio','password','date','datetime-local'].includes(el.type)) return false;
+
   if (value == null || value === "") return false;
   if (window.vjaAtsControls?.isInteractiveReviewType?.(fieldTypeFor(el))) return false;
   if (el instanceof HTMLInputElement && el.type === "file") return false;

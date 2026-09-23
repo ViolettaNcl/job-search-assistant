@@ -1,14 +1,51 @@
-.env
-**/appsettings.local.json
-**/candidate.private.json
-**/user-settings.cmd
-**/*.db
-**/*.db-shm
-**/*.db-wal
+﻿# Release packages
+*.zip
+*.zip.sha256
+*.sha256
+
+# Generated test output
+/test-results/
+/playwright-report/
+/coverage/
+Violetta_*_TEST_REPORT.md
+TEST_REPORT.md
+
+# Logs / diagnostics
+*.log
+backend-diagnostic.txt
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+
+# .NET generated output
 **/bin/
 **/obj/
+*.dll
+*.exe
+*.pdb
+
+# Node / tooling
+node_modules/
+.npm/
+.cache/
+
+# Temporary extraction folders
+violetta-*-github-upload/
+violetta-*-clean-source/
+
+# IDE / OS
 .vs/
+.vscode/
 .idea/
-*.user
-*.suo
+Thumbs.db
 .DS_Store
+
+# Generated release files
+/backend/
+/extension/
+/test-results/
+FILE_HASHES.sha256
+*.zip
+*.zip.sha256

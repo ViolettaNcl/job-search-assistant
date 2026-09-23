@@ -5,11 +5,11 @@
 One explicit click performs the deterministic parts of the application sequence:
 
 1. extracts the currently opened vacancy;
-2. asks the backend for the fit score and truthful role-specific application draft;
+2. obtains the fit context and prepares a truthful vacancy-specific application draft;
 3. scans the current ATS form;
 4. fills only fields already classified as safe;
 5. verifies that those values actually persisted after React/ATS state updates;
-6. attempts to insert the recommended English/Russian PDF from the local CV Vault when a confident résumé input is available;
+6. attempts to insert the English/Russian PDF selected from the vacancy language from the local CV Vault when a confident résumé input is available;
 7. rescans the form;
 8. refreshes submission readiness and ATS stage intelligence;
 9. saves the active multi-step application session;

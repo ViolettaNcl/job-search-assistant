@@ -43,13 +43,14 @@ async function serializeFile(file) {
     type: "application/pdf",
     size: file.size,
     base64: arrayBufferToBase64(buffer),
-    savedAt: new Date().toISOString()
+    savedAt: new Date().toISOString(),
+    source: "manual"
   };
 }
 
 async function getApiBase() {
-  const stored = await chrome.storage.sync.get({ apiBase: "http://localhost:8080" });
-  return String(stored.apiBase || "http://localhost:8080").trim().replace(/\/$/, "");
+  const stored = await chrome.storage.sync.get({ apiBase: "http://127.0.0.1:8080" });
+  return String(stored.apiBase || "http://127.0.0.1:8080").trim().replace(/\/$/, "");
 }
 
 async function getApplicationMemory() {
@@ -99,7 +100,7 @@ function renderReadiness(result) {
   summary.dataset.state = result.state;
   summary.replaceChildren();
   const title = document.createElement("strong");
-  title.textContent = `${result.title} · ${result.passed}/${result.total} checks`;
+  title.textContent = `${result.title} · ${result.passed}/${result.total} проверок`;
   const detail = document.createElement("span");
   detail.textContent = result.detail;
   summary.append(title, detail);
@@ -107,11 +108,11 @@ function renderReadiness(result) {
   const capabilities = $("capabilities");
   capabilities.replaceChildren();
   const labels = [
-    ["externalAts", "External ATS"],
-    ["contactAutofill", "Phone"],
-    ["cvAutoload", "Both CVs ready"],
-    ["dailyQueue", "Daily queue"],
-    ["hhDirect", "HH website apply"]
+    ["externalAts", "Внешние ATS"],
+    ["contactAutofill", "Контакты"],
+    ["cvAutoload", "Оба CV готовы"],
+    ["dailyQueue", "Очередь"],
+    ["hhDirect", "Отклик на HH.ru"]
   ];
   for (const [key, label] of labels) {
     const chip = document.createElement("span");
@@ -142,10 +143,10 @@ function renderReadiness(result) {
 async function runSystemCheck() {
   const button = $("runReadiness");
   button.disabled = true;
-  button.textContent = "Checking…";
+  button.textContent = "Проверяю…";
   const summary = $("readinessSummary");
   summary.dataset.state = "neutral";
-  summary.innerHTML = "<strong>Checking setup…</strong><span>Verifying backend, profile, phone, local CVs and the strong-job queue.</span>";
+  summary.innerHTML = "<strong>Проверяю систему…</strong><span>Backend, профиль, контакты и локальные CV.</span>";
 
   try {
     const api = await getApiBase();
@@ -177,7 +178,7 @@ async function runSystemCheck() {
     renderReadiness(window.vjaSetupReadiness.build({ backend: { reachable: false, ready: false } }));
   } finally {
     button.disabled = false;
-    button.textContent = "Run system check";
+    button.textContent = "Проверить систему";
   }
 }
 
@@ -188,15 +189,17 @@ async function openBackendPath(path) {
 }
 
 async function refreshLocalContacts() {
+  const phone = $("localPhone");
+  const status = $("contactStatus");
+  if (!phone || !status) return;
   const memory = await getApplicationMemory();
-  $("localPhone").value = String(memory.phone || "");
+  phone.value = String(memory.phone || "");
   if ($("localLinkedIn")) $("localLinkedIn").value = "";
   const state = window.vjaLocalContactProfile.resolve({ candidate: {}, memory });
-  const status = $("contactStatus");
   status.className = state.phoneReady ? "status ok" : "status";
   status.textContent = state.phoneReady
-    ? "Phone is stored locally for reusable contact autofill."
-    : "Add your phone once so the extension can reuse it in application forms.";
+    ? "Телефон сохранён локально для заполнения форм."
+    : "Телефон можно добавить в разделе «Профиль и AI».";
 }
 
 async function saveLocalContacts() {
@@ -257,34 +260,52 @@ async function refresh() {
   for (const [kind, statusId] of [["en", "enStatus"], ["ru", "ruStatus"]]) {
     const item = stored[keys[kind]];
     const status = $(statusId);
+    if (!status) continue;
     if (item?.base64) {
       status.className = "status ok";
-      status.textContent = `Stored locally: ${item.name} · ${formatBytes(item.size)}`;
+      status.textContent = `${item.source === "bundled" ? "Встроено" : "Сохранено локально"}: ${item.name} · ${formatBytes(item.size)}`;
     } else {
-      status.className = "status";
-      status.textContent = "No CV stored yet.";
+      status.className = "status warning";
+      status.textContent = "CV отсутствует. Нажмите «Восстановить встроенные CV».";
     }
   }
-  $("apiBase").value = await getApiBase();
+  if ($("apiBase")) $("apiBase").value = await getApiBase();
   await refreshLocalContacts();
 }
 
 async function clearAll() {
-  if (!confirm("Remove both stored CV copies from the extension?")) return;
+  if (!confirm("Удалить обе локальные копии CV из расширения?")) return;
   await chrome.storage.local.remove([keys.en, keys.ru]);
   await refresh();
   await runSystemCheck();
 }
 
-$("saveApi").addEventListener("click", saveApiBase);
-$("runReadiness").addEventListener("click", runSystemCheck);
-$("openDashboard").addEventListener("click", () => openBackendPath("/"));
-$("openQueue").addEventListener("click", () => openBackendPath("/queue.html"));
-$("connectHh").addEventListener("click", () => alert("HH.ru website application mode is enabled. Open an HH.ru vacancy and use Apply + send now. No HH OAuth connection is required."));
-$("saveContacts").addEventListener("click", saveLocalContacts);
-$("clearContacts").addEventListener("click", clearLocalContacts);
-$("saveEn").addEventListener("click", () => save("en"));
-$("saveRu").addEventListener("click", () => save("ru"));
-$("clearAll").addEventListener("click", clearAll);
+async function restoreBundledCvs() {
+  const button = $("restoreBundled");
+  if (button) { button.disabled = true; button.textContent = "Восстанавливаю…"; }
+  try {
+    if (!window.vjaBundledCv?.ensure) throw new Error("Встроенные CV недоступны.");
+    await window.vjaBundledCv.ensure({force:true});
+    await refresh();
+    await runSystemCheck();
+  } catch (error) {
+    alert(error?.message || String(error));
+  } finally {
+    if (button) { button.disabled = false; button.textContent = "Восстановить встроенные CV"; }
+  }
+}
 
-refresh().then(runSystemCheck).catch(() => {});
+const bind=(id,event,fn)=>{const el=$(id);if(el)el.addEventListener(event,fn);};
+bind("saveApi","click",saveApiBase);
+bind("runReadiness","click",runSystemCheck);
+bind("openDashboard","click",()=>openBackendPath("/"));
+bind("openQueue","click",()=>openBackendPath("/queue.html"));
+bind("connectHh","click",()=>alert("HH.ru подключён через обычный сайт. Нажмите ✦ Apply на вакансии — расширение само подготовит письмо и запустит отклик."));
+bind("saveContacts","click",saveLocalContacts);
+bind("clearContacts","click",clearLocalContacts);
+bind("saveEn","click",()=>save("en"));
+bind("saveRu","click",()=>save("ru"));
+bind("restoreBundled","click",restoreBundledCvs);
+bind("clearAll","click",clearAll);
+
+window.vjaBundledCv?.ensure?.().catch(()=>{}).finally(()=>refresh().then(runSystemCheck).catch(()=>{}));

@@ -98,3 +98,18 @@ html.floating main { width:100%; max-width:100%; }
 html.floating #pinPanel { display:none; }
 
 #browserSearchMode{width:auto;min-height:0;margin-right:8px}
+
+/* Recruiter chat assistant: analysis + review-only reply drafting. */
+.recruiterAssistant { border-color: #d9d6f5; background: linear-gradient(180deg,#ffffff 0%,#fbfaff 100%); }
+.recruiterTop { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:7px; }
+.recruiterTop > div strong { display:block; font-size:13px; margin-top:5px; }
+.reviewOnlyBadge { flex:none; padding:3px 7px; border-radius:999px; background:#f1efff; color:#5749a6; font-size:9px; font-weight:750; }
+.recruiterContext { font-size:11px; line-height:1.4; color:#4b5563; margin:0 0 8px; }
+.recruiterAnalysis { margin:0 0 9px; padding:7px 8px; border-radius:8px; background:#f7f7fb; }
+.recruiterActions { margin-bottom:9px; }
+#recruiterStatus[data-tone="ready"] { color:#166534; }
+#recruiterStatus[data-tone="warning"] { color:#9a3412; }
+#recruiterStatus[data-tone="working"] { color:#4f46a5; }
+.autopilotCard details{margin-top:8px}.autopilotCard details summary{cursor:pointer;font-size:11px;font-weight:700;color:#384152}.autopilotGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:10px}.autopilotGrid label{font-size:9px;color:#6b7280;line-height:1.35}.autopilotGrid input{margin-top:4px;padding:7px;font-size:11px}.autopilotCheck{display:flex;gap:7px;align-items:flex-start;margin-top:10px;font-size:10px;color:#4b5563}.autopilotCheck input{width:auto;margin-top:1px}
+
+.autopilotQueries{display:grid;gap:5px;margin-top:10px;font-size:10px;color:#4b5563}.autopilotQueries textarea{min-height:76px;font-size:10px;line-height:1.35;padding:7px}

@@ -1,72 +1,26 @@
-function vjaBase64ToBytes(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
+function vjaBase64ToBytes(base64) { const b=atob(base64),bytes=new Uint8Array(b.length);for(let i=0;i<b.length;i++)bytes[i]=b.charCodeAt(i);return bytes; }
 function vjaUploadLabel(input) {
-  const parts = [input.name || "", input.id || "", input.getAttribute("aria-label") || "", input.getAttribute("accept") || ""];
-  if (input.id) {
-    try {
-      const label = document.querySelector(`label[for="${CSS.escape(input.id)}"]`);
-      if (label) parts.push(label.innerText || label.textContent || "");
-    } catch { }
-  }
-  const parent = input.closest("label");
-  if (parent) parts.push(parent.innerText || parent.textContent || "");
-  const container = input.parentElement;
-  if (container) parts.push(container.innerText || container.textContent || "");
-  return parts.join(" ").toLowerCase();
+  if(window.vjaSiteAdapters)return window.vjaSiteAdapters.label(input);
+  const label=input.id?document.querySelector(`label[for="${CSS.escape(input.id)}"]`):input.closest('label');
+  return [label?.textContent,input.name,input.id,input.getAttribute('aria-label')].filter(Boolean).join(' ');
 }
-
+function vjaIsResumeField(label){return /\b(resume|cv)\b|résumé|резюме|lebenslauf/i.test(label)&&!/portfolio|портфолио|cover.?letter|сопровод|other.?document|друг.*документ/i.test(label);}
 function vjaFindResumeInput() {
-  const inputs = [...document.querySelectorAll('input[type="file"]')]
-    .filter(input => !input.disabled);
-  if (!inputs.length) return null;
-
-  const resumeWords = /\b(resume|cv|curriculum|application file)\b|резюме|резюм|currículo|lebenslauf/i;
-  const explicitResume = inputs.find(input => resumeWords.test(vjaUploadLabel(input)));
-  if (explicitResume) return explicitResume;
-
-  if (inputs.length === 1) return inputs[0];
-
-  const visible = inputs.find(input => input.offsetParent !== null);
-  return visible || null;
+  const candidates=[...document.querySelectorAll('input[type="file"]')].filter(el=>!el.disabled&&vjaIsResumeField(vjaUploadLabel(el))&&!window.vjaCopilotCore?.highRisk(vjaUploadLabel(el)));
+  return candidates.length===1?candidates[0]:null;
 }
-
-function vjaUploadCv(fileData) {
-  if (!fileData?.base64 || !fileData?.name) return { success: false, error: "Stored CV data is missing." };
-  const input = vjaFindResumeInput();
-  if (!input) return { success: false, error: "No unambiguous résumé/CV upload field was found on this page." };
-
-  const bytes = vjaBase64ToBytes(fileData.base64);
-  const file = new File([bytes], fileData.name, { type: fileData.type || "application/pdf", lastModified: Date.now() });
-  const transfer = new DataTransfer();
-  transfer.items.add(file);
-
-  input.files = transfer.files;
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  input.dispatchEvent(new Event("change", { bubbles: true }));
-  input.style.outline = "3px solid #16a34a";
-  input.style.outlineOffset = "3px";
-  input.scrollIntoView({ behavior: "smooth", block: "center" });
-
-  return {
-    success: true,
-    filename: file.name,
-    size: file.size,
-    hiddenField: input.offsetParent === null,
-    fieldLabel: vjaUploadLabel(input).slice(0, 180)
-  };
-}
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== "uploadCv") return false;
+function vjaUploadCv(fileData,explicitInput=null) {
   try {
-    sendResponse(vjaUploadCv(message.fileData));
-  } catch (error) {
-    sendResponse({ success: false, error: error?.message || String(error) });
-  }
-  return false;
-});
+    if(window.vjaCopilotCore&&!window.vjaCopilotCore.cvValid(fileData))return {success:false,error:'Проверьте PDF в CV Vault.'};
+    const input=explicitInput||vjaFindResumeInput();
+    if(!input||input.type!=='file'||input.disabled||!input.isConnected||!vjaIsResumeField(vjaUploadLabel(input))||window.vjaCopilotCore?.highRisk(vjaUploadLabel(input)))return {success:false,error:'Нет однозначного поля резюме.'};
+    if(input.files?.length)return {success:false,error:'В поле уже есть файл; он сохранён без замены.'};
+    if(input.accept&&!input.accept.split(',').some(s=>['.pdf','application/pdf','application/*','*/*'].includes(s.trim().toLowerCase())))return {success:false,error:'Поле не принимает PDF.'};
+    const bytes=vjaBase64ToBytes(fileData.base64);
+    if(bytes.length!==fileData.size||String.fromCharCode(...bytes.slice(0,5))!=='%PDF-')return {success:false,error:'Неверный формат или размер PDF.'};
+    const file=new File([bytes],fileData.name,{type:'application/pdf',lastModified:Date.now()}),transfer=new DataTransfer();transfer.items.add(file);input.files=transfer.files;
+    input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
+    return {success:input.files?.[0]?.name===file.name,filename:file.name,size:file.size,fieldLabel:vjaUploadLabel(input)};
+  }catch{return {success:false,error:'Сайт не разрешил прикрепить файл. Сделайте это вручную.'};}
+}
+chrome.runtime.onMessage.addListener((message,_sender,respond)=>{if(message?.type!=='uploadCv')return false;respond(vjaUploadCv(message.fileData));return false;});

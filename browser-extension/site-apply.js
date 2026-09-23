@@ -266,12 +266,19 @@
     });
   }
 
+
+  function unreviewedSensitive(fields = []) {
+    const risky = /work\s*authorization|visa|sponsorship|citizenship|criminal|background\s*check|relocation|legal|privacy|personal\s*data|terms|contract|прав[оа].*работ|разрешен.*работ|виз[аы]|спонсор|гражданств|судим|провер.*безопас|релокац|юрид|персональн.*данн|услови[яй]|договор/i;
+    return fields.filter(field => field && !field.disabled && !field.hidden && field.checked && !field.reviewed && risky.test(clean(field.label)));
+  }
+
   function canSubmit(input = {}) {
     const unresolved = Math.max(0, Number(input.unresolvedRequired || 0));
     if (!input.applicationUiFound) return { ok: false, reason: "application-ui-not-found" };
     if (input.coverLetterRequired && !input.coverLetterFilled) return { ok: false, reason: "cover-letter-not-persisted" };
     if (unresolved) return { ok: false, reason: "required-fields" };
     if (input.cvFieldPresent && !input.cvUploaded) return { ok: false, reason: "cv-not-uploaded" };
+    if (Math.max(0, Number(input.unreviewedSensitive || 0))) return { ok: false, reason: "manual-risk-fields" };
     if (!input.finalFound) return { ok: false, reason: "final-action-not-found" };
     if (input.finalAmbiguous) return { ok: false, reason: "final-action-ambiguous" };
     return { ok: true, reason: "ready" };
@@ -284,5 +291,5 @@
     return Boolean(input.receiptConfirmed && input.letterStepCompleted);
   }
 
-  return { clean, safeUrl, isHhUrl, sameJobUrl, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, chooseHhCoverLetterAction, isApplicationContainerText, startReceiptDisposition, scoreCoverLetterField, chooseCoverLetterField, chooseHhResumeChoice, unresolvedRequired, canSubmit, finalSubmissionConfirmed };
+  return { clean, safeUrl, isHhUrl, sameJobUrl, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, chooseHhCoverLetterAction, isApplicationContainerText, startReceiptDisposition, scoreCoverLetterField, chooseCoverLetterField, chooseHhResumeChoice, unresolvedRequired, unreviewedSensitive, canSubmit, finalSubmissionConfirmed };
 });

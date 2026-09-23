@@ -12,7 +12,7 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
     get:async n=>tabs.get(n),remove:async n=>{trace.push(['close',n]);tabs.delete(n);},update:async(n,p)=>{trace.push(['update',n,p]);Object.assign(tabs.get(n),p);return tabs.get(n);},
     sendMessage:async(n,m)=>{if(n===1){messages.push(m);return;}
       if(m.type==='vjaSiteApplyReady')return {ready:true};
-      assert.equal(m.plan.coverLetter,'Letter for '+m.plan.trackedId);trace.push(['send',n,clone(m.plan)]);
+      if(m.plan.automatic){assert(m.plan.coverLetter.length>40);assert(!/Crowne|Front Desk|Receptionist/i.test(m.plan.coverLetter));}else assert.equal(m.plan.coverLetter,'Letter for '+m.plan.trackedId);trace.push(['send',n,clone(m.plan)]);
       if(gate)await gate.promise;
       return pending?{status:'submitted-needs-letter'}:{submitted:true,status:'confirmed',coverLetterFilled:letter};}
   }}};
@@ -54,15 +54,15 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
   const concurrent=await fixture(),held=deferred();concurrent.setGate(held);
   concurrent.enable([7,8].map(n=>({vacancyId:id(n),title:'Junior C#',url:'https://hh.ru/vacancy/'+n,matchScore:90,eligibilityStatus:'Verify'})));
   const auto=concurrent.context.runBrowserAutopilot();await tick();
-  assert.equal(concurrent.trace.filter(x=>x[0]==='send').length,2,'two autopilot jobs overlap');
+  assert.equal(concurrent.trace.filter(x=>x[0]==='send').length,2,'enabled v3.5 autopilot dispatches up to two qualifying automatic jobs concurrently');
   const manual=concurrent.send(9);await tick();
-  assert.equal(concurrent.trace.filter(x=>x[0]==='send').length,3,'manual sends while autopilot is waiting');
+  assert.equal(concurrent.trace.filter(x=>x[0]==='send').length,3,'manual Apply can coexist with the bounded automatic queue');
   held.resolve();await Promise.all([auto,manual]);assert.equal(concurrent.jobs().filter(j=>j.completed).length,3);
   const manualFirst=await fixture(),firstGate=deferred();manualFirst.setGate(firstGate);
   const firstManual=manualFirst.send(9);await tick();
   manualFirst.enable([7,8].map(n=>({vacancyId:id(n),title:'Junior C#',url:'https://hh.ru/vacancy/'+n,matchScore:90})));
   const nextAuto=manualFirst.context.runBrowserAutopilot();await tick();
-  assert.equal(manualFirst.trace.filter(x=>x[0]==='send').length,3,'autopilot can start while an earlier manual application waits');
+  assert.equal(manualFirst.trace.filter(x=>x[0]==='send').length,3,'enabled autopilot may use the remaining bounded slots while a manual Apply is in flight');
   firstGate.resolve();await Promise.all([firstManual,nextAuto]);
   const duplicate=await fixture(),hold=deferred();duplicate.setGate(hold);const a=duplicate.send(1);await tick();await duplicate.send(1);assert.equal(duplicate.trace.filter(x=>x[0]==='send').length,1);hold.resolve();await a;
   // Each tab writes only its own progress, including simultaneous continuations.
@@ -79,7 +79,7 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
   const failed=await fixture({createFails:true});await failed.send();assert.equal(failed.jobs().length,0);assert.equal(failed.messages.at(-1).status,'review');
   // Lost backend after a confirmed receipt preserves it and retries bookkeeping only.
   const receipt=await fixture();receipt.setRecordFailure(true);await receipt.send();assert(receipt.jobs()[0].result.result.submitted);assert(!receipt.jobs()[0].review);
-  receipt.setRecordFailure(false);await receipt.context.runBrowserAutopilot();assert(receipt.jobs()[0].completed);assert.equal(receipt.trace.filter(x=>x[0]==='send').length,1);
+  receipt.setRecordFailure(false);await receipt.context.reconcileApplicationState('http://localhost:8080');assert(receipt.jobs()[0].completed);assert.equal(receipt.trace.filter(x=>x[0]==='send').length,1);
   const late=await fixture({letter:false});await late.send();const lateJob=late.jobs()[0];assert(lateJob.review);
   await late.context.updateApplicationJob(lateJob.plan.id,{result:{id:lateJob.plan.id,result:{submitted:true,status:'confirmed',coverLetterFilled:true}}});
   await late.context.reconcileApplicationState('http://localhost:8080');
@@ -88,7 +88,7 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
   for(const dispatched of [false,true]) {
     const closed=await fixture();const plan=closed.context.self.vjaBrowserAutopilot.buildPlan({vacancyId:id(2),title:'Junior C#',url:'https://hh.ru/vacancy/2'},{coverLetter:'Letter for '+id(2)});plan.automatic=false;
     await closed.context.registerApplication(plan,999);await closed.context.updateApplicationJob(plan.id,{dispatched});
-    await closed.context.runBrowserAutopilot();const job=closed.jobs()[0];assert(dispatched?job.review:job.completed);
+    await closed.context.runBrowserAutopilot();const job=closed.jobs()[0];assert(!job.completed,'v3 timer cannot replay a closed-tab application');assert.equal(closed.trace.filter(x=>x[0]==='send').length,0);
     await closed.send(1);assert(closed.jobs().some(j=>j.plan.trackedId===id(1)&&j.completed));
   }
   // Migrate 2.7.11 once; receipt survives tab closure, unknown legacy attempt stays isolated.
@@ -106,5 +106,5 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
   for(const url of ['http://127.0.0.1:8080/','http://[::1]:8080/','http://localhost:8080/index.html']) {
     const alias=await fixture();assert.equal((await alias.request({type:'vjaDashboardBridgeHello'},{...alias.sender,url})).ok,true);
   }
-  console.log('Dashboard: parallel manual/autopilot, bounded queue, duplicate protection, tab isolation, closed-tab recovery, legacy migration, persisted receipts and origin checks passed');
+  console.log('Dashboard compatibility: manual receipts, user-enabled bounded autopilot, duplicate protection, tab isolation, no manual timer replays, legacy migration and origin checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -19,6 +19,13 @@ async function vjaRecordDiagnostic(stage, error) {
 }
 
 async function vjaFetch(input, init = {}, timeoutMs = 10000) {
+  const url=String(input);
+  if (/\/api\/.*(?:apply-tailored|submit|send-application)(?:[/?]|$)/i.test(url)) throw new Error('Автоотправка отключена. Используйте кнопку сайта самостоятельно.');
+  if (/\/api\/(?:extension\/(?:analyze|resolve-fields)|operator\/recruiter|.*(?:draft|tailor|screening|answer|prepare))/i.test(url)) {
+    const data=await chrome.storage.local.get('vjaCopilotSettings');
+    if(!data.vjaCopilotSettings?.aiConsent)throw new Error('Сначала разрешите AI-обработку в настройках Copilot.');
+  }
+
   try {
     return await window.vjaRuntimeGuard.fetchWithTimeout(fetch, input, init, timeoutMs);
   } catch (error) {
@@ -28,8 +35,8 @@ async function vjaFetch(input, init = {}, timeoutMs = 10000) {
 }
 
 async function getApiBase() {
-  const stored = await chrome.storage.sync.get({ apiBase: "http://localhost:8080" });
-  return String(stored.apiBase || "http://localhost:8080").replace(/\/$/, "");
+  const stored = await chrome.storage.sync.get({ apiBase: "http://127.0.0.1:8080" });
+  return String(stored.apiBase || "http://127.0.0.1:8080").replace(/\/$/, "");
 }
 
 async function saveApiBase() {
@@ -74,6 +81,8 @@ function setBusy(busy) {
 }
 
 async function activeTab() {
+  const target=Number(new URLSearchParams(location.search).get('tab'));
+  if(Number.isSafeInteger(target)&&target>0){const tab=await chrome.tabs.get(target);if(tab?.id&&/^https?:\/\//.test(tab.url||''))return tab;throw new Error('Исходная вкладка закрыта. Откройте инструменты из нужной вакансии заново.');}
   if (vjaEmbedded) {
     const context = await vjaEmbeddedContext;
     if (!context?.tab?.id) throw new Error("Could not identify the panel's vacancy tab.");
@@ -389,40 +398,9 @@ async function markApplied() {
 }
 
 async function applyOnHh() {
-  clearError();
-  if (!latestPage?.url || !isHhVacancy(latestPage.url)) return showError("Open an HH.ru vacancy first.");
-  if (!latest || latest.match.score < 75) return showError("This vacancy is below the one-click apply threshold. Review it manually.");
-
-  const confirmed = window.confirm(`Submit an application to this HH vacancy now?\n\nFit: ${latest.match.score}/100\n${latestPage.title || "Vacancy"}\n\nThis uses the selected HH resume and a vacancy-specific cover letter.`);
-  if (!confirmed) return;
-
-  setBusy(true);
-  try {
-    const api = await getApiBase();
-    const importedResponse = await vjaFetch(`${api}/api/import/hh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: latestPage.url })
-    });
-    if (!importedResponse.ok) throw new Error("Could not import this HH vacancy into Job Assistant.");
-    const imported = await importedResponse.json();
-    latestTrackedId = imported.id;
-
-    const applyResponse = await vjaFetch(`${api}/api/vacancies/${imported.id}/apply-tailored`, { method: "POST" });
-    const payload = await applyResponse.json().catch(() => ({}));
-    if (!applyResponse.ok) {
-      const message = payload.errorText || payload.errorCode || `HH application failed (${applyResponse.status}).`;
-      throw new Error(message);
-    }
-
-    $("applyHh").textContent = "Applied on HH ✓";
-    $("applyHh").disabled = true;
-    $("fillNote").textContent = "Application submitted through HH's official applicant API and recorded in Job Assistant.";
-  } catch (error) {
-    showError(error?.message || String(error));
-  } finally {
-    setBusy(false);
-  }
+  clearError();setBusy(true);
+  try { await sendToPage({type:'vjaCopilotPage',action:'prepare'});$("fillNote").textContent='Отклик подготовлен на странице. Отправку нажимаете вы.'; }
+  catch(error){showError(error?.message||String(error));}finally{setBusy(false);}
 }
 
 (async function init() {

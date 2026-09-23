@@ -2,8 +2,8 @@
   const $ = id => document.getElementById(id);
 
   async function getApiBaseForContacts() {
-    const stored = await chrome.storage.sync.get({ apiBase: "http://localhost:8080" });
-    return String(stored.apiBase || "http://localhost:8080").trim().replace(/\/$/, "");
+    const stored = await chrome.storage.sync.get({ apiBase: "http://127.0.0.1:8080" });
+    return String(stored.apiBase || "http://127.0.0.1:8080").trim().replace(/\/$/, "");
   }
 
   async function getContactMemory() {

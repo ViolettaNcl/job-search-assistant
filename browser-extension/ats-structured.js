@@ -141,6 +141,7 @@
 
   return {
     detectAtsHost,
+    htmlToText,
     collectJobPostings,
     normalizeJobPosting,
     parseJsonLdText,

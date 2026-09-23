@@ -7,12 +7,14 @@ async function discoverHhInBrowser(api, status, afterImport) {
   }
   if (settings.vjaHhDiscoveryBlocked) return settings.vjaHhDiscoveryBlocked;
   if (Date.now()-(settings.vjaHhDiscoveryAt||0)<30*60*1000) return settings.vjaHhDiscoveryMessage||'';
-  const queries = status.browserSearchQueries?.length ? status.browserSearchQueries : ['Junior C# .NET'];
+  const syncPrefs=await chrome.storage.sync.get(['vjaAutopilotPreferences','vjaHhBrowserSearch']);
+  const prefs=self.vjaBrowserAutopilot.normalizePreferences(syncPrefs.vjaAutopilotPreferences||{});
+  const queries = prefs.searchQueries?.length ? prefs.searchQueries : (status.browserSearchQueries?.length ? status.browserSearchQueries : ['Junior C# .NET']);
   const index = (settings.vjaHhDiscoveryQuery||0)%queries.length;
   await chrome.storage.local.set({vjaHhDiscoveryAt:Date.now(),vjaHhDiscoveryQuery:index+1});
   const search = new URL('https://hh.ru/search/vacancy');
   search.searchParams.set('text',queries[index]);search.searchParams.set('order_by','publication_time');
-  if(status.remoteOnly)search.searchParams.set('schedule','remote');
+  if(prefs.remoteOnly||status.remoteOnly)search.searchParams.set('schedule','remote');
   let tab, imported=0, keep=false;
   try {
     const old = await chrome.storage.local.get('vjaHhDiscoveryTab');
@@ -43,13 +45,16 @@ async function discoverHhInBrowser(api, status, afterImport) {
     if(!results?.links?.length)throw new Error('В выдаче HH нет доступных карточек, либо изменилась страница. Проверьте вкладку поиска.');
     for(const url of results.links.slice(0,10)) {
       const live=await browserAutopilotJson(`${api}/api/automation/status`);
-      const config=await chrome.storage.sync.get('vjaHhBrowserSearch');
+      const config=await chrome.storage.sync.get(['vjaHhBrowserSearch','vjaAutopilotPreferences']);
+      const livePrefs=self.vjaBrowserAutopilot.normalizePreferences(config.vjaAutopilotPreferences||{});
       if(!self.vjaBrowserAutopilot.shouldRun(live)||!config.vjaHhBrowserSearch)break;
       await browserAutopilotHeartbeat(api,false,`Читаю вакансии через сайт HH: ${imported} сохранено.`);
       await chrome.tabs.update(tab.id,{url});
       const r=await read(url);if(r?.alreadyApplied)continue;
       if(!r?.vacancy)throw new Error('HH не вернул читаемую вакансию.');
       if(!self.vjaBrowserAutopilot.hasSafeSeniority(r.vacancy.title))continue;
+      if(livePrefs.programmingOnly&&!self.vjaBrowserAutopilot.isProgrammingRole(r.vacancy.title))continue;
+      if(livePrefs.remoteOnly&&!r.vacancy.remote)continue;
       await browserAutopilotJson(`${api}/api/import/browser`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r.vacancy)});
       imported++;
       // Qualify and apply before reading the next card; unresolved submissions retain their plan.

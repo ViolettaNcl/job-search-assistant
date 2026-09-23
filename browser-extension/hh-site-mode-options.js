@@ -5,10 +5,10 @@
   const replacement = button.cloneNode(true);
   button.replaceWith(replacement);
   replacement.id = 'connectHh';
-  replacement.textContent = 'HH.ru website apply enabled';
-  replacement.title = 'The local bundle uses the normal HH.ru website flow. Official HH API OAuth is not required.';
+  replacement.textContent = 'HH.ru: автоотклик через сайт включён';
+  replacement.title = 'Используется обычная страница HH.ru. Отдельная OAuth-авторизация HH API не требуется.';
   replacement.addEventListener('click', () => {
-    window.alert('HH.ru website application mode is enabled. Open an HH.ru vacancy and use “Apply + send now”. No HH OAuth connection is required.');
+    window.alert('Режим HH.ru включён. Откройте вакансию и нажмите ✦ Apply: расширение подготовит CV и сопроводительное письмо и выполнит отклик в текущей вкладке, если форма однозначно готова.');
   });
 
   function patch() {

@@ -27,6 +27,11 @@ async function updateApplicationJob(id, patch) {
   });
 }
 function sameApplication(a, b) {
+  if (globalThis.vjaCopilotCore) {
+    if (a.trackedId && a.trackedId === b.trackedId) return true;
+    return globalThis.vjaCopilotCore.sameVacancy({url:a.sourceUrl}, {url:b.sourceUrl});
+  }
+
   if (a.trackedId && a.trackedId === b.trackedId) return true;
   const vacancy = url => { try { const u = new URL(url); return /(^|\.)hh\.ru$/.test(u.hostname) ? u.pathname.match(/^\/vacancy\/(\d+)/)?.[1] : u.origin + u.pathname; } catch {return null;} };
   const left = vacancy(a.sourceUrl), right = vacancy(b.sourceUrl);

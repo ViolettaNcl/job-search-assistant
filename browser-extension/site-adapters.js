@@ -1,0 +1,183 @@
+/* Small per-provider selector profiles over a shared, conservative DOM adapter. */
+(function(root){
+  'use strict';
+  const C=root.vjaCopilotCore;
+  const profiles={
+    hh:{title:['[data-qa="vacancy-title"]'],company:['[data-qa="vacancy-company-name"]'],description:['[data-qa="vacancy-description"]'],messages:['[data-qa="chat-message"]','[data-qa*="chatik-message"]','[data-qa*="message-text"]','[data-qa*="chat-message"]','[data-qa*="message-container"]','[data-testid*="message"]','[class*="chat-message"]','[class*="message-bubble"]'],jobLink:'a[href*="/vacancy/"]'},
+    linkedin:{title:['.job-details-jobs-unified-top-card__job-title','h1'],company:['.job-details-jobs-unified-top-card__company-name'],description:['#job-details'],messages:['.msg-s-event-listitem','.msg-s-message-list__event'],jobLink:'a[href*="/jobs/view/"]'},
+    indeed:{title:['[data-testid="jobsearch-JobInfoHeader-title"]','.jobsearch-JobInfoHeader-title'],company:['[data-testid="inlineHeader-companyName"]'],description:['#jobDescriptionText']},
+    greenhouse:{title:['.app-title','.job__title','h1'],company:['.company-name'],description:['#content','.job__description']},
+    lever:{title:['.posting-headline h2','.posting-headline h1'],company:['.main-header-logo img[alt]'],description:['.posting-page .content','.posting-page .section-wrapper']},
+    workday:{title:['[data-automation-id="jobPostingHeader"]'],description:['[data-automation-id="jobPostingDescription"]']},
+    smartrecruiters:{title:['.job-title','h1'],company:['.company-name'],description:['[itemprop="description"]','#st-jobDescription']},
+    teamtailor:{title:['h1'],description:['[data-controller="careersite--job-description"]','.body-block']},
+    ashby:{title:['[class*="jobPostingHeader"] h1','h1'],description:['[class*="jobDescription"]','[data-testid="job-description"]']},
+    workable:{title:['[data-ui="job-title"]'],description:['[data-ui="job-description"]']},
+    habr:{title:['.vacancy-title__text','h1'],company:['.company_name'],description:['.vacancy-description']},
+    superjob:{title:['h1'],description:['[itemprop="description"]']},
+    geekjob:{title:['h1'],description:['.job-description']},
+    bamboohr:{title:['[class*="JobOpening"] h1','h1'],description:['[class*="jobDescription"]']},
+    recruitee:{title:['[data-cy="job-title"]','h1'],description:['[data-cy="job-description"]']},
+    personio:{title:['.job-title','h1'],description:['.job-description']},
+    comeet:{title:['h1'],description:['[class*="position-description"]']},
+    jobvite:{title:['.jv-header h2','h1'],description:['.jv-job-detail-description']},glassdoor:{title:['h1'],description:['.JobDetails_jobDescription__uW_fK']},generic:{}
+  };
+  const generic={title:['[itemprop="title"]','[data-testid*="job-title"]','[class*="job-title"]','h1'],company:['[itemprop="hiringOrganization"] [itemprop="name"]','[data-testid*="company-name"]','[class*="company-name"]'],description:['[itemprop="description"]','[data-testid*="job-description"]','[class*="job-description"]','[class*="vacancy-description"]']};
+  const messageSelectors=['[data-message-id]','[data-testid="message"]','[data-qa="message"]','[data-sender]','[class*="message-bubble"]','[class*="messageBubble"]','[class~="message"]','[role="log"] [role="article"]'];
+  const ui = el => Boolean(el?.closest?.('[data-vja-root], [data-vja-recruiter-copilot]'));
+  function all(selector,scope=document,depth=0){
+    let found=[];try{found=[...scope.querySelectorAll(selector)].filter(el=>!ui(el));}catch{return [];}
+    if(depth<4){for(const el of scope.querySelectorAll('*'))if(el.shadowRoot&&!ui(el))found.push(...all(selector,el.shadowRoot,depth+1));}
+    return [...new Set(found)];
+  }
+  function visible(el){if(!el||ui(el)||!el.isConnected)return false;const s=getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&el.getClientRects().length>0;}
+  function text(el,max=24000){return C.clip(el?.innerText||el?.textContent||el?.getAttribute?.('alt')||'',max);}
+  function first(selectors,scope=document){for(const s of selectors){const e=all(s,scope).find(visible);if(e)return text(e)||e.getAttribute('alt')||'';}return '';}
+  function attr(scope,names){if(!scope)return '';for(const key of names){let el=scope instanceof Element&&scope.hasAttribute(key)?scope:all(`[${key}]`,scope).find(visible);const value=el?.getAttribute(key);if(value)return C.clip(value,300);}return '';}
+  function formFields(scope=document){return all('input,textarea,select,[contenteditable="true"][role="textbox"],[role="combobox"],[role="radiogroup"]',scope).filter(el=>!el.disabled&&!el.readOnly&&el.getAttribute('aria-disabled')!=='true'&&(!['hidden','password','submit','button','reset','image'].includes(el.type))&&(visible(el)||el.type==='file'&&visible(el.parentElement)));}
+  function label(el){
+    const parts=[el.getAttribute('aria-label'),el.getAttribute('placeholder'),el.getAttribute('name'),el.id];
+    const scope=el.getRootNode();
+    if(el.id)try{parts.unshift(text(scope.querySelector(`label[for="${CSS.escape(el.id)}"]`),400));}catch{}
+    if(el.closest('label'))parts.unshift(text(el.closest('label'),400));
+    for(const id of (el.getAttribute('aria-labelledby')||'').split(/\s+/))if(id)parts.unshift(text(scope.getElementById?.(id),400));
+    const group=el.closest('fieldset,[role="group"],.field,.question,[data-automation-id="formField"]');
+    if(group)parts.unshift(first(['legend','label','[class*="label"]'],group));
+    return [...new Set(parts.filter(Boolean))].join(' ').slice(0,1000);
+  }
+  function descriptor(el,i=0){return {token:typeof ensureToken==='function'?ensureToken(el,i):'field-'+i,label:label(el),type:el.getAttribute('role')==='combobox'?'combobox':el.tagName==='SELECT'?(el.multiple?'multiselect':'select'):el.tagName==='TEXTAREA'||el.isContentEditable?'textarea':el.type||el.getAttribute('role')||'text',currentValue:el.type==='file'?(el.files?.length?'attached':''):['radio','checkbox'].includes(el.type)?(el.checked?'checked':''):el.value||'',required:el.required||el.getAttribute('aria-required')==='true',maxLength:el.maxLength||0,options:el.options?[...el.options].map(o=>({value:o.value,text:text(o)})):[]};}
+  function structured(doc=document){
+    const items=[];
+    for(const s of all('script[type="application/ld+json"]',doc))try{root.vjaAtsStructured?.collectJobPostings(JSON.parse(s.textContent),items);}catch{}
+    if(items.length===1)return items[0];
+    const id=C.idFromUrl(location.href);
+    return items.find(j=>id&&(C.idFromUrl(j.url||'')===id||String(j.identifier?.value||'')===id))||null;
+  }
+  function make(doc=document,url=location.href){
+    const provider=C.provider(url), cfg=profiles[provider]||profiles.generic;
+    function extractVacancy(scope=doc){
+      const j=scope===doc?structured(doc):null;
+      const v={provider,url,title:j?.title||first([...(cfg.title||[]),...generic.title],scope),company:(typeof j?.hiringOrganization==='string'?j.hiringOrganization:j?.hiringOrganization?.name)||first([...(cfg.company||[]),...generic.company],scope),description:j?.description?root.vjaAtsStructured.htmlToText(j.description):first([...(cfg.description||[]),...generic.description],scope),vacancyId:String(j?.identifier?.value||attr(scope,['data-vacancy-id','data-job-id','data-requisition-id'])||C.idFromUrl(url)),location:j?.jobLocation?.address?.addressLocality||first(['[data-qa="vacancy-view-location"]','[class="location"]'],scope),experience:j?.experienceRequirements||'',employmentType:j?.employmentType||'',salary:j?.baseSalary||null,remote:/TELECOMMUTE/i.test(j?.jobLocationType||''),requirements:j?.qualifications||j?.skills||''};
+      return C.vacancy(v);
+    }
+    function getReplyInput(){
+      const pageHint=text(doc.body,1200);const urlHint=/chat|message|inbox|conversation|negotiation|dialog|responses?|отклики|переписк/i.test(url)||/переписк|сообщени.{0,20}работодател|recruiter|employer messages?/i.test(pageHint);
+      const inputs=all('textarea,[contenteditable="true"],[role="textbox"],[data-qa*="chat" i][contenteditable="true"],[data-qa*="message" i] textarea',doc).filter(visible).filter(el=>!el.disabled&&!el.readOnly).map(el=>{
+        const meta=label(el)+' '+String(el.className||'')+' '+String(el.getAttribute?.('data-qa')||'');let score=/(message|reply|сообщ|ответ|напис|chat|переписк)/i.test(meta)?6:0;
+        if(/search|поиск|cover.?letter|сопровод|комментарий к отклику/i.test(meta))score-=12;
+        if(urlHint)score+=3;
+        if(el.closest('[data-conversation-id],[data-thread-id],[data-chat-id],[role="log"],[class*="chat"],[class*="conversation"],[class*="negotiation"]'))score+=3;
+        return {el,score};
+      }).sort((a,b)=>b.score-a.score);
+      const threshold=urlHint?2:4;
+      return inputs.find(x=>x.score>=threshold)?.el||null;
+    }
+    function chatRoot(input=getReplyInput()){
+      if(!input)return null;
+      let node=input.parentElement;
+      for(let depth=0;node&&depth<10;depth++,node=node.parentElement){
+        if(all([...cfg.messages||[],...messageSelectors].join(','),node).filter(visible).length)return node;
+        if(node.matches('main,[data-conversation-id],[data-thread-id],[data-chat-id]'))return node;
+      }
+      const roots=all('[role="log"],[data-conversation-id],[data-thread-id]',doc).filter(visible);
+      return roots.length===1?roots[0]:input.closest('main')||null;
+    }
+    function fallbackMessageBlocks(scope,input=getReplyInput()){
+      if(!scope||!input)return [];
+      const ir=input.getBoundingClientRect(),sr=scope.getBoundingClientRect();
+      const candidates=all('div,p,span,li,section,article',scope).filter(visible).map(el=>{
+        const value=text(el,5000),r=el.getBoundingClientRect();
+        let marker='',n=el;
+        for(let depth=0;n&&n!==scope&&depth<5;depth++,n=n.parentElement)marker+=' '+['data-sender','data-direction','data-author-role','data-qa','data-testid','class'].map(k=>n.getAttribute?.(k)||'').join(' ');
+        return {el,value,r,marker};
+      }).filter(x=>{
+        if(x.value.length<2||x.value.length>5000||x.el===input||x.el.contains(input)||input.contains(x.el))return false;
+        if(x.el.closest('[data-vja-root],nav,aside,[role="navigation"]'))return false;
+        if(/^(?:Чаты|Только непрочитанные|Вакансия|Перейти|Сообщение)$/i.test(x.value))return false;
+        const overlap=Math.min(x.r.right,ir.right)-Math.max(x.r.left,ir.left);
+        if(overlap<Math.min(Math.max(40,x.r.width*.2),120))return false;
+        if(x.r.bottom>ir.top+4||x.r.top<sr.top-4)return false;
+        return true;
+      });
+      // Prefer the deepest visible text blocks. Then merge adjacent fragments from
+      // the same bubble (HH currently splits long recruiter messages into several
+      // paragraph/link nodes without stable data-qa message wrappers).
+      let leaves=candidates.filter(x=>!candidates.some(y=>y!==x&&x.el.contains(y.el)&&y.value.length>1&&y.r.width>20&&y.r.height>8));
+      if(!leaves.length)leaves=candidates;
+      leaves.sort((a,b)=>a.r.top-b.r.top||a.r.left-b.r.left);
+      const groups=[];
+      for(const item of leaves){
+        const last=groups.at(-1);
+        const markerSpeaker=/outgoing|candidate|from-me|message_me|\bown\b|\bsent\b|\bself\b/i.test(item.marker)?'candidate':/incoming|employer|recruiter|received/i.test(item.marker)?'employer':'unknown';
+        const center=item.r.left+item.r.width/2,composerCenter=ir.left+ir.width/2;
+        const geometricSpeaker=markerSpeaker==='unknown'&&item.r.width<ir.width*.82?(center>composerCenter+ir.width*.08?'candidate':'employer'):markerSpeaker;
+        const speaker=geometricSpeaker;
+        const gap=last?item.r.top-last.bottom:999, sameLane=last?Math.abs(item.r.left-last.left)<150:false;
+        const common=last?.elements?.some(el=>{let n=item.el;for(let i=0;n&&i<4;i++,n=n.parentElement)if(n===el.parentElement)return true;return false;});
+        if(last&&gap<=18&&(sameLane||common)&&(!last.speaker||last.speaker==='unknown'||speaker==='unknown'||last.speaker===speaker)){
+          if(!last.parts.includes(item.value))last.parts.push(item.value);
+          last.bottom=Math.max(last.bottom,item.r.bottom);last.left=Math.min(last.left,item.r.left);last.elements.push(item.el);
+          if(last.speaker==='unknown'&&speaker!=='unknown')last.speaker=speaker;
+        }else groups.push({parts:[item.value],top:item.r.top,bottom:item.r.bottom,left:item.r.left,speaker,elements:[item.el]});
+      }
+      return groups.map((g,i)=>({id:'dom-fallback-'+i,speaker:g.speaker||'unknown',text:C.clip(g.parts.join('\n').replace(/\n{3,}/g,'\n\n'),4500),timestamp:'',order:i})).filter(m=>m.text.length>1).slice(-120);
+    }
+    function getMessages(scope=chatRoot()){
+      if(!scope)return [];
+      const input=getReplyInput();
+      let nodes=all([...(cfg.messages||[]),...messageSelectors].join(','),scope).filter(visible).filter(el=>text(el,2600).length>1&&!el.contains(input));
+      nodes=nodes.filter(el=>!nodes.some(other=>other!==el&&el.contains(other)));
+      let messages=nodes.slice(-300).map((el,i)=>{
+        let marker='';let n=el;
+        for(let depth=0;n&&n!==scope&&depth<4;depth++,n=n.parentElement)marker+=' '+['data-sender','data-direction','data-author-role','data-qa','data-testid','class'].map(k=>n.getAttribute(k)||'').join(' ');
+        const speaker=/outgoing|candidate|from-me|message_me|\bown\b|\bsent\b|\bself\b/i.test(marker)?'candidate':/incoming|employer|recruiter|received/i.test(marker)?'employer':'unknown';
+        return {id:el.getAttribute('data-message-id')||el.closest('[data-message-id]')?.getAttribute('data-message-id')||'',speaker,text:text(el,2500),timestamp:el.getAttribute('data-timestamp')||el.querySelector('time')?.getAttribute('datetime')||'',order:i};
+      });
+      if(provider==='hh'&&messages.length<1)messages=fallbackMessageBlocks(scope,input);
+      return messages;
+    }
+    function conversation(){
+      const input=getReplyInput(), scope=chatRoot(input), messages=getMessages(scope);
+      const strongChatHint=/chat|message|conversation|negotiation|responses?|отклики|переписк/i.test(url)||/переписк|сообщени.{0,20}работодател|recruiter|employer messages?/i.test(text(doc.body,1200));
+      if(!input||!scope||(!messages.length&&!strongChatHint))return {detected:false};
+      let u;try{u=new URL(url);}catch{return {detected:false};}
+      let conversationId=attr(scope,['data-conversation-id','data-thread-id','data-chat-id','data-negotiation-id']);
+      // Include attributes on a containing conversation panel, not sibling chats.
+      if(!conversationId){const parent=input.closest('[data-conversation-id],[data-thread-id],[data-chat-id]');if(parent)conversationId=attr(parent,['data-conversation-id','data-thread-id','data-chat-id']);}
+      for(const k of ['conversationId','threadId','chatId','negotiationId','chat','thread','conversation'])conversationId ||=u.searchParams.get(k)||'';
+      conversationId ||=u.pathname.match(/\/(?:chat|chats|messages|messaging\/thread|conversation|conversations|negotiations)\/([^/?#]+)/i)?.[1]||'';
+      if(!conversationId){const h=u.hash.match(/(?:chat|thread|conversation)[=/:-]([^/&?]+)/i);conversationId=h?.[1]||'';}
+      let weak=false;
+      if(!conversationId){weak=true;conversationId='page:'+C.hash(C.canonicalUrl(url)+'|'+first(['h1','h2','[class*="recipient"]'],scope));}
+      const links=all(cfg.jobLink||'a[href*="/vacancy/"],a[href*="/jobs/view/"],a[href*="jobId="],a[href*="/jobs/"],a[href*="gh_jid="]',scope).filter(visible).map(a=>({url:a.href,title:text(a,300)}));
+      const distinct=[...new Map(links.map(v=>[C.canonicalUrl(v.url),v])).values()];
+      const ref=distinct.length===1?distinct[0]:null;
+      const vacancyId=attr(scope,['data-vacancy-id','data-job-id','data-requisition-id'])||(ref?C.idFromUrl(ref.url):'');
+      const company=first(['[data-company-name]','[class*="company-name"]'],scope);
+      const recruiterName=first(['[data-recruiter-name]','[class*="recruiter-name"]','[class*="recipient-name"]'],scope);
+      const employerMessage=[...messages].reverse().find(m=>m.speaker==='employer');
+      const fallbackInbound=[...messages].reverse().find(m=>m.speaker!=='candidate');
+      const latestInbound=(employerMessage||fallbackInbound)?.text||'';
+      return {detected:true,provider,url,conversationId,identityConfidence:weak?'weak':'direct',applicationId:attr(scope,['data-application-id','data-response-id']),vacancyId,vacancyUrl:ref?.url||'',vacancy:ref?C.vacancy({...ref,provider,vacancyId,company}):null,messages,latestInbound,recruiterName,company,hasComposer:true,historyPartial:true,unknownSender:!employerMessage};
+    }
+    function detectApplicationForm(){
+      const candidates=all('form,[role="dialog"],[data-application-form]',doc).filter(visible).filter(el=>formFields(el).length>=1&&(/apply|application|resume|résumé|cv|candidate|отклик|резюме|анкет|кандидат/i.test(text(el,1500)+' '+el.id+' '+(el.getAttribute('action')||'')+' '+url)||Boolean(el.querySelector('[name="email"]')&&el.querySelector('input[type="file"]'))));
+      return candidates.filter(el=>!candidates.some(other=>other!==el&&el.contains(other)))[0]||null;
+    }
+    function detectPageType(){
+      if(conversation().detected)return 'RECRUITER_CHAT';
+      if(detectApplicationForm())return 'APPLICATION_FORM';
+      const v=extractVacancy();
+      if(v.title&&(structured(doc)||v.description&&(/vacancy|job|career|position|requisition/i.test(url)||cfg.description?.length)))return 'JOB_DESCRIPTION';
+      if(/(?:jobs|vacancies|search)/i.test(new URL(url).pathname)&&all('a[href*="/vacancy/"],a[href*="/jobs/"]',doc).length>2)return 'JOB_LIST';
+      if(/interview|собеседование/i.test(new URL(url).pathname))return 'INTERVIEW_PAGE';
+      if(/compan(?:y|ies)|about/i.test(new URL(url).pathname))return 'COMPANY_PAGE';
+      return 'UNKNOWN';
+    }
+    function detectApplyButton(){
+      return all('a[href]',doc).filter(visible).find(a=>C.safeApplyLink({label:text(a,120),href:a.href,base:url,inForm:Boolean(a.closest('form'))}))||null;
+    }
+    return {provider,extractVacancy,detectPageType,detectVacancy:()=>detectPageType()==='JOB_DESCRIPTION',detectApplicationForm,extractFormFields:()=>formFields(detectApplicationForm()||doc).map(descriptor),getReplyInput,chatRoot,getMessages,conversation,detectApplyButton};
+  }
+  root.vjaSiteAdapters={profiles,make,all,visible,text,label,descriptor,formFields};
+})(globalThis);
