@@ -1,3 +1,4 @@
+importScripts("candidate-seed.js", "candidate-truth.js", "relevance-engine.js", "context-reply.js", "writing-provider.js");
 importScripts("copilot-core.js", "profile-defaults.js", "quick-replies.js", "bundled-cv.js", "followup-intelligence.js", "application-analytics.js", "application-state-machine.js");
 importScripts("browser-autopilot.js", "hh-discovery-navigation.js", "hh-discovery-background.js", "application-executor.js", "dashboard-apply-background.js");
 
@@ -253,11 +254,11 @@ async function browserAutopilotApplyNext(api) {
     applicationClaims.add(candidate.vacancyId);
     try {
       const backendDraft=await browserAutopilotJson(`${api}/api/vacancies/${encodeURIComponent(candidate.vacancyId)}/application-draft`);
-      const profileStore=await chrome.storage.local.get('vjaCandidateTruthProfile');
-      const truthProfile=globalThis.vjaCopilotCore.profile(profileStore.vjaCandidateTruthProfile||globalThis.vjaProfileDefaults||{});
-      const letterVacancy=globalThis.vjaCopilotCore.vacancy({url:candidate.url,vacancyId:candidate.vacancyId,title:candidate.title,company:candidate.company,description:[candidate.description,candidate.matchedSkills,candidate.missingSkills,candidate.requirements].filter(Boolean).join(' ') });
-      const localLetter=globalThis.vjaCopilotCore.coverLetter(truthProfile,letterVacancy);
-      const draft={...backendDraft,coverLetter:localLetter,letterVersion:'3.7-context-github'};
+      const data=await cpData(),truthProfile=data.profile;
+      const seedVacancy=globalThis.vjaCopilotCore.vacancy({url:candidate.url,vacancyId:globalThis.vjaCopilotCore.idFromUrl(candidate.url),title:candidate.title,company:candidate.company,description:candidate.description||''});
+      const letterVacancy=await cpCompleteVacancy(seedVacancy,{url:candidate.url});
+      const writing=await cpCreateLetter(truthProfile,letterVacancy);
+      const draft={...backendDraft,coverLetter:writing.text,letterVersion:'3.8-evidence'};
       const live=await browserAutopilotJson(`${api}/api/automation/status`);
       const reservations=(await applicationJobs()).filter(job=>!job.review&&!job.completed).length;
       if(!self.vjaBrowserAutopilot.shouldRun(live) || Number(live.remainingToday)<=reservations)break;
@@ -265,6 +266,9 @@ async function browserAutopilotApplyNext(api) {
       const plan=self.vjaBrowserAutopilot.buildPlan(candidate,draft);
       if(!plan.coverLetter)throw new Error('Не удалось подготовить письмо.');
       await registerApplication(plan);
+      const cvStore=await chrome.storage.local.get(['cvVaultRu','cvVaultEn']);const cv=globalThis.vjaCopilotCore.cvSelection(globalThis.vjaRelevance.route(letterVacancy.title,letterVacancy.description),globalThis.vjaRelevance.language(letterVacancy.description),cvStore);
+      plan.cvKey=cv.key;plan.fileData=cv.file||null;plan.resumeHint=letterVacancy.title;
+      await updateApplicationJob(plan.id,{plan,context:{vacancy:letterVacancy,profileSnapshot:truthProfile,evidenceAudit:writing.audit,cvKey:cv.key,cvName:cv.file?.name||'',coverLetter:writing.text,coverLetterMemory:{text:writing.text,evidenceAudit:writing.audit,generatedAt:Date.now(),source:writing.source}}});
       await browserAutopilotSessionAdd(1);
       tasks.push(executeApplication(api,plan));
     } finally {applicationClaims.delete(candidate.vacancyId);}
@@ -383,4 +387,4 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   respond({ok:false,error:'Откройте ✎ AI непосредственно в переписке для проверки контекста.'});
   return false;
 });
-importScripts("copilot-background.js");
+importScripts("writing-background.js", "copilot-background.js");

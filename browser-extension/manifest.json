@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "3.7.0",
-  "description": "Violetta Apply Assistant: ✦ Apply отправляет текущий отклик с релевантным письмом; быстрый клик «Откликнуться» в списке HH автоматически добавляет письмо; ✎ AI анализирует весь активный recruiter-чат; 🚀 Autopilot после явного запуска сам ищет подходящие по уровню/CV IT-вакансии и отправляет отклики с письмами.",
+  "version": "3.8.0",
+  "description": "Violetta: Apply, Autopilot и ответы по текущему чату с памятью CV/HH и отбором подтвержденных фактов под вакансию.",
   "permissions": [
     "activeTab",
     "storage",
@@ -47,6 +47,7 @@
         "ats-structured.js",
         "ats-controls.js",
         "field-verification.js",
+        "chat-reader.js",
         "site-adapters.js",
         "copilot-ui.js",
         "content.js",

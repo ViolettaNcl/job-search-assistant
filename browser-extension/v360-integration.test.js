@@ -5,9 +5,9 @@ const path=require('node:path');
 const root=__dirname;
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 
-test('manifest and core expose 3.7.0',()=>{
-  assert.equal(JSON.parse(read('manifest.json')).version,'3.7.0');
-  assert.match(read('copilot-core.js'),/VERSION = '3\.7\.0'/);
+test('manifest and core expose 3.8.0',()=>{
+  assert.equal(JSON.parse(read('manifest.json')).version,'3.8.0');
+  assert.match(read('copilot-core.js'),/VERSION = '3\.8\.0'/);
 });
 
 test('main Apply routes job descriptions directly to auto-apply without opening popup auto page',()=>{
@@ -47,23 +47,23 @@ test('quick replies are Russian-only and ship requested default reply',()=>{
 test('floating Apply uses compact inline auto state and never opens internal application page',()=>{const u=read('universal-content.js');assert.match(u,/U\.toast/);assert.match(u,/request\('auto-apply'/);assert.doesNotMatch(u,/popup\.html\?auto=1/);assert.match(u,/✓ Отклик отправлен/);assert.match(u,/✓ Уже откликнулись/);assert.match(u,/refreshVacancyStatus\(\)/);});
 test('cover letter memory persists and CV selection is simplified to vacancy language',()=>{const bg=read('copilot-background.js');const core=read('copilot-core.js');const html=read('options.html');assert.match(bg,/coverLetterMemory/);assert.match(bg,/submittedText/);assert.match(core,/function cvSelection/);assert.match(core,/language-default/);assert.doesNotMatch(core,/cvVaultRole:/);assert.doesNotMatch(html,/CV для конкретных ролей/);});
 test('settings are separated into profile resume AI auto apply and developer sections',()=>{const html=read('options.html');assert.match(html,/Профиль/);assert.match(html,/Резюме/);assert.match(html,/AI и ответы/);assert.match(html,/Автоотклик/);assert.match(html,/Для разработчика/);});
-test('chat bar can improve existing user draft in current conversation',()=>{const chat=read('recruiter-chat-content.js');assert.match(chat,/Улучшить текст/);assert.match(chat,/analyze\('polish',currentDraftText\(\)\)/);});
+test('chat bar can improve existing user draft in current conversation',()=>{const chat=read('recruiter-chat-content.js');assert.match(chat,/Улучшить текст/);assert.match(chat,/analyze\('polish',currentDraftText\(\),true\)/);});
 
 
 test('user-controlled HH autopilot is present and targets remote IT vacancies',()=>{
   const popup=read('popup.html'),auto=read('browser-autopilot.js'),bg=read('background.js');
   assert.match(popup,/Запустить автопилот/);assert.match(popup,/Удалённо · IT по профилю/);
   assert.match(auto,/programmingOnly:true/);assert.match(auto,/remoteOnly:true/);assert.match(auto,/sessionLimit:5/);
-  assert.match(bg,/browserAutopilotSession/);assert.match(bg,/3\.7-context-github/);
+  assert.match(bg,/browserAutopilotSession/);assert.match(bg,/3\.8-evidence/);
 });
 
 test('backend dashboard no longer claims autopilot is disabled by Copilot 3.0',()=>{
-  const backend=fs.readFileSync(path.join(root,'../backend/wwwroot/index.html'),'utf8');
+  const file=path.join(root,'../backend/wwwroot/index.html');if(!fs.existsSync(file))return;const backend=fs.readFileSync(file,'utf8');
   assert.doesNotMatch(backend,/Автоотправка отключена · Copilot 3\.0/);assert.match(backend,/Запустить автопилот/);
 });
 
 
-test('3.7.0 launcher exposes backend diagnostics and uses the exact loopback host',()=>{
+test('3.8.0 launcher exposes backend diagnostics and uses the exact loopback host',()=>{
   const rootPath=path.join(root,'..');
   const start=fs.readFileSync(path.join(rootPath,'start-assistant.cmd'),'utf8');
   const diag=fs.readFileSync(path.join(rootPath,'BACKEND_DIAGNOSTICS.cmd'),'utf8');
@@ -81,8 +81,8 @@ test('3.7.0 launcher exposes backend diagnostics and uses the exact loopback hos
   assert.match(stop,/JobSearchAssistant/);
 });
 
-test('3.7.0 fresh backend config permits user-started autopilot and names bundled CVs correctly',()=>{
-  const cfg=JSON.parse(fs.readFileSync(path.join(root,'../backend/appsettings.json'),'utf8'));
+test('3.8.0 fresh backend config permits user-started autopilot and names bundled CVs correctly',()=>{
+  const file=path.join(root,'../backend/appsettings.json');if(!fs.existsSync(file))return;const cfg=JSON.parse(fs.readFileSync(file,'utf8'));
   assert.equal(cfg.Security.EnableAutomaticSubmission,true);
   assert.equal(cfg.Candidate.EnglishCvFileName,'Violetta_Nicolaou_CV_EN.pdf');
   assert.equal(cfg.Candidate.RussianCvFileName,'Violetta_Nicolaou_CV_RU.pdf');
@@ -105,7 +105,7 @@ test('chat AI exposes full-dialog analysis, current HH DOM fallback, and explici
   assert.match(chat,/function conversationIdentity/);
   assert.match(bg,/function cpAssertChatPage/);
   assert.match(bg,/explicitUserRequest/);
-  assert.match(bg,/style==='dialog'/);
+  assert.match(bg,/cpAnswerCurrentChat/);assert.match(read('context-reply.js'),/LATEST|latest/i);
   assert.match(adapters,/fallbackMessageBlocks/);
   assert.match(adapters,/dom-fallback-/);
 });

@@ -32,7 +32,7 @@
   }
   function visible(el){if(!el||ui(el)||!el.isConnected)return false;const s=getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&el.getClientRects().length>0;}
   function text(el,max=24000){return C.clip(el?.innerText||el?.textContent||el?.getAttribute?.('alt')||'',max);}
-  function first(selectors,scope=document){for(const s of selectors){const e=all(s,scope).find(visible);if(e)return text(e)||e.getAttribute('alt')||'';}return '';}
+  function first(selectors,scope=document){for(const s of selectors){const e=all(s,scope).find(visible);if(e)return text(e,60000)||e.getAttribute('alt')||'';}return '';}
   function attr(scope,names){if(!scope)return '';for(const key of names){let el=scope instanceof Element&&scope.hasAttribute(key)?scope:all(`[${key}]`,scope).find(visible);const value=el?.getAttribute(key);if(value)return C.clip(value,300);}return '';}
   function formFields(scope=document){return all('input,textarea,select,[contenteditable="true"][role="textbox"],[role="combobox"],[role="radiogroup"]',scope).filter(el=>!el.disabled&&!el.readOnly&&el.getAttribute('aria-disabled')!=='true'&&(!['hidden','password','submit','button','reset','image'].includes(el.type))&&(visible(el)||el.type==='file'&&visible(el.parentElement)));}
   function label(el){
@@ -57,10 +57,11 @@
     const provider=C.provider(url), cfg=profiles[provider]||profiles.generic;
     function extractVacancy(scope=doc){
       const j=scope===doc?structured(doc):null;
-      const v={provider,url,title:j?.title||first([...(cfg.title||[]),...generic.title],scope),company:(typeof j?.hiringOrganization==='string'?j.hiringOrganization:j?.hiringOrganization?.name)||first([...(cfg.company||[]),...generic.company],scope),description:j?.description?root.vjaAtsStructured.htmlToText(j.description):first([...(cfg.description||[]),...generic.description],scope),vacancyId:String(j?.identifier?.value||attr(scope,['data-vacancy-id','data-job-id','data-requisition-id'])||C.idFromUrl(url)),location:j?.jobLocation?.address?.addressLocality||first(['[data-qa="vacancy-view-location"]','[class="location"]'],scope),experience:j?.experienceRequirements||'',employmentType:j?.employmentType||'',salary:j?.baseSalary||null,remote:/TELECOMMUTE/i.test(j?.jobLocationType||''),requirements:j?.qualifications||j?.skills||''};
+      const v={provider,url,title:j?.title||first([...(cfg.title||[]),...generic.title],scope),company:(typeof j?.hiringOrganization==='string'?j.hiringOrganization:j?.hiringOrganization?.name)||first([...(cfg.company||[]),...generic.company],scope),description:j?.description?root.vjaAtsStructured.htmlToText(j.description):first([...(cfg.description||[]),...generic.description],scope),vacancyId:String(j?.identifier?.value||attr(scope,['data-vacancy-id','data-job-id','data-requisition-id'])||C.idFromUrl(url)),location:j?.jobLocation?.address?.addressLocality||first(['[data-qa="vacancy-view-location"]','[class="location"]'],scope),experience:j?.experienceRequirements||'',employmentType:j?.employmentType||'',salary:j?.baseSalary||null,remote:/TELECOMMUTE/i.test(j?.jobLocationType||''),requirements:j?.qualifications||j?.skills||'',descriptionCoverage:scope===doc?(j?'full-structured':'full-dom'):'partial'};
       return C.vacancy(v);
     }
     function getReplyInput(){
+      if(root.vjaChatReader)return root.vjaChatReader.composer(doc,url);
       const pageHint=text(doc.body,1200);const urlHint=/chat|message|inbox|conversation|negotiation|dialog|responses?|отклики|переписк/i.test(url)||/переписк|сообщени.{0,20}работодател|recruiter|employer messages?/i.test(pageHint);
       const inputs=all('textarea,[contenteditable="true"],[role="textbox"],[data-qa*="chat" i][contenteditable="true"],[data-qa*="message" i] textarea',doc).filter(visible).filter(el=>!el.disabled&&!el.readOnly).map(el=>{
         const meta=label(el)+' '+String(el.className||'')+' '+String(el.getAttribute?.('data-qa')||'');let score=/(message|reply|сообщ|ответ|напис|chat|переписк)/i.test(meta)?6:0;
@@ -73,6 +74,7 @@
       return inputs.find(x=>x.score>=threshold)?.el||null;
     }
     function chatRoot(input=getReplyInput()){
+      if(root.vjaChatReader)return root.vjaChatReader.scopeFor(input);
       if(!input)return null;
       let node=input.parentElement;
       for(let depth=0;node&&depth<10;depth++,node=node.parentElement){
@@ -123,6 +125,7 @@
       return groups.map((g,i)=>({id:'dom-fallback-'+i,speaker:g.speaker||'unknown',text:C.clip(g.parts.join('\n').replace(/\n{3,}/g,'\n\n'),4500),timestamp:'',order:i})).filter(m=>m.text.length>1).slice(-120);
     }
     function getMessages(scope=chatRoot()){
+      if(root.vjaChatReader)return root.vjaChatReader.readMessages(scope,getReplyInput(),url);
       if(!scope)return [];
       const input=getReplyInput();
       let nodes=all([...(cfg.messages||[]),...messageSelectors].join(','),scope).filter(visible).filter(el=>text(el,2600).length>1&&!el.contains(input));
@@ -137,6 +140,7 @@
       return messages;
     }
     function conversation(){
+      if(root.vjaChatReader){const {input,scope,...snapshot}=root.vjaChatReader.read(doc,url);return snapshot;}
       const input=getReplyInput(), scope=chatRoot(input), messages=getMessages(scope);
       const strongChatHint=/chat|message|conversation|negotiation|responses?|отклики|переписк/i.test(url)||/переписк|сообщени.{0,20}работодател|recruiter|employer messages?/i.test(text(doc.body,1200));
       if(!input||!scope||(!messages.length&&!strongChatHint))return {detected:false};

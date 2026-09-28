@@ -36,7 +36,7 @@
     const company=text(card.querySelector('[data-qa="vacancy-serp__vacancy-employer"],[data-qa*="vacancy-employer"],[class*="company"]'));
     const locationText=text(card.querySelector('[data-qa="vacancy-serp__vacancy-address"],[data-qa*="vacancy-address"],[class*="location"]'));
     const cardText=text(card).slice(0,7000);
-    return {provider:'hh',url,vacancyId,title,company,location:locationText,description:cardText,requirements:cardText,remote:/удал[её]н|remote/i.test(cardText)};
+    return {provider:'hh',url,vacancyId,title,company,location:locationText,description:cardText,descriptionCoverage:'snippet',requirements:'',remote:/удал[её]н|remote/i.test(cardText)};
   }
   function findCard(vacancyId,fallback){
     if(fallback?.isConnected&&H.vacancyIdFromUrl(vacancyLink(fallback)?.href)===vacancyId)return fallback;

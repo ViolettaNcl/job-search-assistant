@@ -1,11 +1,16 @@
-# Violetta Apply Assistant — Chrome extension 3.7.0
+# Violetta Apply Assistant — Chrome extension 3.8.0
 
-## 3.7.0
+Единая память кандидата по CV и подтверждённым владельцем данным HH, отбор фактов по вакансии, короткие сопроводительные письма и ответы на последнее сообщение работодателя.
 
-- Main `home.html` popup now exposes a prominent **🚀 Autopilot** start/stop control with live backend message plus match/session/day limits.
-- The home control wakes the existing background Autopilot; it does not create a second automation system.
-- Browser HH discovery defaults to enabled when the preference has never been stored.
-- Default IT targeting now includes development, QA and Technical Support while rejecting explicit Middle/Senior/Lead/Principal/Staff/Architect/Head/Manager titles.
-- Existing `✦ Apply`, HH list quick cover letter, `✎ AI` full-dialog analysis, RU/EN CV, Cover Letter Memory and recruiter manual-Send behavior are preserved.
+## Основные действия
 
-See the repository-level `README.md`, `ARCHITECTURE.md`, `TESTING_GUIDE.md` and `TEST_REPORT.md` for details and boundaries.
+- **✦ Apply** и **🚀 Автопилот** используют полное прочитанное описание вакансии и один механизм отбора подтверждённых фактов.
+- **✎ AI → Проанализировать весь диалог** читает доступные сообщения активной переписки, отличает участников и показывает, на какое сообщение готовит ответ. Сообщение не отправляется автоматически.
+- **Настройки → Память кандидата** показывает источник каждого факта; новые структурированные данные импортируются только после предварительного просмотра и подтверждения.
+- **Настройки → AI и ответы → Генерация текста**: локальный режим работает без API; для свободной переформулировки и сложных вопросов нужен подключённый совместимый Chat Completions API, модель и ключ. Локальный ответ не выдаётся за ответ модели.
+
+Исходники на GitHub находятся в `browser-extension/`; в Windows-сборке это та же папка под именем `extension/`. Загружайте в Chrome только одну из них, согласно используемой установке.
+
+Подробнее: [стратегия](../docs/WRITING_STRATEGY_3.8.md), [архитектура](../ARCHITECTURE.md), [проверки](../TESTING_GUIDE.md), [ограничения площадок](../SUPPORTED_SITES.md).
+
+Никаких обещаний обхода AI-детекторов или фильтров ATS. Данные AppXite предоставлены владельцем; автоматической проверки трудоустройства нет. Исходные PDF не переписываются.

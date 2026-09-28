@@ -1,81 +1,37 @@
-# Testing guide — 3.7.0
+# Тестирование · 3.8.0
 
-## Quality strategy
+В source clone используйте `browser-extension/`; в Windows ZIP — `extension/`. Тестовый bridge автоматически различает две структуры.
 
-```mermaid
-flowchart LR
-    U[Unit tests] --> I[Integration tests]
-    I --> B[Synthetic browser fixtures]
-    B --> P[Windows packaging verification]
-    P --> S[Small live-site smoke test]
-```
-
-## 1. Extension tests
-
-Node 22+:
+## Node
 
 ```powershell
-$tests = Get-ChildItem .\browser-extension\*.test.js | Select-Object -ExpandProperty FullName
-foreach ($test in $tests) {
-  node $test
-  if ($LASTEXITCODE -ne 0) { throw "Failed: $test" }
-}
+$ext = if (Test-Path .\browser-extension) { '.\browser-extension' } else { '.\extension' }
+$cases = Get-ChildItem $ext -Filter '*.test.js' -File | Select-Object -ExpandProperty FullName
+node --test @cases
+if ($LASTEXITCODE -ne 0) { throw 'Node tests failed' }
 ```
 
-## 2. Backend tests
+## Chromium
 
-```powershell
-dotnet restore .\src\JobSearchAssistant\JobSearchAssistant.csproj
-dotnet build .\src\JobSearchAssistant\JobSearchAssistant.csproj -c Release --no-restore
-dotnet test .\tests\JobSearchAssistant.Tests\JobSearchAssistant.Tests.csproj -c Release
-```
-
-## 3. Synthetic browser regression
+Требуются Python, Playwright и Chromium. Linux runner использует системный `chromium`; без него Playwright должен иметь установленный браузер.
 
 ```powershell
 python -m pip install playwright
 python -m playwright install chromium
 python .\tests\browser_e2e.py
+if ($LASTEXITCODE -ne 0) { throw 'Browser tests failed' }
 ```
 
-These fixtures do not sign in to a real employer account and do not submit real applications.
+Fixtures используют реальные модули worker/content scripts, но подменяют Chrome API, HTTP, вкладки загрузки вакансий и ответ модели. Они не отправляют реальные отклики и не расходуют AI-кредиты.
 
-## 4. Manual acceptance
+## Новые сценарии
 
-- [ ] Extension/backend version = `3.7.0`
-- [ ] Backend ready on `127.0.0.1:8080`
-- [ ] RU/EN CV assets available
-- [ ] ✦ Apply stays in employer flow
-- [ ] HH list `Откликнуться` uses the same vacancy card
-- [ ] High-risk unknown required field stops the flow
-- [ ] ✎ AI drafts for the current recruiter chat
-- [ ] Full-dialog analysis reads accessible history
-- [ ] Chat A response never appears in Chat B
-- [ ] Quick Replies remain compact
-- [ ] 🚀 Autopilot starts/stops explicitly
-- [ ] Senior/Lead/Manager roles are rejected by the junior guard
-- [ ] Session/day limits are respected
-- [ ] Duplicate applications are blocked
-- [ ] Small live smoke test passes after major HH/ATS UI changes
+Миграция/приоритет источников; сохранение ручных CV; AppXite; разные проекты для WPF/PHP/backend; исключение Crowne; beginner French; отсутствие выдуманного Jira/стажа/зарплаты; последнее сообщение работодателя; несколько открытых вопросов; stale A→B; пустой чат; подтверждение неизвестного автора; full vacancy before HH-list letter; модель/локальный режим и содержимое model payload.
 
-## 5. GitHub Actions
+## Windows / реальный аккаунт
 
-| Workflow | Purpose |
-|---|---|
-| `ci.yml` | Backend build/tests + extension validation |
-| `site-apply-regression.yml` | Extension/apply regressions + Chromium fixtures |
-| `package-windows.yml` | Self-contained Windows release artifact |
-| `codeql.yml` | CodeQL security analysis |
+Обновить старую установку, Reload расширения, refresh HH. Проверить профиль и дату источников. Сначала выполнить предпросмотр письма без отправки и chat draft. Затем проверить один явно выбранный реальный отклик. Автопилот сначала ограничить одной заявкой за сессию.
 
-## 6. What should never be committed
+PowerShell-публикатор этой поставки проверен по структуре/ограничениям и Git-плану, но не исполнялся под Windows PowerShell. Windows backend EXE не запускался в Linux-среде; совпадение файлов не является runtime-тестом.
 
-- generated `backend/` runtime;
-- `test-results/`;
-- release ZIPs;
-- logs/hashes;
-- `.NET bin/obj`;
-- local databases.
-
-## 7. What passing tests do not prove
-
-Automated tests do not permanently certify every production DOM variation, CAPTCHA/MFA path, custom ATS widget or third-party uptime.
+Локальные отчёты и screenshots относятся к `test-results/` и не коммитятся. Числа фактического финального прогона находятся в `TEST_REPORT.md` Windows-пакета и отдельном отчёте поставки.

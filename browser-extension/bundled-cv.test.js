@@ -13,7 +13,7 @@ const fakeFetch=async url=>({ok:true,arrayBuffer:async()=>bytes.buffer,url});
  assert.equal(r.ok,true);assert.deepEqual(r.loaded.sort(),['en','ru']);
  assert.ok(fakeChrome.patch.cvVaultEn.base64);assert.equal(fakeChrome.patch.cvVaultEn.source,'bundled');
  assert.ok(fakeChrome.patch.cvVaultRu.base64);assert.equal(fakeChrome.patch.vjaBundledCvVersion,api.VERSION);
- const migrating={runtime:{getURL:p=>'chrome-extension://test/'+p},storage:{local:{get:async()=>({cvVaultEn:{name:'old.pdf',base64:'OLD'},cvVaultRu:{name:'old-ru.pdf',base64:'OLD'}}),set:async patch=>{migrating.patch=patch;}}}};
+ const migrating={runtime:{getURL:p=>'chrome-extension://test/'+p},storage:{local:{get:async()=>({cvVaultEn:{name:'old.pdf',base64:'OLD',source:'bundled'},cvVaultRu:{name:'old-ru.pdf',base64:'OLD',source:'bundled'}}),set:async patch=>{migrating.patch=patch;}}}};
  const m=await api.ensure({chromeApi:migrating,fetchFn:fakeFetch});assert.deepEqual(m.loaded.sort(),['en','ru']);assert.notEqual(migrating.patch.cvVaultEn.base64,'OLD');
  const stable={runtime:{getURL:p=>'chrome-extension://test/'+p},storage:{local:{get:async()=>({cvVaultEn:{name:'manual.pdf',base64:'KEEP',source:'manual'},cvVaultRu:{name:'manual-ru.pdf',base64:'KEEP',source:'manual'},vjaBundledCvVersion:api.VERSION}),set:async patch=>{stable.patch=patch;}}}};
  const st=await api.ensure({chromeApi:stable,fetchFn:fakeFetch});assert.deepEqual(st.loaded,[]);assert.equal(stable.patch,undefined);

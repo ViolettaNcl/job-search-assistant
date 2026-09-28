@@ -7,12 +7,13 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
   const trace=[],messages=[],listeners=[];let nextTab=10,enabled=false,gate=null,queue=[],failRecord=false;
   const clone=v=>v===undefined?undefined:JSON.parse(JSON.stringify(v));
   const event={addListener:()=>{}},local={get:async()=>clone(data),set:async x=>Object.assign(data,clone(x)),remove:async keys=>[].concat(keys).forEach(k=>delete data[k]),setAccessLevel:async()=>{}};
-  const context={console,URL,Date,Promise,AbortController,setTimeout,clearTimeout,self:{},chrome:{runtime:{onInstalled:event,onStartup:event,onMessage:{addListener:f=>listeners.push(f)},getManifest:()=>({version:'2.7.12'}),getURL:p=>'chrome-extension://test/'+p},alarms:{create:async()=>{},onAlarm:event},storage:{local,sync:{get:async()=>({apiBase})}},tabs:{
+  const context={console,URL,Date,Promise,AbortController,setTimeout,clearTimeout,crypto:require('node:crypto').webcrypto,self:{},chrome:{runtime:{onInstalled:event,onStartup:event,onMessage:{addListener:f=>listeners.push(f)},getManifest:()=>JSON.parse(fs.readFileSync(__dirname+'/manifest.json')),getURL:p=>'chrome-extension://test/'+p},alarms:{create:async()=>{},onAlarm:event},permissions:{contains:async()=>true,onRemoved:event},scripting:{executeScript:async()=>{}},storage:{local,sync:{get:async()=>({apiBase})}},tabs:{
     create:async p=>{trace.push(['create',p]);if(createFails)throw Error('tab unavailable');const tab={id:++nextTab,status:'complete',url:p.url};tabs.set(tab.id,tab);return tab;},
     get:async n=>tabs.get(n),remove:async n=>{trace.push(['close',n]);tabs.delete(n);},update:async(n,p)=>{trace.push(['update',n,p]);Object.assign(tabs.get(n),p);return tabs.get(n);},
     sendMessage:async(n,m)=>{if(n===1){messages.push(m);return;}
+      if(m.type==='vjaCopilotPage'){const tab=tabs.get(n);if(m.action==='ping')return {ok:true};if(m.action==='vacancy')return {vacancy:{url:tab.url,vacancyId:new URL(tab.url).pathname.split('/').pop(),title:'Junior C# Developer',description:'C# ASP.NET Core SQL Server REST API Docker remote. Full description from the employer page.',descriptionCoverage:'full-dom'}};}
       if(m.type==='vjaSiteApplyReady')return {ready:true};
-      if(m.plan.automatic){assert(m.plan.coverLetter.length>40);assert(!/Crowne|Front Desk|Receptionist/i.test(m.plan.coverLetter));}else assert.equal(m.plan.coverLetter,'Letter for '+m.plan.trackedId);trace.push(['send',n,clone(m.plan)]);
+      if(!m.plan.id.startsWith('old')){assert(m.plan.coverLetter.length>40);assert(!/Crowne|Front Desk|Receptionist/i.test(m.plan.coverLetter));}trace.push(['send',n,clone(m.plan)]);
       if(gate)await gate.promise;
       return pending?{status:'submitted-needs-letter'}:{submitted:true,status:'confirmed',coverLetterFilled:letter};}
   }}};
@@ -38,7 +39,7 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
 (async()=>{
   const f=await fixture();await f.send();
   assert.equal(f.trace.find(x=>x[0]==='create')[1].active,false);
-  assert(f.trace.some(x=>x[0]==='http'&&x[1].endsWith('/browser-applied')&&JSON.parse(x[2]).coverLetter==='Letter for '+id(1)));
+  assert(f.trace.some(x=>x[0]==='http'&&x[1].endsWith('/browser-applied')&&JSON.parse(x[2]).coverLetter===f.jobs()[0].plan.coverLetter&&f.jobs()[0].context.evidenceAudit.factIds.length>0));
   assert.equal(f.messages.at(-1).status,'confirmed');assert(f.jobs()[0].completed);
   assert(!f.trace.some(x=>x[0]==='update'&&x[2].active));
   await f.send();assert.equal(f.trace.filter(x=>x[0]==='send').length,1,'completed duplicate never resends');

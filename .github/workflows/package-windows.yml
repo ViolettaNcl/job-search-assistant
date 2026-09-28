@@ -48,6 +48,11 @@ jobs:
           Copy-Item scripts/start-assistant-windows.cmd dist/Violetta-Apply-Assistant/start-assistant.cmd -Force
           Copy-Item scripts/user-settings.example.cmd dist/Violetta-Apply-Assistant/user-settings.example.cmd -Force
           Copy-Item scripts/START_HERE.txt dist/Violetta-Apply-Assistant/START_HERE.txt -Force
+          # Violetta 3.8 companion files
+          Copy-Item BACKEND_DIAGNOSTICS.cmd,STOP_ASSISTANT.cmd,UPDATE_EXISTING.cmd dist/Violetta-Apply-Assistant/ -Force
+          Copy-Item tools dist/Violetta-Apply-Assistant/tools -Recurse -Force
+          Copy-Item README.md,ARCHITECTURE.md,IMPLEMENTATION_STATUS.md,SUPPORTED_SITES.md,TESTING_GUIDE.md,WHAT_CHANGED.md,SECURITY.md,ROADMAP.md dist/Violetta-Apply-Assistant/ -Force
+          Copy-Item docs dist/Violetta-Apply-Assistant/docs -Recurse -Force
 
           if (-not (Test-Path 'dist/Violetta-Apply-Assistant/backend/JobSearchAssistant.exe')) {
             throw 'Published Windows backend executable is missing.'

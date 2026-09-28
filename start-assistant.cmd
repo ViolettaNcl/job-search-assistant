@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
-title Violetta Apply Assistant 3.7.0
+title Violetta Apply Assistant 3.8.0
 
 set "VJA_API=http://127.0.0.1:8080"
 set "VJA_BACKEND=%~dp0backend"
@@ -43,7 +43,7 @@ if not exist "%VJA_EXE%" (
 
 echo.
 echo ============================================================
-echo   Violetta Apply Assistant 3.7.0
+echo   Violetta Apply Assistant 3.8.0
 echo ============================================================
 echo API:  %VJA_API%
 echo Data: %VJA_DATA_DIR%
@@ -125,7 +125,7 @@ exit /b 0
 :startup_failed
 echo.
 echo [ERROR] Backend process did not start correctly or exited before /health/live became available.
-echo The old launcher hid this information; 3.7.0 keeps diagnostic logs instead.
+echo The old launcher hid this information; 3.8.0 keeps diagnostic logs instead.
 echo.
 call "%~dp0BACKEND_DIAGNOSTICS.cmd" nopause
 

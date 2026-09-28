@@ -1,6 +1,6 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.vjaBundledCv=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
-  const VERSION='2026-09-23-v2';
+  const VERSION='2026-09-28-v3';
   const specs={
     en:{key:'cvVaultEn',path:'assets/cv/Violetta_Nicolaou_CV_EN.pdf',name:'Violetta_Nicolaou_CV_EN.pdf',language:'en'},
     ru:{key:'cvVaultRu',path:'assets/cv/Violetta_Nicolaou_CV_RU.pdf',name:'Violetta_Nicolaou_CV_RU.pdf',language:'ru'}
@@ -29,7 +29,7 @@
     const installingThisBundle=stored.vjaBundledCvVersion!==VERSION;
     for(const spec of Object.values(specs)){
       const current=stored[spec.key];
-      if(!force&&!installingThisBundle&&current?.base64)continue;
+      if(!force&&current?.base64&&(!installingThisBundle||current.source!=='bundled'))continue;
       const file=await load(spec,chromeApi,fetchFn);patch[spec.key]=file;loaded.push(spec.language);
     }
     if(force||installingThisBundle)patch.vjaBundledCvVersion=VERSION;

@@ -1,82 +1,61 @@
-VIOLETTA APPLY ASSISTANT — WINDOWS QUICK START
-=============================================
+VIOLETTA APPLY ASSISTANT 3.8.0
+=============================
 
-1. Extract the whole ZIP to a normal folder.
+ОБНОВИТЬ УСТАНОВЛЕННУЮ ВЕРСИЮ
+1. Распакуйте весь ZIP рядом со старой папкой, не внутрь неё.
+2. Остановите старый backend: STOP_ASSISTANT.cmd.
+3. Запустите UPDATE_EXISTING.cmd из новой папки, выберите старую установленную папку.
+4. Не удаляйте расширение Chrome: нажмите Reload в chrome://extensions.
+5. Обновите открытые вкладки HH и чатов.
+6. Запустите start-assistant.cmd из обновлённой старой папки.
 
-2. Double-click:
-   start-assistant.cmd
+ПЕРВЫЙ ЗАПУСК
+Распакуйте весь ZIP. Chrome → chrome://extensions → Режим разработчика →
+Загрузить распакованное → папка extension внутри пакета.
+Запустите start-assistant.cmd. Одного запуска сервера недостаточно без расширения.
 
-   The launcher starts the local backend at:
-   http://127.0.0.1:8080
+ПРОФИЛЬ
+Настройки → Профиль → Память CV и HH.
+Версия источников: 2026-09-28.1; добавлены ваши AppXite и фриланс-сведения.
+PDF сохранены без переписывания. В них AppXite не добавлялся: новые данные
+находятся в памяти профиля по вашему тексту HH. Неизвестные факты не угадываются.
+Ручные CV и контакты при обновлении не должны перезаписываться.
 
-   No database installation is required. By default the assistant stores its
-   persistent local database here:
-   %LOCALAPPDATA%\ViolettaApplyAssistant\jobassistant.db
+ПИСЬМА
+В настройках есть предпросмотр по полному тексту вакансии, без отклика.
+Apply / автопилот используют актуальные факты и полную вакансию.
+Из списка HH полная вакансия может открываться в неактивной вкладке для чтения,
+но текущая вкладка не переключается на внутреннюю страницу расширения.
+При ошибке чтения письмо не отправляется по короткой карточке.
 
-   Application history, queue state, follow-ups and analytics survive backend
-   and computer restarts. The database lives outside the extracted bundle, so
-   replacing the bundle with a newer version does not remove local history.
+ЧАТ
+Откройте нужную переписку → ✎ AI → Проанализировать весь диалог и ответить.
+Проверьте блок «Что прочитано и на чём основан ответ».
+Неизвестный автор / пустой чат / неполная история показываются явно.
+Ответ можно вставить; Send всегда нажимаете вы.
 
-3. FIRST INSTALL ONLY — install the Chrome extension locally:
-   - Open chrome://extensions
-   - Enable Developer mode
-   - Click Load unpacked
-   - Select the included "extension" folder
-   - Pin "Violetta Apply Assistant"
+AI-МОДЕЛЬ
+По умолчанию работают локальные ответы по фактам и короткие письма.
+Для свободных ответов, сложных вопросов и «Улучшить текст»:
+Настройки → AI и ответы → Модель для свободных ответов.
+Укажите совместимый endpoint /chat/completions, модель, ключ и согласие.
+Пример endpoint: https://openrouter.ai/api/v1/chat/completions
+Идентификатор модели берётся из вашего аккаунта провайдера; он не выдуман в пакете.
+Ключ хранится на текущий сеанс Chrome; после полного перезапуска введите его снова.
+Внешняя модель может быть платной. Ключ не отправляйте в чат или GitHub.
 
-4. Open the extension's options page / Setup & Readiness.
-   Run the system check.
+GITHUB
+Запустите SYNC_GITHUB.cmd либо Publish-Violetta-3.8.0.ps1 -Push.
+Отдельно скачанный PS1 предложит выбрать этот полный ZIP.
+По умолчанию репозиторий: %USERPROFILE%\Downloads\job-search-assistant
+Копируются только исходники/тесты/документация из проверенного списка.
+Рабочая папка должна быть чистой. При divergence или ошибке push скрипт остановится.
+Никаких reset --hard, force-push, git clean и удаления базы.
+CV и факты в публичном GitHub будут видны всем; учитывайте видимость репозитория.
 
-5. Store the two CV PDFs once:
-   - English CV
-   - Russian CV
+BACKEND
+http://127.0.0.1:8080
+При ошибке: BACKEND_DIAGNOSTICS.cmd. Базу не удалять.
 
-6. If you want HH.ru direct API submission, configure HH applicant API credentials locally:
-   - Copy user-settings.example.cmd to user-settings.cmd
-   - Fill HH__ClientId and HH__ClientSecret
-   - Keep user-settings.cmd private
-   - Restart start-assistant.cmd
-   - In Setup & Readiness click Connect / refresh HH.ru
-   - Complete HH OAuth in the browser
-
-   HH is optional. External ATS application preparation works without HH direct API access.
-
-7. Choose a working mode:
-
-   AUTONOMOUS HH MODE
-   - Keep the backend window open for the whole working day
-   - Sign in to HH.ru in the same Chrome profile as the extension
-   - Keep Chrome open; the extension connects to the dashboard automatically
-   - Client ID and Client Secret are not required in this browser mode
-   - Select the desired resume on HH when the site offers more than one
-   - Set the minimum fit and daily limit
-   - Click "Запустить AI-ассистента"
-   - The program collects jobs and the extension checks the HH queue every 30 seconds
-   - Each successful application includes the letter generated for that vacancy
-   - Click "Остановить" whenever you want to pause it
-
-   MANUAL EXTENSION MODE
-   - Open a vacancy in Chrome
-   - Open Violetta Apply Assistant
-   - Click "Отправить отклик + письмо"
-   - The extension prepares the tailored letter, selects/attaches the CV and
-     submits only when the final action and required fields are verified
-   - If it stops, review the mandatory field shown in the extension and retry
-
-8. The dashboard records who received each application, the exact time,
-   whether Autopilot or the extension was used, whether a letter was attached,
-   and later HR/interview/rejection/offer updates.
-
-OPTIONAL DATABASE SETTINGS
---------------------------
-- The default local SQLite database requires no setup.
-- Advanced users can override the SQLite connection using ConnectionStrings__Sqlite.
-- PostgreSQL remains supported for a server/shared deployment through ConnectionStrings__Postgres.
-  When PostgreSQL is configured it takes precedence over local SQLite.
-
-IMPORTANT
----------
-- Never share user-settings.cmd.
-- Never paste passwords, SMS codes, CAPTCHA answers or 2FA codes into configuration files.
-- Back up %LOCALAPPDATA%\ViolettaApplyAssistant\jobassistant.db if you want an extra copy of local CRM/application history.
-- CV Vault PDFs are stored in Chrome local extension storage, not in the backend database.
+ПРОВЕРКА
+TEST_REPORT.md — фактическая локальная регрессия и ограничения проверки.

@@ -173,8 +173,10 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(!sameApplication(message.plan,{sourceUrl:tab.url}))throw new Error('Вкладка изменилась. Откройте выбранную вакансию.');
     const previous=await applicationNeedsReview({vacancyId:message.plan.trackedId,url:message.plan.sourceUrl});
     if(previous)throw new Error(previous.reason);
-    const plan={...message.plan,automatic:false,popup:true};
+    const enriched=await cpEnrichExistingPlan({...message.plan,automatic:false,popup:true});
+    const plan=enriched.plan;
     await registerApplication(plan,tab.id);
+    await updateApplicationJob(plan.id,{context:enriched.context});
     await executeApplication(await browserAutopilotApiBase(),plan);
     return {ok:true,job:await applicationJob(plan.id)};
   })().then(respond).catch(error=>respond({ok:false,error:error.message}));

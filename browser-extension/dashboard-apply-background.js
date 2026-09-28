@@ -57,8 +57,10 @@ async function runDashboardApply(api, vacancyId, sender, requestId) {
     if(!prepared.ready || prepared.candidate?.vacancyId!==vacancyId || !prepared.draft?.coverLetter) throw new Error(prepared.message||'Не удалось подготовить отклик.');
     const priorUrl=await applicationNeedsReview(prepared.candidate);
     if(priorUrl)throw new Error(priorUrl.reason);
-    const plan={...self.vjaBrowserAutopilot.buildPlan(prepared.candidate,prepared.draft),...stub,automatic:false};
+    const enriched=await cpEnrichExistingPlan({...self.vjaBrowserAutopilot.buildPlan(prepared.candidate,prepared.draft),...stub,automatic:false});
+    const plan=enriched.plan;
     await registerApplication(plan);
+    await updateApplicationJob(plan.id,{context:enriched.context});
     await executeApplication(api,plan);
   } catch(error) {await dashboardApplyNotify(stub,{message:error?.message||String(error)});}
   finally {applicationClaims.delete(vacancyId);}

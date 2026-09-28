@@ -14,7 +14,7 @@ set "VJA_STDERR_LOG=%VJA_LOG_DIR%\backend.stderr.log"
 set "VJA_DIAG=%VJA_DATA_DIR%\backend-diagnostic.txt"
 if not exist "%VJA_DATA_DIR%" mkdir "%VJA_DATA_DIR%" >nul 2>nul
 
->"%VJA_DIAG%" echo Violetta Apply Assistant 3.7.0 backend diagnostics
+>"%VJA_DIAG%" echo Violetta Apply Assistant 3.8.0 backend diagnostics
 >>"%VJA_DIAG%" echo Generated: %DATE% %TIME%
 >>"%VJA_DIAG%" echo Project: %~dp0
 >>"%VJA_DIAG%" echo API: %VJA_API%

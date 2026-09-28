@@ -1,4 +1,4 @@
-﻿# Release packages
+# Release packages
 *.zip
 *.zip.sha256
 *.sha256
@@ -49,3 +49,11 @@ Thumbs.db
 FILE_HASHES.sha256
 *.zip
 *.zip.sha256
+/artifacts/
+/dist/
+**/.env
+**/.env.*
+!**/.env.example
+**/candidate.private.json
+**/appsettings.local.json
+**/user-settings.cmd

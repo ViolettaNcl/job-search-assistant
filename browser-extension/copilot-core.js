@@ -5,7 +5,7 @@
   if (root) root.vjaCopilotCore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   'use strict';
-  const VERSION = '3.7.0';
+  const VERSION = '3.8.0';
   function newId(){if(globalThis.crypto?.randomUUID)return globalThis.crypto.randomUUID();const b=new Uint8Array(16);globalThis.crypto.getRandomValues(b);b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;const h=Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');return [h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-');}
   const clean = v => String(v ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
   const clip = (v, n = 12000) => clean(v).slice(0, n);
@@ -57,7 +57,7 @@
     const url = canonicalUrl(v.url || v.vacancyUrl || v.sourceUrl || '');
     const p = v.provider || v.ats || provider(url);
     const id = clean(v.vacancyId || v.jobId || v.requisitionId || idFromUrl(url));
-    return { ...v, provider:p, vacancyId:id, url, tenant:tenant(url,p), title:clip(v.title || v.jobTitle,300), company:clip(v.company || v.companyName,300), description:clip(v.description,24000) };
+    return { ...v, provider:p, vacancyId:id, url, tenant:tenant(url,p), title:clip(v.title || v.jobTitle,300), company:clip(v.company || v.companyName,300), description:String(v.description||'').replace(/\u00a0/g,' ').trim().slice(0,60000) };
   }
   function vacancyKey(input = {}) {
     const v = vacancy(input);
@@ -86,6 +86,7 @@
     ['sales', /sales|account manager|продаж/i]
   ];
   function classifyRole(title = '', description = '') {
+    if(globalThis.vjaRelevance)return globalThis.vjaRelevance.route(title,description);
     for (const [id,re] of roles) if (re.test(title)) return id;
     for (const [id,re] of roles) if (re.test(description)) return id;
     return 'other';
@@ -95,10 +96,10 @@
   function profile(input = {}, defaults = {}) {
     const p = {...defaults,...input};
     const contacts = {...(defaults.contacts || {}),...(input.contacts || {})};
-    const facts = (Array.isArray(p.facts) ? p.facts : []).filter(f => f && typeof f.id === 'string').slice(0,200).map(f => ({ id:clip(f.id,80),kind:clip(f.kind,40),text:clip(f.text,1800),status:['CONFIRMED','TRANSFERABLE','INFERENCE','UNKNOWN'].includes(f.status)?f.status:'UNKNOWN',roles:Array.isArray(f.roles)?f.roles.filter(x=>labels[x]):[],source:clip(f.source,200) }));
-    return { version:3, fullName:clip(p.fullName,200),firstName:clip(p.firstName,100),lastName:clip(p.lastName,100),contacts:{email:clip(contacts.email,254),telegram:clip(contacts.telegram,100),phone:clip(contacts.phone,40),preferredContact:['platform_chat','telegram','email'],phoneAvailability:'limited'},location:clip(p.location,200),github:clip(p.github,500),portfolio:clip(p.portfolio,500),linkedin:clip(p.linkedin,500),facts,updatedAt:p.updatedAt||null };
+    const facts = (Array.isArray(p.facts) ? p.facts : []).filter(f => f && typeof f.id === 'string').slice(0,200).map(f => ({ ...f, id:clip(f.id,80),kind:clip(f.kind,40),text:clip(f.text,1800),status:['CONFIRMED','TRANSFERABLE','INFERENCE','UNKNOWN'].includes(f.status)?f.status:'UNKNOWN',roles:Array.isArray(f.roles)?f.roles.filter(x=>labels[x]):[],source:clip(f.source,200) }));
+    return { ...p, version:4, fullName:clip(p.fullName,200),firstName:clip(p.firstName,100),lastName:clip(p.lastName,100),contacts:{email:clip(contacts.email,254),telegram:clip(contacts.telegram,100),phone:clip(contacts.phone,40),preferredContact:['platform_chat','telegram','email'],phoneAvailability:'limited'},location:clip(p.location,200),github:clip(p.github,500),portfolio:clip(p.portfolio,500),linkedin:clip(p.linkedin,500),facts,updatedAt:p.updatedAt||null };
   }
-  function confirmed(p = {}, role = '') { return (p.facts || []).filter(f => f.status === 'CONFIRMED' && (!role || !f.roles?.length || f.roles.includes(role))); }
+  function confirmed(p = {}, role = '') { if(globalThis.vjaCandidateTruth)return globalThis.vjaCandidateTruth.evidence(p,role); return (p.facts || []).filter(f => f.status === 'CONFIRMED' && (!role || !f.roles?.length || f.roles.includes(role))); }
   function roleProfile(p, role) { return {id:role,headline:labels[role]||role,factIds:confirmed(p,role).map(f=>f.id)}; }
   function cvSelection(role,lang,stored={}) {
     // 3.5 keeps CV choice intentionally simple: the bundled/user-replaced RU or EN
@@ -247,6 +248,7 @@
     return lang==='ru'?`GitHub с проектами: ${link}`:`GitHub projects: ${link}`;
   }
   function coverLetter(p, v, lang = language(v.title+' '+v.description)) {
+    if(globalThis.vjaRelevance){const result=globalThis.vjaRelevance.localCover(p,v,lang);return result.ok?result.text:'';}
     const role=classifyRole(v.title,v.description),skills=relevantSkills(p,role,v,4),project=projectSentence(p,role,v,lang),github=githubSentence(p,role,v,lang);
     const title=clean(v.title)||(lang==='ru'?'эта вакансия':'this role');
     const company=clean(v.company);
@@ -276,6 +278,7 @@
     return [intro,rel,'I have practical experience communicating with people and handling day-to-day work tasks, and I learn new processes quickly.','I would be glad to discuss the details.'].filter(Boolean).join(' ').slice(0,780);
   }
   function guardDraft(text, p, context={}) {
+    if(globalThis.vjaRelevance){const v=globalThis.vjaRelevance.verify(text,p,{...context,kind:'reply'});return {...v,text:String(text||'').trim(),reason:v.errors?.join(',')||''};}
     const draft=clip(text,4000); const evidence=confirmed(p).map(f=>f.text).join('\n');
     if(!draft)return {ok:false,reason:'empty'};
     // Numbers about experience/availability/pay must never be invented by an LLM.

@@ -5,6 +5,7 @@ import asyncio, base64, json, tempfile, threading, http.server, shutil
 from pathlib import Path
 from playwright.async_api import async_playwright
 ROOT=Path(__file__).resolve().parents[1]
+EXT=ROOT/('browser-extension' if (ROOT/'browser-extension').exists() else 'extension')
 RESULTS=ROOT/'test-results';RESULTS.mkdir(exist_ok=True)
 async def main():
  proc=await asyncio.create_subprocess_exec('node',str(ROOT/'tests/worker-bridge.cjs'),stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,limit=4*1024*1024)
@@ -23,9 +24,9 @@ async def main():
  def check(name,cond):
   assert cond,name;passed.append(name);print('PASS',name,flush=True)
  base='https://fixture.invalid'
- scripts=json.loads((ROOT/'extension/manifest.json').read_text())['content_scripts'][1]['js']
+ scripts=json.loads((EXT/'manifest.json').read_text())['content_scripts'][1]['js']
  async with async_playwright() as p:
-  browser=await p.chromium.launch(executable_path=shutil.which('chromium'),headless=True,args=['--no-sandbox','--disable-gpu']);ctx=await browser.new_context(viewport={'width':1280,'height':1000});ctx.set_default_timeout(5000)
+  browser=await p.chromium.launch(executable_path=shutil.which('chromium') or None,headless=True,args=['--no-sandbox','--disable-gpu']);ctx=await browser.new_context(viewport={'width':1280,'height':1000});ctx.set_default_timeout(5000)
   pages={};nextid=7
   async def bridge(source,msg):return await call(op='message',message=msg,sender={'tab':{'id':pages[source['page']]},'frameId':0,'url':await source['frame'].evaluate('__vjaLocation.href')})
   await ctx.expose_binding('workerBridge',bridge)
@@ -38,7 +39,7 @@ async def main():
    await pg.evaluate('(url)=>{window.__vjaLocation=new URL(url)}',virtual_base+path)
    if inject:
     await pg.add_script_tag(content=chrome_mock)
-    for script in scripts:await pg.add_script_tag(content=(ROOT/'extension'/script).read_text().replace('location.', '__vjaLocation.'))
+    for script in scripts:await pg.add_script_tag(content=(EXT/script).read_text().replace('location.', '__vjaLocation.'))
     await pg.wait_for_timeout(250)
    return pg
   try:
@@ -70,13 +71,14 @@ async def main():
    # Real HH chat markup may not expose stable message data-qa attributes. The
    # DOM fallback must still read the active right-side dialogue instead of the chat list.
    hh_chat_html='''<html><body><div style="display:flex;height:850px"><aside style="width:330px"><h2>Чаты</h2><div>Разработчик C#</div><div>Менеджер</div></aside><main style="width:640px;padding:20px"><header><div>Adviya</div><div>Сейчас онлайн</div><div>Вакансия</div><h2>Специалист чат-поддержки</h2><a href="https://hh.ru/vacancy/999">Перейти</a></header><div class="plain-chat-area"><div class="plain-bubble" style="margin:40px 25px 20px 20px;padding:18px;background:#f3f4f8;border-radius:14px"><p>Здравствуйте! Это команда подбора Adviya. Коротко об условиях вакансии.</p><p>Задачи: консультация клиентов в чате и ведение истории общения в CRM.</p><p>Требование: знание азербайджанского языка.</p><p>Если условия подходят, напишите здесь несколько слов о себе.</p></div></div><form><textarea aria-label="Сообщение" placeholder="Сообщение" style="width:100%;height:70px"></textarea><button type="submit">Отправить</button></form></main></div></body></html>'''
-   hh_chat=await open_page('/chat',html=hh_chat_html,virtual_base='https://hh.ru');hh_snap=await hh_chat.evaluate('vjaLiveChat.snapshot()');check('HH chat fallback reads dialogue even without stable message selectors',len(hh_snap.get('messages',[]))>0 and 'Если условия подходят' in hh_snap.get('latestInbound',''))
+   hh_chat=await open_page('/chat',html=hh_chat_html,virtual_base='https://hh.ru');hh_snap=await hh_chat.evaluate('vjaLiveChat.snapshot()');check('HH chat fallback reads dialogue even without stable message selectors',len(hh_snap.get('messages',[]))>0 and 'Если условия подходят' in ' '.join(m['text'] for m in hh_snap.get('messages',[])) and not hh_snap.get('latestInbound'))
    context_before=await chat.evaluate('vjaLiveChat.snapshot()');await chat.evaluate('switchThread()');r=await chat.evaluate('(s)=>vjaLiveChat.insertText("Wrong A reply",s)',context_before);check('old thread insertion rejected immediately',r.get('code')=='stale' and await chat.locator('textarea[name=message]').input_value()=='')
    await chat.wait_for_timeout(300);await chat.evaluate('dispatchExtensionMessage({type:"vjaCopilotPage",action:"command",command:"contacts-reply"})');check('hotkey command only inserts contacts', '@Violet111' in await chat.locator('textarea[name=message]').input_value() and await chat.evaluate('sends')==0)
    await chat.locator('textarea[name=message]').fill('');await chat.evaluate('dispatchExtensionMessage({type:"vjaCopilotPage",action:"command",command:"thank-you-reply"})');hot=await chat.locator('textarea[name=message]').input_value();check('thank-you hotkey inserts full default feedback reply without Send',hot.startswith('Здравствуйте! Спасибо за ответ.') and '@Violet111' in hot and 'violettanicolaou@gmail.com' in hot and await chat.evaluate('sends')==0)
    await chat.evaluate("switchThread('chat-A','support-1');document.querySelector('.incoming').textContent='Спасибо! Мы дадим обратную связь до пятницы.'");await chat.wait_for_timeout(300);await chat.evaluate("chrome.runtime.sendMessage({type:'vjaCopilot',op:'observe-chat',snapshot:vjaLiveChat.snapshot()})");state=await call(op='get');support_job=next(v for k,v in state['data'].items() if k.startswith('vjaApplicationJob:') and v.get('plan',{}).get('vacancyId')=='support-1');next_action=support_job.get('context',{}).get('nextAction');check('explicit recruiter deadline becomes a local next-action reminder',support_job.get('context',{}).get('status')=='Recruiter Replied' and next_action and next_action.get('type')=='feedback' and next_action.get('dueAt',0)>0)
    ext_sender={'url':'chrome-extension://fixture/home.html'};apps_payload=await call(op='message',message={'type':'vjaCopilot','op':'applications'},sender=ext_sender);check('popup analytics are derived from stored application history',apps_payload.get('ok') is True and apps_payload.get('analytics',{}).get('total',{}).get('applications',0)>=1 and apps_payload.get('analytics',{}).get('total',{}).get('response',0)>=1)
    app_id=support_job['plan']['id'];old_due=next_action['dueAt'];snoozed=await call(op='message',message={'type':'vjaCopilot','op':'next-action','id':app_id,'mode':'snooze','days':1},sender=ext_sender);check('next-action reminder can be snoozed without sending anything',snoozed.get('ok') is True and snoozed.get('application',{}).get('nextAction',{}).get('dueAt',0)>old_due and await chat.evaluate('sends')==0);done=await call(op='message',message={'type':'vjaCopilot','op':'next-action','id':app_id,'mode':'done'},sender=ext_sender);check('next-action can be marked done locally',done.get('ok') is True and done.get('application',{}).get('nextAction',{}).get('doneAt',0)>0)
+   await call(op='set',data={'vjaWritingProvider':{'mode':'custom','endpoint':'http://127.0.0.1:43210/v1/chat/completions','model':'fixture-model','consent':True}})
    # Thread A request remains in flight while navigating to B.
    await chat.evaluate("switchThread('chat-A','support-1');document.querySelector('.incoming').textContent='SLOW_TEST расскажите о задачах';");await chat.wait_for_timeout(250)
    await chat.evaluate('()=>{window.slowResult=vjaLiveChat.analyze("neutral","",true);}');await chat.wait_for_timeout(150);await chat.evaluate('switchThread()');r=await chat.evaluate('window.slowResult');check('late Chat A response discarded in Chat B',r.get('code')=='stale' and await chat.get_by_label('Черновик ответа',exact=True).count()==0)
@@ -95,7 +97,7 @@ async def main():
    # A trusted native HH list-card click is allowed to complete the same card's cover letter inline.
    hh_html='''<html><body><div data-qa="vacancy-serp__vacancy" id="card"><a data-qa="serp-item__title" href="https://hh.ru/vacancy/777">Junior .NET Backend Developer</a><div data-qa="vacancy-serp__vacancy-employer">Fixture Tech</div><div data-qa="vacancy-serp__vacancy-address">Можно удалённо</div><p>C# ASP.NET Core REST API SQL Server Docker backend developer</p><button id="nativeApply">Откликнуться</button><div id="receipt" hidden>Вы откликнулись <button id="attach">Приложить письмо</button></div></div><script>window.sentLetter='';nativeApply.addEventListener('click',()=>{receipt.hidden=false});attach.addEventListener('click',()=>{const d=document.createElement('div');d.className='bloko-modal';d.innerHTML='<h2>Сопроводительное письмо</h2><textarea name="coverLetter" placeholder="Почему именно ваша кандидатура должна заинтересовать работодателя"></textarea><footer><button id="closeLetter">Закрыть</button><button id="sendLetter">Отправить</button></footer>';document.body.append(d);d.querySelector('#sendLetter').addEventListener('click',()=>{window.sentLetter=d.querySelector('textarea').value;d.remove()})});</script></body></html>'''
    hh=await open_page('/search/vacancy?text=.net',html=hh_html,virtual_base='https://hh.ru');await hh.get_by_role('button',name='Откликнуться',exact=True).click();
-   await hh.wait_for_function("window.sentLetter && window.sentLetter.length>20",timeout=12000);sent_letter=await hh.evaluate('window.sentLetter');check('native HH list click attaches and sends a vacancy-specific cover letter without opening vacancy detail','Junior .NET Backend Developer' in sent_letter and 'github.com/ViolettaNcl' in sent_letter and len(ctx.pages)>=1)
+   await hh.wait_for_function("window.sentLetter && window.sentLetter.length>20",timeout=12000);sent_letter=await hh.evaluate('window.sentLetter');check('native HH list click attaches and sends a vacancy-specific cover letter without opening vacancy detail','DentalClinic' in sent_letter and 'github.com/ViolettaNcl' in sent_letter and len(ctx.pages)>=1)
    list_job=None
    for _ in range(30):
     state=await call(op='get');list_job=next((v for k,v in state['data'].items() if k.startswith('vjaApplicationJob:') and v.get('plan',{}).get('vacancyId')=='777'),None)
@@ -108,9 +110,9 @@ async def main():
    # Open shadow DOM fields and explicit steps are browser DOM operations.
    shadow=await open_page('/application-shadow',inject=False,html='<html><body><h1>QA Engineer</h1><div id="host"></div></body></html>');await shadow.evaluate("document.querySelector('#host').attachShadow({mode:'open'}).innerHTML='<form id=application><label>Email<input name=email type=email></label><button type=submit>Submit application</button></form>'")
    await shadow.add_script_tag(content=chrome_mock)
-   for script in scripts:await shadow.add_script_tag(content=(ROOT/'extension'/script).read_text().replace('location.', '__vjaLocation.'))
+   for script in scripts:await shadow.add_script_tag(content=(EXT/script).read_text().replace('location.', '__vjaLocation.'))
    await shadow.evaluate('vjaUniversal.prepare({open:false})');check('open shadow DOM form fills',await shadow.locator('#host input').input_value()=='violettanicolaou@gmail.com')
-   r=await call(op='get');ai_requests=[h for h in r['http'] if h['url'].endswith('/api/operator/recruiter/triage')];check('AI payload includes vacancy snapshot CV version and latest message',any('cvVersion' in h['body'] and 'support-1' in h['body'] and 'CONFIRMED' in h['body'] for h in ai_requests));check('no final submission HTTP endpoint called',not any('apply-tailored' in h['url'] or 'browser-applied' in h['url'] or 'browser-auto-applied' in h['url'] for h in r['http']))
+   r=await call(op='get');ai_requests=[h for h in r['http'] if h['url'].endswith('/chat/completions')];check('AI payload includes vacancy snapshot CV version and latest message',any('applicationContext' in h['body'] and 'support-1' in h['body'] and 'CONFIRMED' in h['body'] and 'AppXite' in h['body'] for h in ai_requests));check('no final submission HTTP endpoint called',not any('apply-tailored' in h['url'] or 'browser-applied' in h['url'] or 'browser-auto-applied' in h['url'] for h in r['http']))
    # A safe multi-step button never becomes a final submit command.
    step=await open_page('/application-step',html='<html><body><h1>Junior Developer</h1><main data-job-id="step-1"><form id="application" data-step="1"><label>First name<input name="firstName"></label><button type="button" id="next">Next</button></form></main><script>window.submits=0;document.querySelector("form").addEventListener("submit",e=>{e.preventDefault();submits++});document.querySelector("#next").onclick=()=>{document.querySelector("form").innerHTML="<label>Email<input type=email name=email></label><button type=submit>Submit application</button>"};</script></body></html>')
    await step.evaluate('vjaUniversal.prepare({open:false})');await step.get_by_role('button',name='Следующий шаг',exact=True).click();await step.wait_for_timeout(700);check('explicit intermediate step fills next form without submit',await step.locator('[name=email]').input_value()=='violettanicolaou@gmail.com' and await step.evaluate('submits')==0)
@@ -121,26 +123,66 @@ async def main():
    # Render the real compact action popup and verify the new rocket agent is the primary autonomous control.
    import re
    home=await ctx.new_page();nextid+=1;pages[home]=nextid;home.on('pageerror',lambda e:page_errors.append('home: '+str(e)))
-   home_markup=(ROOT/'extension/home.html').read_text();await home.set_content(re.sub(r'<script src="[^"]+"></script>','',home_markup));await home.add_script_tag(content=chrome_mock)
+   home_markup=(EXT/'home.html').read_text();await home.set_content(re.sub(r'<script src="[^"]+"></script>','',home_markup));await home.add_script_tag(content=chrome_mock)
    await home.evaluate("""()=>{chrome.tabs={query:async()=>[{id:91,url:'https://hh.ru/search/vacancy?text=.net'}],sendMessage:async()=>({pageType:'JOB_LIST'}),create:async()=>{}};chrome.permissions={contains:async()=>true,request:async()=>true};chrome.storage.session={get:async()=>({vjaAutopilotSession:{count:0}}),remove:async()=>{}};chrome.storage.sync={get:async(arg)=>{if(Array.isArray(arg))return {vjaHhBrowserSearch:true};return {apiBase:'http://127.0.0.1:8080'};},set:async()=>{}};chrome.storage.local={get:async()=>({}),set:async()=>{},remove:async()=>{}};chrome.runtime.sendMessage=async m=>m?.type==='vjaCopilot'?(m.op==='applications'?{ok:true,applications:[],analytics:null}:{ok:true}):{ok:true};window.fetch=async()=>({ok:true,text:async()=>JSON.stringify({allowed:true,autoApplyEnabled:false,remainingToday:15,autoApplyMinimumScore:80,dailyAutoApplyLimit:15,appliedToday:0,lastMessage:''})});}""")
-   await home.add_script_tag(content=(ROOT/'extension/home.js').read_text());await home.wait_for_timeout(200);check('compact home popup exposes the rocket autopilot with threshold/session/day status',await home.get_by_role('button',name='🚀 Запустить автопилот',exact=True).count()==1 and 'Порог 80/100' in await home.locator('#autopilotHomeStats').inner_text() and await home.locator('#primary').is_disabled())
+   await home.add_script_tag(content=(EXT/'home.js').read_text());await home.wait_for_timeout(200);check('compact home popup exposes the rocket autopilot with threshold/session/day status',await home.get_by_role('button',name='🚀 Запустить автопилот',exact=True).count()==1 and 'Порог 80/100' in await home.locator('#autopilotHomeStats').inner_text() and await home.locator('#primary').is_disabled())
    # Render the actual settings with storage/Chrome APIs mocked at the boundary.
    import re
-   opt=await ctx.new_page();nextid+=1;pages[opt]=nextid;opt.on('pageerror',lambda e:page_errors.append('options: '+str(e)))
-   markup=(ROOT/'extension/options.html').read_text();option_scripts=re.findall(r'<script src="([^"]+)"></script>',markup)
+   opt=await ctx.new_page();nextid+=1;pages[opt]=nextid;opt.on('pageerror',lambda e:page_errors.append('options: '+str(e)));opt.on('console',lambda m: print('OPTIONS CONSOLE',m.text,flush=True) if m.type in ['error','warning'] else None)
+   markup=(EXT/'options.html').read_text();option_scripts=re.findall(r'<script src="([^"]+)"></script>',markup)
    await opt.set_content(re.sub(r'<script src="[^"]+"></script>','',markup));await opt.evaluate("()=>window.__vjaLocation=new URL('chrome-extension://fixture/options.html')")
    await ctx.expose_binding('readFixtureStorage',lambda source:call(op='get'))
    async def write_storage(source,data):return await call(op='set',data=data)
    await ctx.expose_binding('writeFixtureStorage',write_storage)
    await opt.add_script_tag(content=chrome_mock)
    await opt.evaluate("""()=>{chrome.storage.local.get=async()=> (await readFixtureStorage()).data;chrome.storage.local.set=writeFixtureStorage;chrome.storage.sync={get:async()=>({apiBase:'http://localhost:8080'}),set:async()=>{}};chrome.runtime.openOptionsPage=async()=>{};chrome.commands={getAll:async()=>[]};chrome.tabs={create:async()=>{},query:async()=>[]};chrome.scripting={getRegisteredContentScripts:async()=>[]};window.fetch=async()=>({ok:false,status:503,json:async()=>({}),text:async()=>''});}""")
-   for script in option_scripts:await opt.add_script_tag(content=(ROOT/'extension'/script).read_text())
+   for script in option_scripts:await opt.add_script_tag(content=(EXT/script).read_text())
    await opt.wait_for_timeout(250);check('actual settings loads migrated contacts',await opt.locator('#cpTelegram').input_value()=='@Violet111')
    await opt.locator('#cpPhone').fill('+70000000000');await opt.locator('#cpSave').click();await opt.get_by_text('Сохранено. Открытые чаты обновятся автоматически или после обновления страницы.', exact=True).wait_for(timeout=3000);stored=await call(op='get');check('settings saves profile and shared legacy phone memory',stored['data']['vjaCandidateTruthProfile']['contacts']['phone']=='+70000000000' and stored['data']['applicationMemory']['phone']=='+70000000000')
    check('settings removed role-specific CV section',await opt.get_by_text('CV для конкретных ролей',exact=False).count()==0)
    check('settings exposes one configurable primary quick reply',await opt.locator('#cpReplies .cpReply').count()==1)
    check('settings exposes native HH list cover-letter toggle',await opt.locator('#cpQuickListCoverLetter').count()==1 and await opt.locator('#cpQuickListCoverLetter').is_checked())
    await opt.screenshot(path=str(RESULTS/'settings.png'))
+   # 3.8 behavior, not merely the presence of buttons.
+   check('memory UI shows imported CV HH provenance',await opt.locator('#truthMemory380').count()==1 and 'AppXite' in await opt.locator('#truthMemory380').text_content())
+   check('model settings distinguish local facts from configured AI',await opt.locator('#writingProvider380').count()==1 and 'Без внешней модели' in await opt.locator('#writingProvider380').text_content())
+   await call(op='set',data={'vjaWritingProvider':{'mode':'local'}})
+   direct=await open_page('/chat.html');await direct.evaluate("document.querySelector('.incoming').textContent='Работали с API? Есть опыт с SQL?'");await direct.wait_for_timeout(200)
+   await direct.get_by_role('button',name='✎ AI',exact=True).click();await direct.get_by_role('button',name='🧠 Проанализировать весь диалог и ответить',exact=True).click()
+   await direct.get_by_label('Черновик ответа',exact=True).wait_for(timeout=4000);reply=await direct.get_by_label('Черновик ответа',exact=True).input_value()
+   check('trusted analyze button answers actual API and SQL questions from current facts','API' in reply and 'SQL' in reply and not reply.startswith('Спасибо'))
+   check('contextual technical reply omits unrelated hospitality and teaching',not any(x in reply for x in ['Crowne','Front Desk','преподав']))
+   await direct.get_by_role('button',name='Вставить',exact=True).click();check('contextual reply insertion never clicks recruiter Send',await direct.evaluate('sends')==0 and await direct.locator('textarea[name=message]').input_value()==reply)
+   await direct.screenshot(path=str(RESULTS/'chat-evidence-3.8.png'),full_page=True)
+   # Candidate corrections do not change an immutable historical application profile.
+   current=await call(op='get');p_before=current['data']['vjaCandidateTruthProfile'];assert p_before['seedRevision']=='2026-09-28.1'
+   check('installed profile actually contains new AppXite and freelance evidence',any(f['id']=='exp-appxite' for f in p_before['facts']) and any(f['id']=='exp-freelance-dev' for f in p_before['facts']))
+   # No content is not an AI success. Unknown evidence is shown separately.
+   await direct.evaluate("document.querySelector('.incoming').textContent='Есть ли опыт с Jira?'");await direct.locator('textarea[name=message]').fill('');await direct.wait_for_timeout(200)
+   r=await direct.evaluate('vjaLiveChat.analyze("dialog","",true)');check('unconfirmed Jira does not become a fabricated answer',not r.get('ok') and await direct.get_by_label('Черновик ответа',exact=True).count()==0)
+   check('missing-fact reason is visible in the chat panel','Jira' in await direct.locator('body').inner_text() and await direct.evaluate('sends')==0)
+   await direct.evaluate("document.querySelectorAll('[data-message-id]').forEach(e=>e.remove())");await direct.wait_for_timeout(200);r=await direct.evaluate('vjaLiveChat.analyze("dialog","",true)');check('empty active history is reported instead of a canned AI response',not r.get('ok') and await direct.get_by_label('Черновик ответа',exact=True).count()==0)
+   # The ambiguous HH bubble can be explicitly attributed, never silently assumed.
+   await hh_chat.evaluate("document.querySelector('.plain-bubble').innerHTML='<p>Работали с API и SQL?</p>'");await hh_chat.wait_for_timeout(200)
+   r=await hh_chat.evaluate('vjaLiveChat.analyze("dialog","",true)');check('ambiguous sender requires a visible single-message confirmation',r.get('code')=='unknown-sender' and await hh_chat.get_by_role('button',name='Это сообщение работодателя — анализировать',exact=True).count()==1)
+   await hh_chat.get_by_role('button',name='Это сообщение работодателя — анализировать',exact=True).click();await hh_chat.get_by_label('Черновик ответа',exact=True).wait_for(timeout=4000)
+   check('confirmed HH sender unlocks a factual draft for the same active dialog','API' in await hh_chat.get_by_label('Черновик ответа',exact=True).input_value())
+   check('HH sidebar conversations never enter read history',not any(m['text']=='Разработчик C#' or m['text']=='Менеджер' for m in (await hh_chat.evaluate('vjaLiveChat.snapshot()'))['messages']))
+   # Read failures must stop letter preparation, not use a vacancy-card snippet.
+   failure=await call(op='eval',code="(async()=>{try{await cpCompleteVacancy({url:'https://hh.ru/vacancy/unreadable',title:'Backend Developer',description:'snippet',descriptionCoverage:'snippet'},{url:'https://hh.ru/search/vacancy'});return false;}catch(e){return e.message;}})()")
+   check('missing full vacancy text blocks letter generation',isinstance(failure,str) and bool(failure))
+   check('HH list sent letter is bound to full-description evidence audit',list_job['context']['evidenceAudit']['coverage']=='full-dom' and list_job['context']['evidenceAudit']['factIds'])
+   # Raw web/AI content cannot invoke the trusted profile import endpoint.
+   denied=await call(op='message',message={'type':'vjaCopilot','op':'source-accept','facts':[{'id':'injected','text':'fake experience'}],'acceptedIds':['injected'],'source':{'id':'bad','type':'user-confirmed'}},sender={'tab':{'id':999},'frameId':0,'url':'https://hh.ru/vacancy/777'})
+   after=await call(op='get');check('employer content cannot write candidate truth facts',not denied.get('ok') and not any(f['id']=='injected' for f in after['data']['vjaCandidateTruthProfile']['facts']))
+   check('thread drafts are not promoted to global candidate history',len(after['data']['vjaCandidateTruthProfile']['facts'])==len(p_before['facts']))
+   # Model transport sends exact active dialog plus evidence (the model is mocked).
+   await call(op='set',data={'vjaWritingProvider':{'mode':'custom','endpoint':'http://127.0.0.1:43210/v1/chat/completions','model':'fixture-model','consent':True}})
+   model_chat=await open_page('/chat.html');await model_chat.evaluate("document.querySelector('.incoming').textContent='Работали с API?'");await model_chat.wait_for_timeout(200)
+   r=await model_chat.evaluate('vjaLiveChat.analyze("dialog","",true)');check('configured model path produces a validated contextual draft',r.get('ok') is True)
+   evidence_text=await model_chat.locator('details').text_content();check('model result is visibly distinguished from local evidence output','AI-модель' in evidence_text)
+   captured=(await call(op='get'))['http'];request_body=json.loads([h['body'] for h in captured if h['url'].endswith('/chat/completions')][-1]);payload=json.loads(request_body['messages'][1]['content'])
+   check('model payload carries last employer question, candidate evidence and application identity',payload['latestRecruiterMessage']['text']=='Работали с API?' and payload['candidateFacts'] and payload['applicationContext']['conversationId']=='chat-A')
    check('no uncaught DOM JavaScript errors',not page_errors)
   finally:
    (RESULTS/'browser-e2e.json').write_text(json.dumps({'passed':passed,'count':len(passed),'pageErrors':page_errors,'boundary':'Offline Chromium DOM + actual worker JS; mocked Chrome APIs, HTTP and page URLs. MV3 load blocked by test-environment administrator policy; not certified live sites.'},ensure_ascii=False,indent=2));await browser.close();proc.terminate();await proc.wait();reader_task.cancel()

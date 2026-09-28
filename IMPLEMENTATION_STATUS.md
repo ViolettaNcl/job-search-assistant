@@ -1,38 +1,23 @@
-# Implementation status — 3.7.0
+# Статус 3.8.0
 
-## Product status
+| Пункт стратегии | Реализация |
+|---|---|
+| Единая память кандидата | Миграция существующего профиля; 56 исходных фактов + актуальные контакты; исходные даты и source IDs. |
+| Новые сведения HH | Импортирован присланный пользователем текст AppXite/фриланс/переводы/Crowne. Автоматический вход в аккаунт HH для чтения CV не выполнялся. |
+| CV | Три исходных PDF сохранены. Основной выбор по языку — RU/EN; ручные CV пользователя при миграции не перезаписываются. |
+| Source Reconciler | Preview/confirm новых структурированных фактов и конфликтов в настройках. Нет автоматического извлечения произвольного нового PDF/HH-резюме. |
+| Role Context Router / Evidence Selector | Разработка, backend/fullstack, QA, technical/integration support, customer support, implementation, teaching и прочие направления. |
+| Отрицательная релевантность | Нерелевантные hospitality/teaching блоки исключены из технических писем. |
+| Полный анализ перед письмом | Apply, автопилот, HH-list, dashboard/advanced. Ошибка получения текста останавливает письмо. |
+| Индивидуальность | Разные требования меняют выбранные факты/проект. Локальный вариант ограничен шаблоном; свободная переформулировка — через настроенную модель. |
+| ATS / естественный стиль | Только подтверждённые термины, краткость, без пересказа CV/keyword stuffing. Обход фильтров/детекторов не обещается. |
+| GitHub | Технические письма — да, преподавание по умолчанию — нет. |
+| Chat Reader | Активная область, целые сообщения, авторы, последнее сообщение, ограниченная подгрузка, диагностика. Неизвестный автор требует подтверждения. |
+| Полноценный chat context | Актуальные факты, текущий чат, открытые вопросы, связанная вакансия и сохранённое письмо. |
+| Quick vs full reply | Отделены. Пустое чтение и неподтверждённые ответы не маскируются canned replies. |
+| Reply verification | Пропуски вынесены отдельно; проверяются evidence IDs, язык, вопросы, длина и ряд ложных утверждений. Проверка не является формальным доказательством. |
+| Memory separation | Переписка/черновики не обновляют глобальные личные факты автоматически. |
+| Свободная AI-генерация | Реальный необязательный Chat Completions transport; нужен endpoint/model/key и согласие. Без модели — локальный фактический режим. |
+| Публикация Git | Whitelist/hash checks, обычный commit/push, резервная копия. Нет force/reset/mirror/delete. |
 
-| Area | Status | Notes |
-|---|---|---|
-| Source cleanup | ✅ Complete | One extension source: `browser-extension/`; generated release files excluded |
-| Candidate Truth Profile | ✅ Implemented | Confirmed / transferable / inference / unknown |
-| RU/EN CV resolver | ✅ Implemented | Simplified language-based selection |
-| Bundled CV assets | ✅ Implemented | Stored as extension assets |
-| Vacancy / role detection | ✅ / ◐ | Adapter + semantic fallback; live DOM can change |
-| Human cover letters | ✅ Implemented | Short, vacancy-first, confirmed skills/projects |
-| IT GitHub portfolio link | ✅ Implemented | Added where relevant |
-| Unrelated hospitality suppression | ✅ Implemented | Technical letters avoid irrelevant repetition |
-| Cover Letter Memory | ✅ Implemented | Per-application exact text/context |
-| ✦ Apply | ✅ Implemented | Supported current-vacancy flow |
-| HH search-list quick apply | ✅ / ◐ | Supported HH flow; DOM-sensitive |
-| 🚀 Autopilot | ✅ Implemented | Explicit start/stop, status and limits |
-| Match / seniority guards | ✅ Implemented | Junior-compatible remote IT focus |
-| High-risk field stops | ✅ Implemented | Salary/visa/legal/privacy/etc. |
-| Recruiter Chat AI | ✅ / ◐ | Active DOM + fallback; live chat DOM can change |
-| Full-dialog analysis | ✅ Implemented | With stale-response protection |
-| Quick Replies | ✅ Implemented | Small Russian set + editable primary |
-| Timeline / follow-up / analytics | ✅ Retained | Existing system preserved |
-| Dedicated multi-site adapters | ◐ Partial | See `SUPPORTED_SITES.md` |
-| Encrypted backup/restore | ⏳ Planned | See `ROADMAP.md` |
-| CAPTCHA/MFA bypass | ❌ Out of scope | Not implemented |
-| Permanent live-site certification | ❌ Not claimed | Requires smoke tests |
-
-## Release engineering
-
-The repository stores source and docs only. Windows runtime binaries, ZIP packages, screenshots/test-output and hash dumps are CI/release artifacts.
-
-## Confidence model
-
-**Green** means the feature exists and is covered by local/synthetic regression.
-
-It does **not** mean an external employer site cannot change its UI tomorrow.
+Не выполнено: подтверждение трудоустройства внешними источниками, переписывание backend ranking/компиляция сервера, реальный логин HH, live-тест внешней модели, запуск Windows EXE и PowerShell на Windows. Это не заявлено выполненным.

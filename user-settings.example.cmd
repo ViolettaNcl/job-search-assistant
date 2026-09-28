@@ -5,7 +5,7 @@ rem Private contact override. Existing extension contact memory is also retained
 rem set "Candidate__Phone=your verified number"
 
 rem Legacy optional HH API credentials (retained for existing integrations).
-rem 3.7.0 enables user-started Apply / Autopilot by default. Set false here only if you want to disable backend automatic submission.
+rem 3.8.0 enables user-started Apply / Autopilot by default. Set false here only if you want to disable backend automatic submission.
 set "HH__ClientId="
 set "HH__ClientSecret="
 

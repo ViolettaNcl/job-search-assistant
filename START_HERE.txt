@@ -1,109 +1,61 @@
-VIOLETTA APPLY ASSISTANT 3.7.0
-==============================
+VIOLETTA APPLY ASSISTANT 3.8.0
+=============================
 
-QUICK START
------------
-Packaged Windows release:
+ОБНОВИТЬ УСТАНОВЛЕННУЮ ВЕРСИЮ
+1. Распакуйте весь ZIP рядом со старой папкой, не внутрь неё.
+2. Остановите старый backend: STOP_ASSISTANT.cmd.
+3. Запустите UPDATE_EXISTING.cmd из новой папки, выберите старую установленную папку.
+4. Не удаляйте расширение Chrome: нажмите Reload в chrome://extensions.
+5. Обновите открытые вкладки HH и чатов.
+6. Запустите start-assistant.cmd из обновлённой старой папки.
 
-1. Run start-assistant.cmd
-2. Reload Violetta Apply Assistant in chrome://extensions
-3. Refresh already-open HH.ru / recruiter-chat tabs
-4. Use:
-   🚀 Autopilot
-   ✦ Apply
-   ✎ AI
+ПЕРВЫЙ ЗАПУСК
+Распакуйте весь ZIP. Chrome → chrome://extensions → Режим разработчика →
+Загрузить распакованное → папка extension внутри пакета.
+Запустите start-assistant.cmd. Одного запуска сервера недостаточно без расширения.
 
-LOCAL BACKEND
--------------
+ПРОФИЛЬ
+Настройки → Профиль → Память CV и HH.
+Версия источников: 2026-09-28.1; добавлены ваши AppXite и фриланс-сведения.
+PDF сохранены без переписывания. В них AppXite не добавлялся: новые данные
+находятся в памяти профиля по вашему тексту HH. Неизвестные факты не угадываются.
+Ручные CV и контакты при обновлении не должны перезаписываться.
+
+ПИСЬМА
+В настройках есть предпросмотр по полному тексту вакансии, без отклика.
+Apply / автопилот используют актуальные факты и полную вакансию.
+Из списка HH полная вакансия может открываться в неактивной вкладке для чтения,
+но текущая вкладка не переключается на внутреннюю страницу расширения.
+При ошибке чтения письмо не отправляется по короткой карточке.
+
+ЧАТ
+Откройте нужную переписку → ✎ AI → Проанализировать весь диалог и ответить.
+Проверьте блок «Что прочитано и на чём основан ответ».
+Неизвестный автор / пустой чат / неполная история показываются явно.
+Ответ можно вставить; Send всегда нажимаете вы.
+
+AI-МОДЕЛЬ
+По умолчанию работают локальные ответы по фактам и короткие письма.
+Для свободных ответов, сложных вопросов и «Улучшить текст»:
+Настройки → AI и ответы → Модель для свободных ответов.
+Укажите совместимый endpoint /chat/completions, модель, ключ и согласие.
+Пример endpoint: https://openrouter.ai/api/v1/chat/completions
+Идентификатор модели берётся из вашего аккаунта провайдера; он не выдуман в пакете.
+Ключ хранится на текущий сеанс Chrome; после полного перезапуска введите его снова.
+Внешняя модель может быть платной. Ключ не отправляйте в чат или GitHub.
+
+GITHUB
+Запустите SYNC_GITHUB.cmd либо Publish-Violetta-3.8.0.ps1 -Push.
+Отдельно скачанный PS1 предложит выбрать этот полный ZIP.
+По умолчанию репозиторий: %USERPROFILE%\Downloads\job-search-assistant
+Копируются только исходники/тесты/документация из проверенного списка.
+Рабочая папка должна быть чистой. При divergence или ошибке push скрипт остановится.
+Никаких reset --hard, force-push, git clean и удаления базы.
+CV и факты в публичном GitHub будут видны всем; учитывайте видимость репозитория.
+
+BACKEND
 http://127.0.0.1:8080
+При ошибке: BACKEND_DIAGNOSTICS.cmd. Базу не удалять.
 
-If readiness fails:
-BACKEND_DIAGNOSTICS.cmd
-
-Local SQLite data is stored outside the release folder under:
-%LOCALAPPDATA%\ViolettaApplyAssistant
-
-SOURCE REPOSITORY
------------------
-browser-extension\             Chrome extension source
-src\JobSearchAssistant\        .NET backend source
-tests\                         tests
-scripts\                       verification / packaging helpers
-tools\                         maintenance helpers
-docs\                          docs + assets + history
-
-Generated backend binaries are release artifacts and are not stored in Git.
-
-✦ APPLY
--------
-Open a supported vacancy and press ✦ Apply.
-
-Expected:
-analyze vacancy
-→ choose RU/EN CV
-→ generate short cover letter
-→ run supported application flow
-→ confirmed / review required / failed
-
-HH QUICK APPLY
---------------
-On HH.ru search results, press the native «Откликнуться».
-
-For a supported unambiguous flow the assistant can prepare and attach the cover letter for that exact vacancy card.
-
-✎ AI
-----
-Open the recruiter conversation you want to answer.
-
-Press:
-✎ AI → «🧠 Проанализировать весь диалог и ответить»
-
-The assistant reads accessible context and prepares a draft for the latest recruiter message.
-
-You review and send the message yourself.
-
-🚀 AUTOPILOT
-------------
-Open the compact extension popup.
-
-Press:
-🚀 Запустить автопилот
-
-Default focus:
-- remote IT
-- C# / .NET
-- ASP.NET Core
-- Backend
-- Full-Stack .NET
-- QA / QA Automation
-- Technical Support
-
-Clearly unsuitable senior-level roles are skipped.
-Session/day limits are enforced.
-Ambiguous high-risk required fields stop the current application.
-
-COVER LETTERS
--------------
-Technical letters are short and vacancy-specific.
-
-Relevant IT letters may include:
-https://github.com/ViolettaNcl
-
-They prioritize technical projects/skills instead of repeating unrelated experience.
-
-IMPORTANT
----------
-- Do not invent candidate facts.
-- Salary / visa / legal / privacy ambiguity requires review.
-- Recruiter Send remains manual.
-- CAPTCHA/MFA is not bypassed.
-- External sites can change DOM; use a small live smoke test after major UI changes.
-
-MORE
-----
-ARCHITECTURE.md
-IMPLEMENTATION_STATUS.md
-SUPPORTED_SITES.md
-TESTING_GUIDE.md
-SECURITY.md
-ROADMAP.md
+ПРОВЕРКА
+TEST_REPORT.md — фактическая локальная регрессия и ограничения проверки.

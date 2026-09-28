@@ -1,136 +1,43 @@
-# Architecture — Violetta Apply Assistant 3.7.0
+# Architecture · 3.8.0
 
-> **Design goal:** keep the user interface small while the context model behind it remains explicit, testable and recoverable.
-
-## 1. System map
+## Единый путь текста в расширении
 
 ```mermaid
-flowchart TB
-    subgraph Chrome["Chrome Extension · Manifest V3"]
-      HOME[home.html / home.js]
-      SW[background.js]
-      APPLY[site-apply*]
-      CHAT[recruiter-chat*]
-      HHQ[hh-list-quick-apply*]
-      MEM[application-state / analytics / memory]
-    end
-
-    subgraph Backend["Local .NET 10 backend"]
-      API[HTTP API]
-      MATCH[Match / vacancy services]
-      QUEUE[Automation / queue services]
-      STORE[(SQLite persistence)]
-    end
-
-    SITE[HH.ru / employer site]
-
-    HOME --> SW
-    SW <--> APPLY
-    SW <--> CHAT
-    SW <--> HHQ
-    APPLY <--> SITE
-    CHAT <--> SITE
-    HHQ <--> SITE
-    SW <--> API
-    API --> MATCH
-    API --> QUEUE
-    API <--> STORE
-    MEM <--> SW
+flowchart LR
+ S[CV + подтверждения HH] --> T[Candidate Truth Memory]
+ V[Полная вакансия] --> R[Role + Evidence Selection]
+ T --> R
+ C[Текущий чат + последний вопрос] --> R
+ R --> G[Локальный текст или настроенная модель]
+ G --> Q[Факты / длина / вопросы / язык]
+ Q --> A[Apply + память отправленного письма]
+ Q --> D[Черновик чата: ручной Send]
 ```
 
-## 2. Source-of-truth layout
+`candidate-seed.js` содержит датированные источники и факты. `candidate-truth.js` мигрирует профиль, хранит происхождение/статус, согласует изменения и отделяет память диалога. `relevance-engine.js` читает требования, определяет семейство роли, выбирает до пяти основных фактов, двух проектов и одного дополнительного факта. Отрицательная релевантность исключает нерелевантную биографию.
 
-```text
-browser-extension/            current extension source
-src/JobSearchAssistant/       backend source
-tests/                        backend + browser fixtures
-scripts/                      CI/release verification
-tools/                        local maintenance helpers
-docs/                         project docs/assets/history
-.github/workflows/             CI + packaging
-```
+`context-reply.js` определяет последнее сообщение работодателя, ранее обсуждённые вопросы и пропуски. `chat-reader.js` ограничивает чтение активной панелью чата; боковой список переписок не является историей. Неизвестный автор не подменяется работодателем. Если разметка не даёт достаточно признаков, интерфейс показывает прочитанный текст и просит подтвердить его автора.
 
-Generated release binaries are intentionally excluded from Git.
+`writing-provider.js` — необязательный транспорт к явно настроенному Chat Completions API. `writing-background.js` связывает правила с существующими worker/storage. Старый canned `/triage` больше не выдаётся за анализ моделью.
 
-## 3. Autopilot
+## Места интеграции
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant H as Home popup
-    participant B as Background
-    participant A as Local backend
-    participant S as HH.ru
+- `cpPrepare` / `cpAutoApply`: полное описание → текущий профиль → новое письмо, а не устаревший application snapshot.
+- `cpEnrichExistingPlan`: тот же путь для старого dashboard и advanced popup.
+- `browserAutopilotApplyNext`: полная вакансия и новая память для письма. Серверная очередь/match score и существующие лимиты сохранены; backend ranking не переписан и автоматически не синхронизируется с произвольными изменениями профиля расширения.
+- HH list quick apply: карточка даёт identity; текст для письма читается отдельно в неактивной вкладке, не переключая текущую. При ошибке загрузки письмо не отправляется.
+- `cpResolve` / `cpAnswerCurrentChat`: актуальные личные факты плюс отдельный снимок CV/письма, использованный при отклике.
 
-    U->>H: 🚀 Start Autopilot
-    H->>A: Enable auto-apply settings
-    H->>B: Wake worker
-    B->>S: Discover vacancies
-    B->>A: Import/analyze vacancy
-    A-->>B: Match score + eligibility
-    B->>B: Role + seniority + limits guard
-    B->>S: Open suitable vacancy in background
-    B->>S: Run supported application flow
-    B->>A: Persist outcome/context
-```
+## Состояние и хранение
 
-Autopilot is a **user-started control surface over the existing automation pipeline**, not a parallel second engine.
+Профиль: Chrome local storage. Ключ модели: Chrome session storage, не content script и не экспорт Git. Память переписки: отдельная запись conversation. Черновик помечается `sent:false`; сохранение черновика не доказывает его отправку. Cover Letter Memory сохраняет фактический текст подтверждённого отклика и audit: vacancy hash, profile revision, fact IDs и источник генерации.
 
-## 4. Current-vacancy Apply
+Кэш письма учитывает ID/полный текст вакансии, revision профиля и конфигурацию модели. Изменение фактов меняет ключ. Переключение чата/новое последнее сообщение отклоняет устаревший ответ. Подгрузка более ранней истории не считается новым последним сообщением.
 
-```text
-JOB_DESCRIPTION
-→ ✦ Apply
-→ vacancy extraction
-→ language / CV resolution
-→ vacancy-specific letter
-→ supported form/application executor
-→ CONFIRMED | REVIEW_REQUIRED | FAILED
-```
+## Границы
 
-The application state machine prevents unrelated navigation from becoming the primary UX.
+Чтение истории ограничено безопасным количеством шагов и доступным DOM. «Достигнут верх» без явного маркера не означает, что сервер отдал всю историю. В интерфейсе сохраняется признак неполной истории.
 
-## 5. HH search-list quick apply
+Проверка текста эвристическая: запрещённые неподтверждённые технологии, количества, известные противоречия, нерелевантный опыт, пустой/слишком длинный ответ. Произвольные семантические ошибки LLM полностью исключить этими проверками нельзя.
 
-A trusted native user click on HH.ru **Откликнуться** pins the exact vacancy card and allows the helper to continue through a supported cover-letter modal.
-
-Programmatic/autopilot clicks are intentionally separated from that trusted-click path to prevent duplicate execution.
-
-## 6. Recruiter chat
-
-Context model:
-
-```text
-active chat DOM
-+ latest recruiter message
-+ linked Application / Vacancy
-+ CV used
-+ Cover Letter Memory
-+ recent thread memory
-```
-
-`✎ AI` uses DOM-first extraction and discards stale responses when the user changes conversation identity.
-
-Recruiter Send is manual.
-
-## 7. Persistence
-
-The architecture preserves the existing application registry and backend persistence. The project does not introduce a second database for the newer extension features.
-
-Key persisted context includes application identity, vacancy identity, CV selection, exact cover letter, timeline and follow-up state.
-
-## 8. Safety gates
-
-The executor stops rather than guesses on ambiguous required candidate decisions such as:
-
-- salary expectations;
-- visa/work authorization;
-- legal/privacy declarations;
-- contractual acceptance;
-- unknown mandatory facts.
-
-## 9. Packaging
-
-`.github/workflows/package-windows.yml` builds a self-contained Windows backend from `src/JobSearchAssistant/`, then assembles it with `browser-extension/` and launcher files.
-
-The source repository remains small and reviewable; generated runtime files are release artifacts.
+В Windows ZIP: `extension/` + опубликованный `backend/`. В Git: `browser-extension/` + существующий `src/`. Изменения .NET-бинарников отсутствуют; профиль/транспорт модели этой версии реализованы в расширении.

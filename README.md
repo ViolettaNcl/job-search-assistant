@@ -1,284 +1,64 @@
-<p align="center">
-  <img src="docs/assets/hero.svg" alt="Violetta Apply Assistant" width="100%">
-</p>
+<p align="center"><img src="docs/assets/hero.svg" alt="Violetta Apply Assistant" width="100%"></p>
 
-<p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-3.7.0-7968F2?style=for-the-badge">
-  <img alt="Chrome MV3" src="https://img.shields.io/badge/Chrome-MV3-3A3F58?style=for-the-badge&logo=googlechrome&logoColor=white">
-  <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white">
-  <img alt="Windows" src="https://img.shields.io/badge/Windows-11-0078D4?style=for-the-badge&logo=windows11&logoColor=white">
-</p>
+# Violetta Apply Assistant · 3.8.0
 
-<p align="center">
-  <a href="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/ci.yml">
-    <img alt="CI" src="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/ci.yml/badge.svg">
-  </a>
-  <a href="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/site-apply-regression.yml">
-    <img alt="Application regression" src="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/site-apply-regression.yml/badge.svg">
-  </a>
-  <a href="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/package-windows.yml">
-    <img alt="Windows package" src="https://github.com/ViolettaNcl/job-search-assistant/actions/workflows/package-windows.yml/badge.svg">
-  </a>
-</p>
+**Память кандидата → полная вакансия → релевантные факты → письмо или ответ в текущем чате.**
 
-# Violetta Apply Assistant
+Windows-пакет с локальным .NET-сервером и расширением Chrome MV3. Версия 3.8 обновляет расширение и правила подготовки текста; опубликованные серверные EXE/DLL сохранены из 3.7.0, а не пересобраны.
 
-**AI copilot for job discovery, tailored applications and recruiter conversations.**
+<p align="center"><img src="docs/assets/autopilot-flow.gif" alt="Этапы работы: поиск, сопоставление, письмо, отклик и история" width="95%"></p>
 
-Violetta Apply Assistant combines a local .NET backend with a Manifest V3 Chrome extension. It helps discover suitable vacancies, tailor short application letters, run supported HH.ru application flows, keep application context, and prepare replies inside the active recruiter chat.
+## Основные действия
 
-The product is designed around three rules:
-
-> **Relevant over random. Truthful over impressive. Fast without losing context.**
-
----
-
-## ✨ Product experience
-
-<table>
-<tr>
-<td width="25%" align="center"><b>🚀 Autopilot</b><br><sub>Discover, score and apply to suitable roles after explicit start.</sub></td>
-<td width="25%" align="center"><b>✦ Apply</b><br><sub>Run the application workflow for the vacancy already open.</sub></td>
-<td width="25%" align="center"><b>✎ Chat AI</b><br><sub>Read the active recruiter conversation and draft a contextual reply.</sub></td>
-<td width="25%" align="center"><b>🧠 Memory</b><br><sub>Remember the vacancy, CV and exact cover letter used.</sub></td>
-</tr>
-</table>
-
-<p align="center">
-  <img src="docs/assets/autopilot-flow.gif" alt="Autopilot workflow" width="95%">
-</p>
-
----
-
-## 🚀 Autopilot
-
-Autopilot starts **only when the user presses the rocket button**.
-
-It can:
-
-- discover vacancies through the existing HH.ru browser workflow;
-- score fit and seniority;
-- prioritize remote IT roles;
-- skip clearly unsuitable Middle / Senior / Lead / Principal / Staff / Architect / Head / Manager roles;
-- select the appropriate RU/EN CV;
-- prepare a short vacancy-specific cover letter;
-- open suitable vacancies in background tabs;
-- execute supported application flows;
-- keep per-session and daily limits.
-
-### Default target families
-
-`C# / .NET` · `ASP.NET Core` · `Backend` · `Full-Stack .NET` · `QA / QA Automation` · `Technical Support`
-
-<details>
-<summary><b>Why the Autopilot is conservative</b></summary>
-
-The goal is not blind mass application. A title keyword alone is not enough. Matching, seniority, role family and existing candidate facts are considered together.
-
-Unknown or ambiguous required fields — salary expectations, visa/work authorization, legal/privacy declarations, contractual commitments — stop that application for review rather than inventing an answer.
-
-</details>
-
----
-
-## ✦ One-click Apply
-
-On an opened supported vacancy, press **✦ Apply**.
-
-```mermaid
-flowchart LR
-    A[Open vacancy] --> B[Analyze role & requirements]
-    B --> C[Select RU / EN CV]
-    C --> D[Generate short cover letter]
-    D --> E[Handle supported application flow]
-    E --> F{Safe to continue?}
-    F -->|Yes| G[Submit + record context]
-    F -->|Needs review| H[Stop on the current page]
-```
-
-The normal Apply path stays in the employer flow instead of redirecting to an internal extension screen.
-
----
-
-## ⚡ HH.ru quick apply from search results
-
-When the user presses HH.ru's native **Откликнуться** button on a vacancy card, the extension can attach a vacancy-specific cover letter for that exact vacancy without forcing the user to open the detail page first.
-
-The shortcut is intentionally bound to the trusted user click. If HH.ru opens an ambiguous or unsupported form, the assistant stops rather than guessing another control.
-
----
-
-## ✎ Recruiter Chat AI
-
-Open the recruiter conversation you want to answer and use:
-
-**✎ AI → 🧠 Проанализировать весь диалог и ответить**
-
-The assistant can combine:
-
-- accessible active chat history;
-- the latest recruiter message;
-- linked vacancy/application context when available;
-- CV used for the application;
-- the exact submitted Cover Letter Memory;
-- recent thread context.
-
-It then prepares a **draft** for the current conversation.
-
-> Recruiter **Send remains manual**.
-
-Other actions include:
-
-- answer the latest message;
-- answer all visible questions;
-- improve the user's draft;
-- suggest a relevant recruiter question;
-- compact Russian quick replies.
-
----
-
-## 📝 Human-style cover letters
-
-Technical cover letters are intentionally:
-
-- short;
-- vacancy-first;
-- grounded in confirmed experience;
-- focused on matching projects and skills;
-- free from irrelevant CV repetition.
-
-For relevant IT roles they may include:
-
-**https://github.com/ViolettaNcl**
-
-Developer / QA letters prioritize real technical work instead of using unrelated hospitality experience as the main argument.
-
----
-
-## 🧠 Application memory
-
-Each application can retain the exact context that matters later:
-
-```text
-Vacancy
-+ selected CV
-+ exact cover letter
-+ application state
-+ timeline / follow-up
-+ recruiter conversation link
-```
-
-That lets Chat AI answer later recruiter questions using what was actually sent for that vacancy instead of reconstructing the context from scratch.
-
----
-
-## 🏗 Architecture
-
-```mermaid
-flowchart TB
-    UI[Chrome Extension<br/>Manifest V3]
-    BG[Background Orchestrator]
-    HH[HH.ru / employer site]
-    API[Local .NET 10 Backend<br/>127.0.0.1:8080]
-    DB[(Persistent SQLite)]
-    MEM[Application Registry<br/>Cover Letter Memory]
-
-    UI --> BG
-    UI <--> HH
-    BG <--> API
-    API <--> DB
-    BG <--> MEM
-    MEM --> UI
-```
-
-### Source layout
-
-```text
-browser-extension/            Chrome extension source
-src/JobSearchAssistant/       .NET backend source
-tests/                        .NET + browser/integration tests
-scripts/                      verification and packaging helpers
-tools/                        maintenance/update helpers
-docs/                         requirements, assets and history
-.github/workflows/             CI, CodeQL and Windows packaging
-```
-
-Generated Windows backend binaries, ZIP releases and test-output folders are **not source files** and are intentionally excluded from Git.
-
----
-
-## 🖥 Local backend
-
-The extension communicates with:
-
-```text
-http://127.0.0.1:8080
-```
-
-For a packaged Windows release:
-
-```text
-start-assistant.cmd
-```
-
-Diagnostics:
-
-```text
-BACKEND_DIAGNOSTICS.cmd
-```
-
-Local SQLite data is stored outside the release bundle under `%LOCALAPPDATA%\ViolettaApplyAssistant`.
-
----
-
-## 🧪 Quality gates
-
-| Layer | Coverage |
+| Действие | Поведение |
 |---|---|
-| Backend | .NET build + MSTest |
-| Extension | Node syntax + unit/regression tests |
-| Browser | Synthetic Chromium fixtures |
-| Packaging | Windows artifact build + verification |
-| Security | CodeQL |
-| Live sites | Manual smoke test after major DOM changes |
+| ✦ Apply | Анализ полного описания, выбор RU/EN PDF, короткое письмо, существующий поддерживаемый сценарий отклика. |
+| 🚀 Автопилот | Сохраняет прежние фильтры и лимиты; перед письмом читает полную вакансию и использует актуальную память расширения. |
+| Откликнуться в списке HH | Привязывает письмо к нажатой карточке. Если полное описание недоступно, не отправляет письмо по обрывку карточки. |
+| ✎ AI → Проанализировать весь диалог | Читает активную переписку, определяет последнее сообщение работодателя и открытые вопросы. Создаёт черновик, но не нажимает Send. |
+| Предпросмотр письма | В настройках можно проверить вакансию и увидеть выбранные факты без реального отклика. |
 
-> Synthetic tests validate logic and known fixtures. They do **not** guarantee every future production DOM variant on HH.ru or another ATS.
+## Память CV и HH
 
----
+Встроены данные из трёх предоставленных PDF и текста резюме HH, присланного владельцем 28 сентября 2026 года. AppXite и фриланс-разработка добавлены как **подтверждённые владельцем сведения**, не как независимо проверенное трудоустройство. Источники, даты получения, идентификаторы фактов и SHA-256 PDF сохранены.
 
-## 🔐 Safety model
+Факты профиля и память переписки разделены. Фраза работодателя или AI-черновик никогда не становится глобальным фактом кандидата автоматически. Новое подтверждение проходит предварительный просмотр; конфликтующие сведения требуют выбора пользователя. Старые непроверенные импортированные факты архивируются, а собственные правки и CV пользователя сохраняются.
 
-The assistant does **not** invent:
+## Два режима подготовки текста
 
-- employers;
-- years of commercial experience;
-- qualifications;
-- legal status;
-- salary expectations;
-- visa/work authorization answers.
+**Локальный режим включён по умолчанию.** Он выбирает подтверждённые факты под задачи вакансии и формирует ограниченный, короткий текст. Умеет отвечать на прямые вопросы об известных навыках, опыте и контактах. Это не скрытая большая языковая модель.
 
-Ambiguous high-risk required fields are review stops.
+**Настроенная AI-модель** нужна для свободного редактирования, сложных технических ответов и более гибкого языка. В «AI и ответы → Модель» укажите совместимый Chat Completions endpoint, точный идентификатор модели и свой ключ. Передача выбранных фактов, вакансии и переписки требует отдельного согласия. Ключ хранится в памяти сеанса браузера; после полного перезапуска его нужно ввести снова. API может быть платным по тарифу вашего провайдера.
 
-CAPTCHA/MFA bypass is not implemented.
+При недоступной модели показывается причина и, только когда это возможно, локальный фактический вариант. Кнопка «Улучшить мой текст» без модели не имитирует генерацию.
 
----
+## Релевантность вместо биографии
 
-## 📚 Documentation
+Backend/.NET: клиентская разработка, соответствующий стек, один подходящий проект. Техподдержка/интеграции: AppXite, тикеты, API, SQL, логи и воспроизведение ошибок. QA: тестирование исправлений, API/данные и подтверждённые тесты проектов. Для технических писем не используются Crowne Plaza, ресепшен или преподавание. GitHub добавляется в технические письма и исключается из преподавания по умолчанию.
 
-| Document | Purpose |
-|---|---|
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | System architecture and execution flows |
-| [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) | Implemented / partial / pending areas |
-| [`SUPPORTED_SITES.md`](SUPPORTED_SITES.md) | Platform support and known limitations |
-| [`TESTING_GUIDE.md`](TESTING_GUIDE.md) | Local + CI verification |
-| [`WHAT_CHANGED.md`](WHAT_CHANGED.md) | 3.7.0 release changes |
-| [`START_HERE.txt`](START_HERE.txt) | Windows usage/update notes |
-| [`SECURITY.md`](SECURITY.md) | Security and privacy model |
-| [`ROADMAP.md`](ROADMAP.md) | Next engineering priorities |
+Задача — естественный, краткий и фактически обоснованный текст. **Гарантий прохождения ATS или «невидимости» для AI-детекторов нет.** Проверки текста — программные эвристики, а не доказательство безошибочности модели.
 
----
+## Запуск
 
-<p align="center">
-  <b>Violetta Apply Assistant 3.7.0</b><br>
-  <sub>Small interface. Strong context. Human-readable applications.</sub>
-</p>
+**Готовый Windows ZIP:** распаковать полностью. Для существующей установки использовать `UPDATE_EXISTING.cmd`, затем Reload у существующего расширения в `chrome://extensions` и обновить вкладки. Запустить `start-assistant.cmd`. При первой установке выбрать «Загрузить распакованное» → папку `extension` внутри Windows-пакета.
+
+**Исходники GitHub:** расширение находится в `browser-extension/`, backend — в `src/JobSearchAssistant/`. Бинарники `backend/` не коммитятся. Исходники сервера в Windows ZIP не подменяют существующий `src/` вашего репозитория.
+
+Локальный адрес сервера: `http://127.0.0.1:8080`. При проблеме запуска: `BACKEND_DIAGNOSTICS.cmd`. Базу не удалять.
+
+## Публикация исходников
+
+`Publish-Violetta-3.8.0.ps1 -Push` выбирает полный ZIP через окно выбора файла либо работает из распакованного пакета. Проверяет SHA-256 каждого публикуемого файла, чистоту рабочей папки, origin и ветку main. Копирует только исходники, тесты, документацию и служебные скрипты, проверяет коды завершения Git. Без `reset`, `clean` и принудительного push. Изменённые файлы резервируются вне репозитория.
+
+**CV и встроенные факты попадут в исходники. При Public-доступе они будут публичны.**
+
+## Документация
+
+- [Архитектура](ARCHITECTURE.md) и [статус реализации](IMPLEMENTATION_STATUS.md)
+- [Стратегия текста и памяти](docs/WRITING_STRATEGY_3.8.md)
+- [Инструкция запуска](START_HERE.txt), [тестирование](TESTING_GUIDE.md), [поддержка сайтов](SUPPORTED_SITES.md)
+- [Безопасность](SECURITY.md), [изменения](WHAT_CHANGED.md), [дальнейшие задачи](ROADMAP.md)
+
+## Границы проверки
+
+Регрессия использует локальные страницы Chromium и настоящие JS-модули расширения с подменёнными Chrome/HTTP API. Она не является тестом авторизованного аккаунта HH, внешней модели или запуска Windows EXE. Старые GitHub CI могут содержать проверки прежнего UI; добавлен отдельный workflow для новой памяти и чтения чата. Текущие публичные/приватные данные GitHub этой сборкой не менялись.
