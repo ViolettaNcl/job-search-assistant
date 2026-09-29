@@ -1,4 +1,11 @@
-# Architecture · 3.9.5
+# Architecture · 3.9.9
+
+
+## 3.9.9: vacancy memory and form continuation
+
+`hh-list-quick-apply.js` restores card UI from `quick-list-state` using the exact vacancy identity. The worker persists the quick-list application before navigation, keeps a short-lived tab/session binding for continuation, and stores durable application/form state in `chrome.storage.local`. `universal-content.js` resumes only an explicitly persisted or exact-ID-recovered application route, fills safe confirmed fields, records unresolved fields back into `formMemory`, and never treats a final Submit as an automatic continuation step.
+
+The durable key is the application/vacancy identity, not the current DOM node. A repeated card therefore rehydrates Analysis and application state after Back/reload. Form recovery requires exact provider/vacancy identity when the URL exposes it; otherwise continuation is constrained to the same prepared tab plus title/context checks.
 
 ## Единый путь текста в расширении
 

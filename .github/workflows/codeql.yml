@@ -1,38 +1,66 @@
 name: CodeQL
+
 on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
   schedule:
-    - cron: '17 5 * * 1'
+    - cron: '23 4 * * 1'
+
 permissions:
-  contents: read
   security-events: write
+  packages: read
+  contents: read
   actions: read
+
 jobs:
-  analyze:
+  javascript:
+    name: analyze (javascript-typescript)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - language: csharp
-            build-mode: manual
-          - language: javascript-typescript
-            build-mode: none
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate JavaScript source
+        shell: bash
+        run: |
+          set -euo pipefail
+          find browser-extension -maxdepth 1 -type f -name '*.js' -print0 | while IFS= read -r -d '' file; do
+            node --check "$file"
+          done
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - name: Analyze JavaScript
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript
+
+  csharp:
+    name: analyze (csharp, manual)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
-        if: matrix.language == 'csharp'
         with:
           dotnet-version: '10.0.x'
-      - uses: github/codeql-action/init@v3
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-      - name: Build C# for analysis
-        if: matrix.language == 'csharp'
-        run: dotnet build src/JobSearchAssistant/JobSearchAssistant.csproj -c Release
-      - uses: github/codeql-action/analyze@v3
+          languages: csharp
+          build-mode: manual
+      - name: Build C# for CodeQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet restore src/JobSearchAssistant/JobSearchAssistant.csproj
+          dotnet build src/JobSearchAssistant/JobSearchAssistant.csproj -c Release --no-restore
+      - name: Analyze C#
+        uses: github/codeql-action/analyze@v3
         with:
-          category: '/language:${{ matrix.language }}'
+          category: /language:csharp

@@ -1,14 +1,53 @@
-# Violetta Apply Assistant 3.9.5
+# Violetta Apply Assistant 3.9.9
 
-## Exact vacancy-card writing on HH lists
+## Persistent vacancy memory + automatic form continuation
 
-- `✦ Отклик + письмо` is now pinned to one exact vacancy ID/card before any click.
-- Search-page headings such as `Найдено 19 718 вакансий` are rejected as vacancy titles and can never seed a cover letter.
-- The background reader verifies the hidden detail tab still points to the same vacancy ID before accepting its title/description.
-- If HeadHunter redirects to a different/search page, the letter is stopped instead of generating generic text.
-- `✦ Fill` inside a list/modal reuses the selected vacancy context instead of the search page body.
-- Cover-letter validation now rejects drafts with no detectable connection to the selected vacancy.
-- Both HH flows remain supported: mandatory letter before response, and response first → `Приложить письмо` → `Отправить`.
+- `Analysis` and application state are persisted by exact HH vacancy ID instead of living only in the current search-page DOM.
+- Back/reload/repeated cards restore green/red Analysis and the saved application/form status automatically.
+- Before leaving a search card for an HH questionnaire, the exact prepared application is persisted and bound to the navigation context.
+- On the questionnaire page, confirmed candidate fields, the prepared cover letter and the selected CV are filled automatically when the field/control can be verified.
+- Unknown salary, legal consent, work authorization, start-date and other unsupported answers are never fabricated; they stay in the review list.
+- Form progress (`filled`, unresolved/review count, CV/letter state) is stored in the application memory and restored on return to the vacancy list.
+- Automatic continuation may advance only through a safe intermediate step; it never presses a final Submit.
+- Existing 3.9.8 `✓ Уже просмотрен` and 3.9.7 full-vacancy call Analysis behavior remain intact.
+
+---
+
+# Violetta Apply Assistant 3.9.8
+
+## HH: уже просмотренный отклик больше не блокирует список
+
+- После нажатия `✦ Отклик + письмо` расширение отслеживает результат именно в модальном окне сопроводительного письма.
+- Если HH сообщает **`Отклик уже просмотрен работодателем`**, расширение автоматически нажимает уникальную кнопку **`Закрыть`** в этом же окне.
+- Текущая страница поиска остаётся открыта; пользователь сразу может перейти к следующей вакансии.
+- Карточка получает терминальное состояние **`✓ Уже просмотрен`**, а не `! Повторить`.
+- В Application history событие фиксируется как `Viewed`; при этом система **не утверждает**, что сопроводительное письмо было отправлено.
+- Автозакрытие привязано только к этому конкретному сообщению HH. Обычные ошибки, неоднозначные модальные окна и другие причины отказа остаются видимыми для проверки.
+- Логика 3.9.7 Analysis (полная вакансия в фоновой вкладке, точный vacancy ID, `✓ Без звонков / ✕ Есть звонки`) сохранена без изменений.
+
+---
+
+# Violetta Apply Assistant 3.9.7
+
+## Full-vacancy Analysis from the HH search list
+
+- `Analysis` no longer decides from the short search-card text when a full vacancy can be opened.
+- The exact selected vacancy ID is opened in an **inactive background tab**. The assistant reads the full vacancy DOM, verifies that the opened vacancy ID still matches the card, analyzes the complete description, and closes the background tab automatically.
+- The user stays on the search-results page; the analysis tab is never activated.
+- If the live vacancy page cannot be read, the assistant falls back to the exact HH vacancy API. Only if both full-detail routes fail does it use the card snippet, and a snippet without explicit call wording is never treated as proof.
+- `✕ Есть звонки` is returned for actual phone-call duties: inbound/outbound calls, generic required calls, call-center work, phone/voice support, phone consultations and customer/employee calling.
+- `✓ Без звонков` is returned for explicit chat/no-call work or when a confirmed full vacancy contains no call duty.
+- Technical wording such as **“настраивать телефонию / SIP / VoIP”** is not treated as a call-center duty by itself.
+- `входящие обращения` without phone/call wording is not treated as `входящие звонки`.
+- If neither the live page nor HH API can be read, the button becomes `↻ Повторить` instead of silently presenting an uncertain green result.
+- Analysis remains separate from `✦ Отклик + письмо` and never submits an application.
+
+## Preserved 3.9.5–3.9.6 protections
+
+- `✦ Отклик + письмо` remains pinned to one exact vacancy ID/card.
+- `Найдено N вакансий` is rejected as a vacancy title.
+- Mandatory-letter-before-submit and post-response `Приложить письмо → Отправить` flows remain covered.
+- Vacancy-specific cover-letter evidence and CV selection are unchanged.
 
 ---
 

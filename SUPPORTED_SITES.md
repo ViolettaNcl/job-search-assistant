@@ -1,8 +1,11 @@
-# Поддержка сайтов · 3.9.5
+# Поддержка сайтов · 3.9.9
 
 ## HH.ru / HeadHunter.kg — основной сценарий
 
-3.9.5 treats `hh.ru` and `headhunter.kg` as the same HeadHunter provider family. Persistent content scripts, floating `✦ Apply`, recruiter `✎ AI`, vacancy identity and the dedicated cover-letter continuation are enabled on both domains.
+3.9.7 treats `hh.ru` and `headhunter.kg` as the same HeadHunter provider family. Persistent content scripts, floating `✦ Apply`, recruiter `✎ AI`, vacancy identity and the dedicated cover-letter continuation are enabled on both domains.
+
+
+В 3.9.9 HH list memory хранит результат Analysis и прогресс отклика по точному vacancy ID. Переход на HH-анкету может быть продолжен в той же вкладке: подтверждённые контактные данные, письмо и CV заполняются автоматически, а неизвестные/юридические/зарплатные ответы остаются на ручную проверку. Возврат к выдаче восстанавливает сохранённый статус карточки. Финальная отправка такой анкеты автоматически не нажимается.
 
 Реализованы существующие vacancy Apply, автопилот, native list quick apply, recruiter chat и новые правила доказательств. Для письма из карточки полное описание читается в неактивной вкладке. Изменения DOM, вход/капча, анкеты и резюме аккаунта могут потребовать ручного шага.
 

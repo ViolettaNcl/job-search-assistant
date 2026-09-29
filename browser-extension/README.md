@@ -1,4 +1,19 @@
-# Violetta Apply Assistant — Chrome extension 3.9.5
+# Violetta Apply Assistant — Chrome extension 3.9.9
+
+
+## Persistent vacancy memory + form continuation (3.9.9)
+
+Search-card state is no longer DOM-only. Analysis and application progress are restored by the exact vacancy ID. A quick-list job is persisted before navigation, so an HH questionnaire can resume in the same tab and fill confirmed candidate data automatically. Unknown/high-risk answers remain marked for review and final submission stays user-controlled.
+
+
+## HH already-viewed guard (3.9.8)
+
+When HH refuses a late cover letter with `Отклик уже просмотрен работодателем`, the list quick-apply flow closes that exact modal automatically and marks the card `✓ Уже просмотрен`. It does not auto-close unrelated send failures.
+
+## Inline Analysis on HH search cards
+
+Each eligible vacancy card now has `Analysis` next to `✦ Отклик + письмо`. The analysis is tied to the exact vacancy ID, opens that exact vacancy in an inactive background tab, reads the full DOM, verifies the ID, and closes the tab automatically. It returns `✓ Без звонков` or `✕ Есть звонки`; if the full page and HH API both fail, it shows `↻ Повторить` instead of guessing. Analysis itself never submits an application.
+
 
 Единая память кандидата по CV и подтверждённым владельцем данным HH, отбор фактов по вакансии, короткие сопроводительные письма и ответы на последнее сообщение работодателя.
 
@@ -15,6 +30,6 @@
 
 Никаких обещаний обхода AI-детекторов или фильтров ATS. Текущие сведения о Technical Support / Integration Support предоставлены владельцем; название работодателя хранится как source metadata, но не вставляется в сопроводительное письмо. Автоматической проверки трудоустройства нет. Исходные PDF не переписываются.
 
-## Exact list-card context (3.9.5)
+## Exact list-card context (3.9.7)
 
 On HH/HeadHunter search results, every injected `✦ Отклик + письмо` control is bound to one vacancy ID. The extension reads the full linked vacancy in the background before writing. Search headings such as `Найдено N вакансий` are rejected and cannot seed a cover letter. If identity cannot be confirmed, the flow stops instead of sending a generic draft.

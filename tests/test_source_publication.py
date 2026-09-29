@@ -19,7 +19,7 @@ def safe(root, relative):
     return result
 
 def validate(data):
-    if data.get('version') != '3.9.5' or data.get('repository') != 'ViolettaNcl/job-search-assistant':
+    if data.get('version') != '3.9.9' or data.get('repository') != 'ViolettaNcl/job-search-assistant':
         raise ValueError('wrong release')
     seen = set()
     for row in data['files']:
@@ -76,7 +76,7 @@ class PublicationPlanTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'duplicate'): validate(self.data)
 
     def test_publisher_checks_exit_codes_and_never_force_resets(self):
-        script = (ROOT/'Publish-Violetta-3.9.5.ps1').read_text(encoding='utf-8-sig')
+        script = (ROOT/'Publish-Violetta-3.9.9.ps1').read_text(encoding='utf-8-sig')
         self.assertIn('$LASTEXITCODE', script)
         self.assertIn("@('diff','--cached','--quiet') -Accepted @(0,1)", script)
         self.assertIn("@('push','origin','HEAD:main')", script)

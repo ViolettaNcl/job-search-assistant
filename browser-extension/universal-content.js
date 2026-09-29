@@ -24,24 +24,26 @@
   function setApplyState(state,message='',kind='neutral'){applyState=state;renderBar();closeToast();if(message){toast=U.toast(message,bar?.box,kind,state==='CONFIRMED'||state==='DUPLICATE'?5500:0);}}
   function show(title='Подготовка отклика'){close();panel=U.panel(title);return panel;}
   function inputValue(el){return el.isContentEditable?el.textContent:el.value;}
+  function pageContextText(){return C.clip([document.title,A.text(document.body,18000)].filter(Boolean).join('\n'),20000);}
   function mark(el,reason){el.setAttribute('data-vja-needs-review',reason);el.style.outline='2px solid #c29438';el.style.outlineOffset='2px';}
   function clearMark(el){if(el.hasAttribute('data-vja-needs-review')){el.removeAttribute('data-vja-needs-review');el.style.outline='';el.style.outlineOffset='';}}
-  async function fill(data,p,status,key,epoch){
+  async function fill(data,p,status,key,epoch,{autoContinue=false,autoDepth=0}={}){
     const adapter=current(),scope=adapter.detectApplicationForm();
     if(!scope){status.textContent='Откройте форму отклика на сайте и нажмите ✦ Fill. Ничего не отправлено.';return {submitted:false,status:'needs-review',reason:'open-form-manually'};}
-    const fields=A.formFields(scope);let filled=0,review=0,coverLetterFilled=false,cvUploaded=false;
+    const fields=A.formFields(scope);let filled=0,review=0,coverLetterFilled=false,cvUploaded=false;const unresolved=[];
+    const addReview=(f,reason)=>{review++;unresolved.push({label:C.clip(f?.label||'',180),reason:C.clip(reason||'Нужна проверка',220)});};
     for(let i=0;i<fields.length;i++){
       if(!alive(key,epoch))throw new Error('Контекст изменился. Заполнение остановлено.');
       const el=fields[i],f=A.descriptor(el,i);clearMark(el);
-      if(f.currentValue){continue;} // Preserve all existing user-entered text and choices.
+      if(f.currentValue){continue;}
       try{
         if(f.type==='file'){
-          if(!/(?:\bcv\b|\bresume\b|résumé|резюме|lebenslauf)/i.test(f.label)||C.highRisk(f.label)||!data.cvFile){review++;mark(el,'Проверьте файл резюме');continue;}
+          if(!/(?:\bcv\b|\bresume\b|résumé|резюме|lebenslauf)/i.test(f.label)||C.highRisk(f.label)||!data.cvFile){addReview(f,'Проверьте файл резюме');mark(el,'Проверьте файл резюме');continue;}
           const result=typeof vjaUploadCv==='function'?vjaUploadCv(data.cvFile,el):{success:false};
-          if(result.success){cvUploaded=true;filled++;}else{review++;mark(el,'Файл не прикреплён');}continue;
+          if(result.success){cvUploaded=true;filled++;}else{addReview(f,'Файл не прикреплён');mark(el,'Файл не прикреплён');}continue;
         }
         const d=C.fieldDecision(f,data.profile,{coverLetter:data.coverLetter,role:data.role});
-        if(d.action!=='fill'){review++;mark(el,d.reason);continue;}
+        if(d.action!=='fill'){addReview(f,d.reason);mark(el,d.reason);continue;}
         let ok=false;
         if(f.type==='select'){
           const values=[...el.options].filter(o=>o.value&&[o.value,o.textContent].some(v=>C.clean(v).toLowerCase()===C.clean(d.value).toLowerCase()));
@@ -52,35 +54,38 @@
           await wait(75);
           const valid=el.isConnected&&(f.type==='select'?[el.value,el.selectedOptions?.[0]?.textContent].some(v=>C.clean(v).toLowerCase()===C.clean(d.value).toLowerCase()):C.clean(inputValue(el))===C.clean(d.value));
           if(valid){filled++;if(/cover.?letter|сопровод/i.test(f.label))coverLetterFilled=true;}
-          else{review++;mark(el,'Значение не сохранилось');}
-        }else{review++;mark(el,'Проверьте поле');}
-      }catch{review++;if(el.isConnected)mark(el,'Не удалось заполнить');}
+          else{addReview(f,'Значение не сохранилось');mark(el,'Значение не сохранилось');}
+        }else{addReview(f,'Проверьте поле');mark(el,'Проверьте поле');}
+      }catch{addReview(f,'Не удалось заполнить');if(el.isConnected)mark(el,'Не удалось заполнить');}
     }
     if(!alive(key,epoch))throw new Error('Страница изменилась.');
-    // Dynamic required fields can appear after filling an earlier answer.
     const original=new Set(fields);
-    for(const el of A.formFields(scope))if(!original.has(el)&&!A.descriptor(el).currentValue){review++;mark(el,'Новое поле — нужна проверка');}
-    status.textContent=review?`${filled} полей заполнено. ${review} полей требуют проверки.\nОтправьте отклик самостоятельно после проверки.`:`✓ Ready — заполнено полей: ${filled}.\nПроверьте данные и нажмите Submit на сайте самостоятельно.`;
-    const result={submitted:false,status:'needs-review',ready:!review,reviewCount:review,filled,coverLetterFilled,cvUploaded,reason:'user-submit-required'};
-    await request('prepared',{id:data.application.id,url:location.href,reviewCount:review,coverLetterFilled});
+    for(const el of A.formFields(scope))if(!original.has(el)&&!A.descriptor(el).currentValue){const f=A.descriptor(el);addReview(f,'Новое поле — нужна проверка');mark(el,'Новое поле — нужна проверка');}
+    status.textContent=review?`${filled} полей заполнено. ${review} полей требуют проверки.\nНеизвестные или важные ответы не придуманы — проверьте отмеченные поля.`:`✓ Ready — заполнено полей: ${filled}.\nФинальную отправку подтвердите на сайте самостоятельно.`;
+    const result={submitted:false,status:'needs-review',ready:!review,reviewCount:review,filled,coverLetterFilled,cvUploaded,unresolved,reason:'user-submit-required'};
+    await request('prepared',{id:data.application.id,url:location.href,pageText:pageContextText(),reviewCount:review,filled,unresolved,coverLetterFilled,cvUploaded,autoFilled:Boolean(autoContinue)});
     const actions=document.createElement('div');actions.className='actions';
     actions.append(U.button('Проверить поля',()=>{const el=A.all('[data-vja-needs-review]',scope)[0];el?.scrollIntoView({block:'center'});el?.focus?.();}));
-    const next=A.all('button,a,[role="button"]',scope).filter(A.visible).find(el=>C.safeNavigation({label:A.text(el,80),inForm:Boolean(el.closest('form')),submitType:el.tagName==='BUTTON'&&el.type!=='button',explicitStep:Boolean(document.querySelector('[aria-current="step"],[data-step],.stepper,.steps'))}));
+    const navigationMeta=el=>({label:A.text(el,80),inForm:Boolean(el.closest('form')),submitType:el.tagName==='BUTTON'&&el.type!=='button',explicitStep:Boolean(document.querySelector('[aria-current="step"],[data-step],.stepper,.steps'))});
+    const next=A.all('button,a,[role="button"]',scope).filter(A.visible).find(el=>C.safeNavigation(navigationMeta(el)));
     if(next&&!review)actions.append(U.button('Следующий шаг',async()=>{
-      if(working||!next.isConnected)return;
-      // Re-evaluate at click time: no stale Next node may turn into Submit.
-      if(!C.safeNavigation({label:A.text(next,80),inForm:Boolean(next.closest('form')),submitType:next.tagName==='BUTTON'&&next.type!=='button',explicitStep:Boolean(document.querySelector('[aria-current="step"],[data-step],.stepper,.steps'))}))return;
-      next.click();await wait(300);void prepare({open:false});
+      if(working||!next.isConnected)return;if(!C.safeNavigation(navigationMeta(next)))return;
+      next.click();await wait(300);void prepare({open:false,autoContinue:false});
     }));
-    p.body.append(actions);p.place();return result;
+    p.body.append(actions);p.place();
+    if(autoContinue&&!review&&next&&autoDepth<4&&next.isConnected&&C.safeNavigation(navigationMeta(next))){
+      status.textContent=`✓ Заполнено полей: ${filled}. Перехожу к следующему безопасному шагу…`;
+      next.click();setTimeout(()=>{if(current().detectApplicationForm())void prepare({open:false,autoContinue:true,autoDepth:autoDepth+1});},420);return {...result,advanced:true};
+    }
+    return result;
   }
-  async function prepare({open=true,legacyPlan=null}={}){
+  async function prepare({open=true,legacyPlan=null,autoContinue=false,autoDepth=0}={}){
     if(working)return {submitted:false,status:'needs-review',reason:'preparation-in-progress'};
     working=true;const key=context(),epoch=++generation;const p=show(),status=p.status('Читаю вакансию…');
     try{
       const adapter=current();if(adapter.detectPageType()==='RECRUITER_CHAT')throw new Error('Для переписки используйте ✎ AI.');
       const pinned=root.vjaHhListQuickApplyRuntime?.selectedVacancy?.()||null;
-      const resumed=await request('pending',{url:location.href});
+      const resumed=await request('pending',{url:location.href,pageText:pageContextText()});
       // If Fill is pressed inside an HH list/application modal, keep the exact
       // vacancy card selected by the user. Never derive a cover letter from the
       // search-results page heading/body.
@@ -95,7 +100,7 @@
       p.body.append(letter);
       const actions=document.createElement('div');actions.className='actions';actions.append(U.button('Использовать этот текст',async()=>{data.coverLetter=letter.value;const result=await request('update-letter',{id:data.application.id,text:letter.value,url:location.href});status.textContent=result.ok?'Текст сохранён для этого отклика. Нажмите ✦ Fill, чтобы заполнить пустое поле.':result.error;}));p.body.append(actions);
       const form=adapter.detectApplicationForm();
-      if(form){status.textContent='Заполняю безопасные поля…';return await fill(data,p,status,key,epoch);}
+      if(form){status.textContent='Заполняю безопасные поля…';return await fill(data,p,status,key,epoch,{autoContinue:Boolean(autoContinue||resumed.pending?.autoContinuation),autoDepth});}
       const link=open?adapter.detectApplyButton():null;
       if(link){
         await request('pending',{url:location.href,value:{id:data.application.id,target:link.href}});
@@ -177,5 +182,5 @@
   root.vjaUniversal={prepare,autoApply,scan,refreshVacancyStatus,documentId,get prepared(){return prepared;},get applyState(){return applyState;}};
   scan();
   // Continue only a explicitly persisted application/form URL in this tab.
-  if(current().detectApplicationForm())request('pending',{url:location.href}).then(r=>{if(r.pending&&current().detectApplicationForm())void prepare({open:false});}).catch(()=>{});
+  if(current().detectApplicationForm())request('pending',{url:location.href,pageText:pageContextText()}).then(r=>{if(r.pending&&current().detectApplicationForm())void prepare({open:false,autoContinue:Boolean(r.pending.autoContinuation),autoDepth:0});}).catch(()=>{});
 })(globalThis);

@@ -1,4 +1,4 @@
-# Статус 3.9.5
+# Статус 3.9.9
 
 | Пункт стратегии | Реализация |
 |---|---|
@@ -28,5 +28,9 @@
 
 Не выполнено: подтверждение трудоустройства внешними источниками, переписывание backend ranking/компиляция сервера, реальный логин HH, live-тест внешней модели, запуск Windows EXE и PowerShell на Windows. Это не заявлено выполненным.
 
-| Search-page heading isolation | ✅ 3.9.5: выбранная карточка закрепляется по vacancy ID; `Найдено N вакансий` отклоняется как title |
-| Manual Fill in HH list modal | ✅ 3.9.5: использует pinned vacancy context, а не body страницы поиска |
+| Persistent vacancy/card memory | ✅ 3.9.9: Analysis + application/form state rehydrate by exact vacancy ID after Back/reload/repeated cards |
+| HH form continuation | ✅ 3.9.9: prepared quick-list application resumes on the questionnaire in the same tab; safe known fields/CV/letter are filled, unresolved fields are recorded, final Submit remains user-controlled |
+| Already-viewed cover-letter modal | ✅ 3.9.8: exact HH notice → click unique `Закрыть` → `✓ Уже просмотрен`; no false claim that the letter was sent |
+| Inline call Analysis | ✅ 3.9.7: exact vacancy ID → full HH description → green no-calls / red calls / neutral unknown; no auto-submit |
+| Search-page heading isolation | ✅ 3.9.7: выбранная карточка закрепляется по vacancy ID; `Найдено N вакансий` отклоняется как title |
+| Manual Fill in HH list modal | ✅ 3.9.7: использует pinned vacancy context, а не body страницы поиска |

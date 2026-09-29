@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "3.9.5",
-  "description": "Violetta 3.9.5: постоянные ✦ Apply/✎ AI; точный «Отклик + письмо» по выбранной HH-карточке; поиск/счётчик вакансий не может стать заголовком письма; vacancy-first writing и Cover Letter Memory.",
+  "version": "3.9.9",
+  "description": "Violetta 3.9.9: постоянная память Analysis/откликов по vacancy ID и автоматическое заполнение форм после перехода из списка вакансий.",
   "permissions": [
     "activeTab",
     "storage",

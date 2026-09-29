@@ -4,6 +4,7 @@ const cpCore=globalThis.vjaCopilotCore;
 const cpFollow=globalThis.vjaFollowUpIntelligence;
 const cpAnalytics=globalThis.vjaApplicationAnalytics;
 const cpState=globalThis.vjaApplicationState;
+const cpHhList=globalThis.vjaHhListQuickApply;
 const cpKey='vjaCandidateTruthProfile';
 let cpInit=null;
 const cpAiRequests=new Map();
@@ -69,6 +70,92 @@ function cpAssertEmbeddedVacancy(sender,vInput={}){
     return;
   }
   if(page.origin!==target.origin)throw new Error('Вакансия относится к другой странице.');
+}
+function cpHhApiText(data={}){
+  const skillText=(Array.isArray(data.key_skills)?data.key_skills:[]).map(x=>x?.name||'').filter(Boolean).join('. ');
+  const meta=[data.schedule?.name,data.employment?.name,data.experience?.name].filter(Boolean).join('. ');
+  return cpCore.clip(cpHhList?.htmlToText?.([data.name||'',data.description||'',data.branded_description||'',skillText,meta].filter(Boolean).join('\n'))||'',60000);
+}
+async function cpFetchHhVacancy(vInput,timeoutMs=4200){
+  const v=cpCore.vacancy(vInput),apiUrl=cpHhList?.hhApiVacancyUrl?.(v.url,v.vacancyId);if(!apiUrl)throw new Error('Не удалось построить HH API-запрос для этой вакансии.');
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.max(1200,Number(timeoutMs)||4200));
+  try{
+    const response=await fetch(apiUrl,{method:'GET',headers:{'Accept':'application/json','HH-User-Agent':'ViolettaApplyAssistant/3.9.9 (github.com/ViolettaNcl/job-search-assistant)'},signal:controller.signal,credentials:'omit',cache:'no-store'});
+    if(!response?.ok)throw new Error(`HH API: ${response?.status||'error'}`);
+    const data=await response.json(),id=String(data?.id||'');if(!id||id!==String(v.vacancyId))throw new Error('HH API вернул другую вакансию.');
+    const title=cpCore.clip(data?.name||v.title,300);if(cpCore.suspiciousVacancyTitle?.(title))throw new Error('HH API не подтвердил название вакансии.');
+    const description=cpHhApiText(data);if(!description)throw new Error('HH API не вернул полное описание вакансии.');
+    return cpCore.vacancy({...v,title,company:cpCore.clip(data?.employer?.name||v.company,300),description,descriptionCoverage:'full-fetch',requirements:cpCore.clip((Array.isArray(data?.key_skills)?data.key_skills:[]).map(x=>x?.name||'').filter(Boolean).join(', '),5000),remote:Boolean(v.remote||/удален|remote/i.test([data?.schedule?.name,data?.work_format?.map?.(x=>x?.name).join(' ')].filter(Boolean).join(' ')))});
+  }finally{clearTimeout(timer);}
+}
+async function cpQuickListCallAnalysis(vInput,sender){
+  cpAssertEmbeddedVacancy(sender,vInput);const selected=cpCore.vacancy(vInput),cacheKey='vjaCallAnalysis:'+selected.vacancyId;
+  const cached=(await chrome.storage.local.get(cacheKey))[cacheKey];if(cached?.result&&cached?.url===selected.url&&Date.now()-Number(cached.at||0)<30*24*60*60*1000)return {...cached.result,cached:true};
+  let full=null,analysis=null,source='hh-live-dom',apiError='',liveError='';
+
+  // Analysis must inspect the exact vacancy, not infer from the search-card snippet.
+  // First open the selected vacancy in an inactive background tab, read its full DOM,
+  // verify the vacancy id, and close the tab automatically. HH API is a fallback only.
+  try{
+    full=await cpReadVacancy(selected.url,sender,{fast:true});
+    if(!cpCore.sameVacancy(selected,full))throw new Error('Фоновая проверка открыла другую вакансию.');
+    analysis=cpHhList?.analyzeCallRequirement?.(`${full.title||''}\n${full.description||''}\n${full.requirements||''}`,full.descriptionCoverage||'full-dom');
+  }catch(error){
+    liveError=error?.message||String(error);
+    try{
+      source='hh-api';full=await cpFetchHhVacancy(selected,3600);
+      if(!cpCore.sameVacancy(selected,full))throw new Error('HH API вернул другую вакансию.');
+      analysis=cpHhList?.analyzeCallRequirement?.(`${full.title||''}\n${full.description||''}\n${full.requirements||''}`,full.descriptionCoverage||'full-fetch');
+    }catch(apiFailure){
+      apiError=apiFailure?.message||String(apiFailure);source='card-snippet';full=selected;
+      analysis=cpHhList?.analyzeCallRequirement?.(`${selected.title||''}\n${selected.description||''}\n${selected.requirements||''}`,'snippet');
+    }
+  }
+  analysis=analysis||{status:'unknown',hasCalls:null,canApply:false,confidence:0,reason:'Не удалось выполнить анализ звонков.',evidence:''};
+  const reason=source==='card-snippet'&&analysis.status==='unknown'
+    ?'Не удалось прочитать полную страницу выбранной вакансии ни в фоне, ни через HH API. Повторите Analysis.'
+    :analysis.reason;
+  const coverage=source==='card-snippet'?'snippet':(full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom'));
+  const result={vacancyId:selected.vacancyId,title:full.title,status:analysis.status,hasCalls:analysis.hasCalls,canApply:analysis.canApply,confidence:analysis.confidence,reason,evidence:analysis.evidence||'',source,coverage,liveError:source==='card-snippet'?liveError:'',apiError:source==='card-snippet'?apiError:''};
+  if(source!=='card-snippet'||analysis.status!=='unknown')await chrome.storage.local.set({[cacheKey]:{url:selected.url,at:Date.now(),result}});return result;
+}
+const cpQuickListAnalysisTtl=30*24*60*60*1000;
+function cpQuickListActiveKey(sender){return `vjaQuickListActive:${sender.tab.id}:${sender.frameId||0}`;}
+function cpFormVacancyId(value){try{const u=new URL(value);return u.searchParams.get('vacancyId')||u.searchParams.get('vacancy_id')||u.searchParams.get('vacancy')||cpCore.idFromUrl(value)||'';}catch{return '';}}
+function cpApplicationRoute(value){try{const u=new URL(value);return /(?:application|applicant|vacancy[_-]?response|response|respond|questionnaire|screening|negotiation|oneclick|apply|form)/i.test(u.pathname+u.search);}catch{return false;}}
+function cpTitleMatchesPage(title,pageText=''){
+  const stop=new Set(['специалист','менеджер','работы','работе','работа','developer','engineer','junior','senior','middle','the','and','для','with']);
+  const tokens=String(title||'').toLocaleLowerCase('ru-RU').replace(/ё/g,'е').split(/[^a-zа-я0-9#+.]+/i).filter(x=>x.length>=4&&!stop.has(x));
+  if(!tokens.length)return false;const hay=String(pageText||'').toLocaleLowerCase('ru-RU').replace(/ё/g,'е');
+  const need=Math.min(2,tokens.length);return tokens.filter(x=>hay.includes(x)).length>=need;
+}
+function cpIsQuickListContinuation(job,sender,pageText=''){
+  if(!job?.plan?.quickList||job.tabId!==sender.tab.id||Number(job.frameId||0)!==Number(sender.frameId||0))return false;
+  const app=cpCore.application(job),terminal=['Applied','Viewed','Recruiter Replied','HR Interview','Technical Interview','Test Assignment','Offer','Rejected','Closed'].includes(app.status);if(terminal)return false;
+  if(!cpApplicationRoute(sender.url))return false;
+  const currentId=cpFormVacancyId(sender.url),expectedId=String(job.plan?.vacancyId||app.vacancy?.vacancyId||'');if(currentId&&expectedId&&String(currentId)!==expectedId)return false;
+  const currentProvider=cpCore.provider(sender.url),expectedProvider=app.vacancy?.provider||job.plan?.provider||'';
+  if(currentProvider===expectedProvider){if(currentId&&expectedId)return true;return cpTitleMatchesPage(app.vacancy?.title||job.plan?.jobTitle,pageText);}
+  return cpTitleMatchesPage(app.vacancy?.title||job.plan?.jobTitle,pageText);
+}
+function cpCanRecoverQuickListExact(job,sender,currentId){
+  if(!job?.plan?.quickList||!currentId||!cpApplicationRoute(sender.url))return false;const app=cpCore.application(job);
+  if(['Applied','Viewed','Recruiter Replied','HR Interview','Technical Interview','Test Assignment','Offer','Rejected','Closed'].includes(app.status))return false;
+  const expectedId=String(job.plan?.vacancyId||app.vacancy?.vacancyId||'');if(String(currentId)!==expectedId)return false;
+  return cpCore.provider(sender.url)===(app.vacancy?.provider||job.plan?.provider||'');
+}
+async function cpPendingPayload(job,extra={}){
+  if(!job)return null;const file=(await chrome.storage.local.get(job.context?.cvKey||[]))[job.context?.cvKey];
+  const cvVersion=file?`${file.savedAt||''}:${file.size}:${cpCore.hash(file.base64?.slice(-100)||'')}`:'';
+  return {application:cpCore.application(job),context:job.context,profile:job.context?.profileSnapshot,coverLetter:job.context?.coverLetter,role:job.context?.role,cvFile:cvVersion===job.context?.cvVersion&&cpCore.cvValid(file)?file:null,...extra};
+}
+async function cpQuickListState(vInput,sender){
+  cpAssertEmbeddedVacancy(sender,vInput);const v=cpCore.vacancy(vInput),cacheKey='vjaCallAnalysis:'+v.vacancyId,stored=(await chrome.storage.local.get(cacheKey))[cacheKey];
+  const analysis=stored?.result&&Date.now()-Number(stored.at||0)<cpQuickListAnalysisTtl&&stored.url===v.url?{...stored.result,cached:true,at:Number(stored.at||0)}:null;
+  const jobs=await applicationJobs();const job=jobs.filter(j=>cpCore.sameVacancy(cpCore.application(j).vacancy,v)).sort((a,b)=>Number(b.context?.updatedAt||b.plan?.createdAt||0)-Number(a.context?.updatedAt||a.plan?.createdAt||0))[0]||null;
+  if(!job)return {vacancyId:v.vacancyId,analysis,application:null};
+  const app=cpCore.application(job),site=job.result?.result||{},memory=job.context?.coverLetterMemory||{},formMemory=job.context?.formMemory||null;
+  return {vacancyId:v.vacancyId,analysis,application:{id:app.id,status:app.status,updatedAt:app.updatedAt||0,completed:Boolean(job.completed||site.submitted),coverLetterSubmitted:Boolean(memory.submittedAt||site.coverLetterFilled),employerAlreadyViewed:Boolean(site.employerAlreadyViewed),formMemory}};
 }
 function cpTimelineEvent(type,label,meta={}){return {id:`evt-${Date.now()}-${Math.random().toString(16).slice(2)}`,at:Date.now(),type:cpCore.clip(type,60),label:cpCore.clip(label,220),meta};}
 function cpWithTimeline(context,type,label,meta={}){const timeline=[...(context?.timeline||[]),cpTimelineEvent(type,label,meta)].slice(-40);return {...context,timeline,updatedAt:Date.now()};}
@@ -191,19 +278,22 @@ async function cpQuickListPrepare(vInput,sender){
     const job=prepared.application?.id?await applicationJob(prepared.application.id):null;
     return {duplicate:true,application:prepared.application,coverLetter:job?.context?.coverLetter||prepared.application?.coverLetter||''};
   }
+  if(prepared?.application?.id){const key=cpQuickListActiveKey(sender);await chrome.storage.session.set({[key]:{id:prepared.application.id,vacancyId:String(prepared.application.vacancy?.vacancyId||vInput?.vacancyId||''),sourceUrl:cpCore.canonicalUrl(vInput?.url),expires:Date.now()+30*60*1000}});}
   return prepared;
 }
 async function cpQuickListComplete(message,sender){
   const job=await applicationJob(message.id);if(!job)throw new Error('Контекст быстрого отклика не найден.');
   if(job.tabId!==sender.tab.id||Number(job.frameId||0)!==Number(sender.frameId||0))throw new Error('Быстрый отклик относится к другой вкладке.');
-  const submitted=message.appliedConfirmed===true,letterSent=message.coverLetterSubmitted===true,now=Date.now();
+  const submitted=message.appliedConfirmed===true,letterSent=message.coverLetterSubmitted===true,employerAlreadyViewed=message.employerAlreadyViewed===true,now=Date.now();
   if(!submitted)throw new Error('Сайт не подтвердил отклик.');
   let memory={...(job.context?.coverLetterMemory||{}),text:job.context?.coverLetter||'',updatedAt:now};
   if(letterSent)memory={...memory,submittedAt:now,submittedText:job.context?.coverLetter||'',submittedCvName:job.context?.cvName||''};
-  let context={...(job.context||{}),status:'Applied',statusSource:'native-list-click',coverLetterMemory:memory,updatedAt:now};
-  context=cpWithTimeline(context,'submitted-native-list',letterSent?'Быстрый отклик из списка + сопроводительное письмо отправлены':'Отклик из списка отправлен; сопроводительное письмо требует проверки',{coverLetterSubmitted:letterSent,vacancyId:job.plan?.vacancyId||''});
-  const result={submitted:true,status:'confirmed',coverLetterFilled:letterSent,nativeList:true};
-  const next=await updateApplicationJob(message.id,{context,completed:true,review:false,reason:letterSent?null:'Сопроводительное письмо не подтверждено сайтом.',pending:null,result:{id:message.id,trackedId:job.plan?.trackedId||job.plan?.vacancyId||'',sourceUrl:job.plan?.sourceUrl||'',coverLetter:job.context?.coverLetter||'',createdAt:now,result}});
+  let context={...(job.context||{}),status:employerAlreadyViewed?'Viewed':'Applied',statusSource:employerAlreadyViewed?'hh-employer-viewed':'native-list-click',coverLetterMemory:memory,updatedAt:now};
+  context=cpWithTimeline(context,employerAlreadyViewed?'hh-employer-viewed':'submitted-native-list',employerAlreadyViewed?'HH сообщил, что отклик уже просмотрен работодателем; окно сопроводительного письма закрыто автоматически.':(letterSent?'Быстрый отклик из списка + сопроводительное письмо отправлены':'Отклик из списка отправлен; сопроводительное письмо требует проверки'),{coverLetterSubmitted:letterSent,employerAlreadyViewed,vacancyId:job.plan?.vacancyId||''});
+  const result={submitted:true,status:'confirmed',coverLetterFilled:letterSent,nativeList:true,employerAlreadyViewed};
+  const reason=employerAlreadyViewed||letterSent?null:'Сопроводительное письмо не подтверждено сайтом.';
+  const next=await updateApplicationJob(message.id,{context,completed:true,review:false,reason,pending:null,result:{id:message.id,trackedId:job.plan?.trackedId||job.plan?.vacancyId||'',sourceUrl:job.plan?.sourceUrl||'',coverLetter:job.context?.coverLetter||'',createdAt:now,result}});
+  await chrome.storage.session.remove(cpQuickListActiveKey(sender)).catch(()=>{});
   return {ok:true,application:cpPublicApplication(cpCore.application(next||job)),result};
 }
 async function cpVacancyStatus(vInput,sender){
@@ -218,16 +308,23 @@ async function cpRememberPrepared(message,sender){
   if(!job||job.tabId!==sender.tab.id||Number(job.frameId||0)!==Number(sender.frameId||0))throw new Error('Этот отклик принадлежит другой вкладке.');
   const savedVacancy=cpCore.application(job).vacancy;
   const same=cpCore.canonicalUrl(savedVacancy.url)===cpCore.canonicalUrl(sender.url)||cpCore.sameVacancy(savedVacancy,{url:sender.url,provider:job.context?.vacancy?.provider});
-  const linked=await chrome.storage.session.get(`vjaCopilotPending:${sender.tab.id}:${sender.frameId||0}`);
-  const pending=linked[`vjaCopilotPending:${sender.tab.id}:${sender.frameId||0}`];
-  if(!same&&(!pending||pending.id!==message.id||pending.target!==cpCore.canonicalUrl(sender.url)))throw new Error('Изменился адрес формы.');
-  const state=message.reviewCount?'Needs review':'Ready';
-  const context=cpWithTimeline({...job.context,status:state},message.reviewCount?'needs-review':'ready',message.reviewCount?`${message.reviewCount} полей требуют проверки`:'Форма готова к проверке',{reviewCount:Number(message.reviewCount||0)});
-  await updateApplicationJob(message.id,{context,review:true,result:{id:job.plan.id,result:{submitted:false,status:'needs-review',reason:'user-submit-required',coverLetterFilled:Boolean(message.coverLetterFilled)}}});
-  return {ok:true,status:state};
+  const linked=await chrome.storage.session.get([`vjaCopilotPending:${sender.tab.id}:${sender.frameId||0}`,cpQuickListActiveKey(sender)]);
+  const pending=linked[`vjaCopilotPending:${sender.tab.id}:${sender.frameId||0}`],quick=linked[cpQuickListActiveKey(sender)];
+  const exactLinked=Boolean(pending&&pending.id===message.id&&pending.target===cpCore.canonicalUrl(sender.url));
+  const quickLinked=Boolean(quick&&quick.id===message.id&&quick.expires>=Date.now()&&cpIsQuickListContinuation(job,sender,message.pageText||''));
+  if(!same&&!exactLinked&&!quickLinked)throw new Error('Изменился адрес формы.');
+  const reviewCount=Math.max(0,Number(message.reviewCount||0)),state=reviewCount?'Needs review':'Ready',now=Date.now();
+  const unresolved=Array.isArray(message.unresolved)?message.unresolved.slice(0,30).map(x=>({label:cpCore.clip(x?.label||'',180),reason:cpCore.clip(x?.reason||'',220)})).filter(x=>x.label||x.reason):[];
+  const formMemory={url:cpCore.canonicalUrl(sender.url),filled:Math.max(0,Number(message.filled||0)),reviewCount,unresolved,coverLetterFilled:Boolean(message.coverLetterFilled),cvUploaded:Boolean(message.cvUploaded),autoFilled:Boolean(message.autoFilled),updatedAt:now};
+  const previous=job.context?.formMemory||{},changed=previous.url!==formMemory.url||previous.reviewCount!==formMemory.reviewCount||previous.filled!==formMemory.filled;
+  let context={...job.context,status:state,formMemory,updatedAt:now};
+  if(changed)context=cpWithTimeline(context,reviewCount?'needs-review':'ready',reviewCount?`${reviewCount} полей требуют проверки`:'Форма автоматически заполнена и готова к проверке',{reviewCount,filled:formMemory.filled,autoFilled:formMemory.autoFilled});
+  await updateApplicationJob(message.id,{context,review:true,result:{id:job.plan.id,result:{submitted:false,status:'needs-review',reason:'user-submit-required',coverLetterFilled:Boolean(message.coverLetterFilled),formMemory}}});
+  return {ok:true,status:state,formMemory};
 }
-async function cpReadVacancy(url,sender){
+async function cpReadVacancy(url,sender,options={}){
   const canonical=cpCore.canonicalUrl(url);if(!canonical)throw new Error('Некорректная ссылка на вакансию.');
+  const fast=Boolean(options?.fast),loadTimeoutMs=fast?7000:12000,readTimeoutMs=fast?4500:7000,readAttempts=fast?2:3,retryDelayMs=fast?250:450;
   const expectedId=cpCore.idFromUrl(canonical), expectedProvider=cpCore.provider(canonical);
   const key='vjaVacancyCache:'+cpCore.hash(canonical);const cached=(await chrome.storage.local.get(key))[key];
   if(cached?.vacancy && ['full-dom','full-structured','full-fetch'].includes(cached.vacancy.descriptionCoverage) && cpCore.canonicalUrl(cached.vacancy.url)===canonical && (!expectedId||cached.vacancy.vacancyId===expectedId) && !cpCore.suspiciousVacancyTitle?.(cached.vacancy.title) && Date.now()-cached.at<15*60*1000)return cached.vacancy;
@@ -240,7 +337,7 @@ async function cpReadVacancy(url,sender){
     tab=await chrome.tabs.create({url:canonical,active:false});
     let loaded=null;
     for(let attempt=0;attempt<2;attempt++){
-      loaded=await browserAutopilotWaitForTab(tab.id,12000);
+      loaded=await browserAutopilotWaitForTab(tab.id,loadTimeoutMs);
       const loadedUrl=cpCore.canonicalUrl(loaded?.url||'');
       const loadedId=cpCore.idFromUrl(loadedUrl),loadedProvider=cpCore.provider(loadedUrl);
       if(loadedProvider===expectedProvider&&(!expectedId||loadedId===expectedId))break;
@@ -249,14 +346,14 @@ async function cpReadVacancy(url,sender){
     }
     await cpInject(tab.id);
     let result=null;
-    for(let attempt=0;attempt<3;attempt++){
-      result=await browserAutopilotWithTimeout(chrome.tabs.sendMessage(tab.id,{type:'vjaCopilotPage',action:'vacancy',expectedVacancyId:expectedId},{frameId:0}),7000,'Не удалось прочитать вакансию.');
+    for(let attempt=0;attempt<readAttempts;attempt++){
+      result=await browserAutopilotWithTimeout(chrome.tabs.sendMessage(tab.id,{type:'vjaCopilotPage',action:'vacancy',expectedVacancyId:expectedId},{frameId:0}),readTimeoutMs,'Не удалось прочитать вакансию.');
       const raw=result?.vacancy||{},v=cpCore.vacancy(raw);
       if(v.description&&(!expectedId||v.vacancyId===expectedId)&&v.provider===expectedProvider&&!cpCore.suspiciousVacancyTitle?.(v.title)){
         if(!v.descriptionCoverage)v.descriptionCoverage='full-dom';
         await chrome.storage.local.set({[key]:{vacancy:v,at:Date.now()}});return v;
       }
-      await browserAutopilotWait(450);
+      await browserAutopilotWait(retryDelayMs);
     }
     if(cpCore.suspiciousVacancyTitle?.(result?.vacancy?.title))throw new Error('Вместо выбранной вакансии HeadHunter вернул заголовок страницы поиска. Письмо не отправлено.');
     throw new Error('Не удалось подтвердить полное описание именно выбранной вакансии.');
@@ -346,6 +443,11 @@ async function cpRepairHhTab(tabId,url,delays=[80,500,1400]){
   try{const u=new URL(url||'');if(!/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(u.hostname))return;}catch{return;}
   for(const delay of delays)setTimeout(()=>void cpInject(tabId).catch(()=>{}),delay);
 }
+async function cpRepairPermittedApplicationTab(tabId,url,delays=[120,650]){
+  let u;try{u=new URL(url||'');if(!/^https?:$/.test(u.protocol)||/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(u.hostname)||!cpApplicationRoute(u.href))return;}catch{return;}
+  const pattern=u.origin+'/*';try{if(!await chrome.permissions.contains({origins:[pattern]}))return;}catch{return;}
+  for(const delay of delays)setTimeout(()=>void cpInject(tabId).catch(()=>{}),delay);
+}
 async function cpRegisterOrigin(origin){
   const pattern=new URL(origin).origin+'/*';
   if(!await chrome.permissions.contains({origins:[pattern]}))throw new Error('Разрешение на сайт не выдано.');
@@ -360,10 +462,10 @@ chrome.runtime.onInstalled.addListener(()=>setTimeout(()=>void cpRepairSupported
 chrome.runtime.onStartup.addListener(()=>setTimeout(()=>void cpRepairSupportedTabs(),250));
 chrome.tabs?.onUpdated?.addListener((tabId,change,tab)=>{
   if(!change.url&&change.status!=='loading'&&change.status!=='complete')return;
-  void cpRepairHhTab(tabId,change.url||tab?.url||'');
+  const url=change.url||tab?.url||'';void cpRepairHhTab(tabId,url);void cpRepairPermittedApplicationTab(tabId,url);
 });
 chrome.tabs?.onActivated?.addListener(async info=>{
-  try{const tab=await chrome.tabs.get(info.tabId);void cpRepairHhTab(info.tabId,tab?.url||'', [20,350]);}catch{}
+  try{const tab=await chrome.tabs.get(info.tabId);const url=tab?.url||'';void cpRepairHhTab(info.tabId,url,[20,350]);void cpRepairPermittedApplicationTab(info.tabId,url,[60,500]);}catch{}
 });
 // HH is a SPA: vacancy transitions can use history.pushState without a traditional
 // page load. Repair the top-frame surfaces on those navigation events as well.
@@ -414,7 +516,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
       if(op==='open-options'){await chrome.runtime.openOptionsPage();return {ok:true};}
     }
     const chatOps=new Set(['quick-context','observe-chat','resolve','analyze','remember-template','remember-ai-draft','map']);
-    if(op==='quick-list-prepare')cpAssertEmbeddedVacancy(sender,message.vacancy||{});
+    if(op==='quick-list-prepare'||op==='quick-list-call-analysis'||op==='quick-list-state')cpAssertEmbeddedVacancy(sender,message.vacancy||{});
     else if(chatOps.has(op)&&message.snapshot)cpAssertChatPage(sender,message.snapshot);
     else cpAssertPage(sender,message.snapshot?.url||message.vacancy?.url||message.url);
     if(op==='bootstrap')return {ok:true,...await cpData()};
@@ -435,6 +537,8 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(op==='prepare')return {ok:true,...await cpPrepare(message.vacancy,sender,message.legacyPlan,{safePreparation:true})};
     if(op==='auto-apply')return {ok:true,...await cpAutoApply(message.vacancy,sender)};
     if(op==='quick-list-prepare')return {ok:true,...await cpQuickListPrepare(message.vacancy,sender)};
+    if(op==='quick-list-call-analysis')return {ok:true,...await cpQuickListCallAnalysis(message.vacancy,sender)};
+    if(op==='quick-list-state')return {ok:true,...await cpQuickListState(message.vacancy,sender)};
     if(op==='quick-list-complete')return cpQuickListComplete(message,sender);
     if(op==='vacancy-status')return cpVacancyStatus(message.vacancy,sender);
     if(op==='prepared')return cpRememberPrepared(message,sender);
@@ -457,12 +561,12 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
         const target=cpCore.canonicalUrl(message.value.target);if(!target)throw new Error('Некорректный адрес формы.');
         await chrome.storage.session.set({[key]:{id:message.value.id,target,expires:Date.now()+10*60*1000}});return {ok:true};
       }
-      const p=(await chrome.storage.session.get(key))[key];
-      if(!p||p.expires<Date.now()||p.target!==cpCore.canonicalUrl(sender.url))return {ok:true,pending:null};
-      const job=await applicationJob(p.id);if(!job)return {ok:true,pending:null};
-      const file=(await chrome.storage.local.get(job.context.cvKey||[]))[job.context.cvKey];
-      const cvVersion=file?`${file.savedAt||''}:${file.size}:${cpCore.hash(file.base64?.slice(-100)||'')}`:'';
-      return {ok:true,pending:{application:cpCore.application(job),context:job.context,profile:job.context.profileSnapshot,coverLetter:job.context.coverLetter,role:job.context.role,cvFile:cvVersion===job.context.cvVersion&&cpCore.cvValid(file)?file:null}};
+      const sessionData=await chrome.storage.session.get([key,cpQuickListActiveKey(sender)]),p=sessionData[key];
+      if(p&&p.expires>=Date.now()&&p.target===cpCore.canonicalUrl(sender.url)){const job=await applicationJob(p.id);if(job)return {ok:true,pending:await cpPendingPayload(job,{autoContinuation:false})};}
+      const active=sessionData[cpQuickListActiveKey(sender)];
+      if(active&&active.expires>=Date.now()){const job=await applicationJob(active.id);if(job&&cpIsQuickListContinuation(job,sender,message.pageText||''))return {ok:true,pending:await cpPendingPayload(job,{autoContinuation:true,quickList:true})};}
+      const currentId=cpFormVacancyId(sender.url);if(currentId){const jobs=(await applicationJobs()).filter(j=>cpCanRecoverQuickListExact(j,sender,currentId));if(jobs.length===1){const rebound=await updateApplicationJob(jobs[0].plan.id,{tabId:sender.tab.id,frameId:sender.frameId||0})||jobs[0];await chrome.storage.session.set({[cpQuickListActiveKey(sender)]:{id:rebound.plan.id,vacancyId:String(currentId),sourceUrl:cpCore.canonicalUrl(rebound.plan.sourceUrl),expires:Date.now()+30*60*1000}});return {ok:true,pending:await cpPendingPayload(rebound,{autoContinuation:true,quickList:true,recovered:true})};}}
+      return {ok:true,pending:null};
     }
     if(op==='open-options'){await chrome.runtime.openOptionsPage();return {ok:true};}
     throw new Error('Неизвестная операция.');

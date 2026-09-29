@@ -1,4 +1,29 @@
-# Тестирование · 3.9.5
+# Тестирование · 3.9.9
+
+
+
+## 3.9.9 persistent-memory regression
+
+Focused Chromium test `tests/browser_memory_399.py` verifies the requested flow end to end with mocked Chrome/HH boundaries:
+
+- Analysis reaches a confirmed state and a duplicate card restores it without another click;
+- quick-list application context is persisted before navigation;
+- an HH questionnaire fills confirmed profile fields, cover letter and selected CV;
+- unknown salary and legal consent stay unresolved;
+- final Submit is not auto-clicked;
+- form progress is written back to vacancy memory;
+- returning to the list restores the saved review state instead of resetting the card.
+
+Run it with:
+
+```powershell
+python .\tests\browser_memory_399.py
+if ($LASTEXITCODE -ne 0) { throw '3.9.9 memory regression failed' }
+```
+
+## 3.9.8 already-viewed HH regression
+
+Browser regression opens a synthetic HH list card, submits a cover letter, returns `Отклик уже просмотрен работодателем.`, and verifies that the extension clicks the modal's unique `Закрыть`, removes the dialog, sets the card action to `✓ Уже просмотрен`, records `Viewed`, and does not claim `coverLetterFilled=true`.
 
 В source clone используйте `browser-extension/`; в Windows ZIP — `extension/`. Тестовый bridge автоматически различает две структуры.
 
@@ -39,11 +64,11 @@ PowerShell-публикатор этой поставки проверен по 
 Локальные отчёты и screenshots относятся к `test-results/` и не коммитятся. Числа фактического финального прогона находятся в `TEST_REPORT.md` Windows-пакета и отдельном отчёте поставки.
 
 
-## 3.9.5 CI refresh
+## 3.9.7 CI refresh
 
 GitHub workflows now validate the current `browser-extension/` source rather than old exact popup text from pre-3.9 UI. `package-windows` packages the current root launcher, and CodeQL uses .NET 10 manual build for C# plus no-build JavaScript analysis.
 
-## 3.9.5 exact list-card regression
+## 3.9.7 exact list-card regression
 
 - Search page with heading `Найдено 19 718 вакансий` and multiple vacancy cards.
 - Each card must get its own `✦ Отклик + письмо`.
@@ -52,3 +77,7 @@ GitHub workflows now validate the current `browser-extension/` source rather tha
 - Hidden detail-tab reading must confirm the same vacancy ID before accepting text.
 - Manual `✦ Fill` inside a list/modal must reuse the selected vacancy context.
 - Both HH cover-letter variants remain covered: required-before-submit and append-after-response.
+
+## 3.9.7 inline call-analysis regression
+
+The browser fixture verifies two HH search cards at once: a chat-only vacancy becomes `✓ Без звонков`, a vacancy with explicit inbound calls becomes `✕ Есть звонки`, the exact `/vacancies/<id>` API request is observed, and the original vacancy-specific `✦ Отклик + письмо` flow still completes afterward.
