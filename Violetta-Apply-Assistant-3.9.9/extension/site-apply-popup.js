@@ -1,0 +1,243 @@
+function vjaEnsureSiteApplyButton() {
+  let button = $("siteApplyNow");
+  if (button) return button;
+  const anchor = $("externalActions") || $("applyHh") || $("fillNote");
+  if (!anchor) return null;
+  button = document.createElement("button");
+  button.id = "siteApplyNow";
+  button.className = $("oneClickApply") ? "hidden" : "primary full";
+  button.textContent = "⚡ Отправить отклик";
+  button.title = "Ваше нажатие запускает полный автоотклик: форма, CV, письмо и финальная отправка только при однозначно готовой форме.";
+  anchor.insertAdjacentElement("beforebegin", button);
+  return button;
+}
+
+async function vjaRecordConfirmedSiteApply(resultEnvelope, cvName = "") {
+  const trackedId = resultEnvelope?.trackedId || latestTrackedId || "";
+  if (!trackedId) return false;
+  try {
+    const api = await getApiBase();
+    const coverLetter = String(resultEnvelope?.coverLetter || $("coverLetter")?.value || latest?.draft?.coverLetter || "").trim();
+    const response = await vjaFetch(`${api}/api/vacancies/${trackedId}/browser-applied`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coverLetter, resumeLabel: cvName, vacancyTitle: latestPage?.title || "" })
+    });
+    if (!response.ok) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function vjaSiteApplyReason(result) {
+  const reason = String(result?.reason || "");
+  if (reason === "required-fields") {
+    const names = (result?.unresolved || []).filter(Boolean);
+    return names.length ? `Required fields still need you: ${names.join(", ")}.` : "Required fields still need your review before submission.";
+  }
+  if (reason === "cv-not-uploaded") return "The site exposes a CV upload field, but the CV could not be attached automatically.";
+  if (reason === "manual-risk-fields") { const names=(result?.unresolved||[]).filter(Boolean); return names.length?`Проверьте вручную юридические/визовые согласия перед отправкой: ${names.join(', ')}.`:'Проверьте вручную юридические, визовые или contractual согласия перед финальной отправкой.'; }
+  if (reason === "cover-letter-not-persisted") return "The tailored cover letter did not stay in the employer form, so the assistant stopped before Send.";
+  if (reason === "hh-resume-choice-required") return "HH.ru shows several resumes and none is selected. Select the resume once, then press ✦ Apply again.";
+  if (reason === "hh-resume-selection-not-persisted") return "HH.ru did not keep the selected resume. Select the resume once, then press ✦ Apply again.";
+  if (reason === "hh-cover-letter-action-not-found") return "HH.ru submitted the response, but its Add cover letter action was not available. Open the response and attach the prepared letter manually.";
+  if (reason === "hh-cover-letter-action-ambiguous") return "HH.ru submitted the response, but showed several possible cover-letter actions. The assistant stopped instead of clicking the wrong one.";
+  if (reason === "application-ui-not-found") return "The Apply action did not open a recognizable application form. The assistant stopped before any final click.";
+  if (reason === "final-action-not-found") return "The application was filled, but no safe final Send/Submit/Откликнуться action was found.";
+  if (reason === "final-action-ambiguous") return "Several possible final submission buttons were found. The assistant stopped instead of clicking the wrong one.";
+  return reason || "The site needs a manual review before it can be submitted safely.";
+}
+
+async function vjaHandleSiteApplyResult(envelope, cvName = "") {
+  const result = envelope?.result || envelope || {};
+  const note = $("fillNote");
+  if (result.submitted && result.status === "confirmed" && result.coverLetterFilled) {
+    const resumeLabel = result.resumeLabel || cvName || result?.cvResult?.filename || "";
+    const recorded = envelope.recorded || await vjaRecordConfirmedSiteApply(envelope, resumeLabel);
+    if (note) note.textContent = recorded
+      ? "Application submitted with the tailored letter and selected resume/CV, then recorded as Applied."
+      : "Application submitted on the employer site. The local tracker could not be updated automatically.";
+    const button = $("siteApplyNow");
+    if (button) {
+      button.textContent = "Applied ✓";
+      button.disabled = true;
+    }
+    return;
+  }
+  if (result.status === "clicked-unverified" || result.status === "verification-needed") {
+    if (note) note.textContent = "The employer's final Send action was clicked, but the site did not expose a reliable confirmation signal. Check the page once before recording it as Applied.";
+    return;
+  }
+  if (result.status === "submitted-needs-letter") {
+    if (note) note.textContent = `${vjaSiteApplyReason(result)} Нажмите кнопку ещё раз — расширение продолжит с письма, не отправляя резюме повторно.`;
+    const button = $("siteApplyNow");
+    if (button) button.textContent = "Добавить письмо";
+    return;
+  }
+  if (result.status === "needs-review") {
+    if (note) note.textContent = vjaSiteApplyReason(result);
+    return;
+  }
+  if (result.error) showError(result.error);
+}
+
+async function vjaApplyNowOnSite() {
+  clearError();
+  if (!latest || !latestPage?.url) return showError("Analyze the vacancy first.");
+
+  const hhWebsite = Boolean(window.vjaSiteApply?.isHhUrl?.(latestPage.url)) || isHhVacancy(latestPage.url);
+  const applyTab = await activeTab();
+  const previous = await chrome.runtime.sendMessage({type:"vjaGetSiteApply",tabId:applyTab.id});
+  const previousEnvelope = previous?.job?.result;
+  if (previousEnvelope?.result?.submitted && previousEnvelope?.result?.status === "confirmed" && window.vjaSiteApply?.sameJobUrl?.(previousEnvelope.sourceUrl, latestPage.url)) {
+    const note = $("fillNote");
+    if (note) note.textContent = "Этот отклик уже был подтверждён и сохранён. Повторная отправка заблокирована.";
+    return;
+  }
+  const language = latest.draft?.language === "ru" ? "ru" : "en";
+  let cvKey = "", fileData = null, resolvedRole = String(latest.draft?.strategy?.cvVariant || "unknown");
+
+  if (!hhWebsite) {
+    const recommended = typeof vjaGetRecommendedStoredCv === "function" ? await vjaGetRecommendedStoredCv() : null;
+    cvKey = recommended?.key || (language === "ru" ? "cvVaultRu" : "cvVaultEn");
+    fileData = recommended?.data || null;
+    resolvedRole = recommended?.role || resolvedRole;
+    if (!fileData?.base64) {
+      showError(`${language === "ru" ? "Russian" : "English"} CV is not stored in the CV Vault yet.`);
+      await chrome.runtime.openOptionsPage();
+      return;
+    }
+  }
+
+  const button = vjaEnsureSiteApplyButton();
+  if (button) {
+    button.disabled = true;
+    button.textContent = hhWebsite ? "Sending on HH…" : "Applying…";
+  }
+
+  const note = $("fillNote");
+  if (note) note.textContent = hhWebsite
+    ? "Opening HH response, filling the tailored cover letter, using the selected HH account resume and pressing Send…"
+    : `Opening the application, attaching ${fileData?.name || "the recommended CV"}, filling the tailored cover letter and submitting…`;
+
+  let trackedId = latestTrackedId || "";
+  try { trackedId = await ensureTracked(); } catch { }
+
+  let sourceHost = "";
+  try { sourceHost = new URL(latestPage.url).hostname; } catch { }
+  const pending = {
+    id: `site-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    trackedId,
+    sourceUrl: latestPage.url,
+    sourceHost,
+    jobTitle: latestPage.title || latest?.draft?.title || '',
+    coverLetter: $("coverLetter")?.value || latest.draft?.coverLetter || "",
+    cvKey,
+    resumeHint: latest.draft?.resumeHint || latest.draft?.recommendedHeadline || latest.draft?.recommendedCv || "",
+    letterVersion: latest.draft?.letterVersion || "unknown",
+    roleVariant: resolvedRole || latest.draft?.strategy?.cvVariant || "unknown",
+    siteKind: hhWebsite ? "hh" : "generic",
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    finalClicked: false
+  };
+
+
+  try {
+    const registered = await chrome.runtime.sendMessage({type:'vjaRegisterSiteApply',tabId:applyTab.id,plan:pending});
+    if(!registered?.ok)throw new Error(registered?.error || 'Не удалось сохранить задание.');
+    const job = registered.job;
+    const result = job?.result?.result || {status:'needs-review',reason:job?.reason || 'Ожидаю результат отклика.'};
+    const envelope = {...job?.result,recorded:job?.completed,result};
+    await vjaHandleSiteApplyResult(envelope, result?.resumeLabel || fileData?.name || "");
+  } catch (error) {
+    if (note) note.textContent = error.message || "Ожидаю результат отклика. Остальные вакансии доступны.";
+  } finally {
+    if (button && !button.textContent.includes("Applied")) {
+      button.disabled = false;
+      button.textContent = "⚡ Отправить отклик";
+    }
+  }
+}
+
+let vjaOneClickRunning = false;
+window.vjaResetOneClickState = () => { vjaOneClickRunning = false; };
+async function vjaOneClickApply() {
+  if (vjaOneClickRunning) return;
+  const button = $("oneClickApply");
+  const status = $("oneClickStatus");
+  vjaOneClickRunning = true;
+  clearError();
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Готовлю и отправляю…";
+  }
+  if (status) status.textContent = "Анализирую вакансию и создаю персональное сопроводительное письмо…";
+
+  try {
+    const summary = await window.vjaPrepareCurrentApplication?.();
+    if (!latest || !latestPage?.url || summary?.state === "failed") {
+      throw new Error("Не удалось подготовить отклик. Проверьте соединение с запущенной программой.");
+    }
+    if (status) status.textContent = "Открываю форму, выбираю резюме/CV, вставляю письмо и проверяю финальную отправку…";
+    await vjaApplyNowOnSite();
+    const submitted = $("siteApplyNow")?.disabled && $("siteApplyNow")?.textContent?.includes("Applied");
+    if (submitted) {
+      button.textContent = "Отклик отправлен ✓";
+      status.textContent = "Работодатель получил отклик, резюме/CV и сопроводительное письмо; запись сохранена на дашборде.";
+      return;
+    }
+    button.textContent = "Продолжить отклик";
+    status.textContent = $("fillNote")?.textContent || "Расширение остановилось на обязательном шаге, который нужно проверить.";
+  } catch (error) {
+    showError(error?.message || String(error));
+    if (button) button.textContent = "Повторить отправку";
+    if (status) status.textContent = "Отклик не отправлен. Исправьте указанную проблему и повторите.";
+  } finally {
+    vjaOneClickRunning = false;
+    if (button && !button.textContent.includes("отправлен")) button.disabled = false;
+  }
+}
+
+async function vjaRestoreSiteApplyResult() {
+  const tab = await activeTab();
+  const stored = await chrome.runtime.sendMessage({type:"vjaGetSiteApply",tabId:tab.id});
+  const envelope = stored?.job?.result;
+  if (!envelope || Date.now() - Number(envelope.createdAt || 0) > 15 * 60 * 1000) return;
+  await vjaHandleSiteApplyResult(envelope, envelope?.result?.resumeLabel || envelope?.result?.cvResult?.filename || "");
+}
+
+const vjaSiteApplyButton = vjaEnsureSiteApplyButton();
+vjaSiteApplyButton?.addEventListener("click", vjaApplyNowOnSite);
+$("oneClickApply")?.addEventListener("click", vjaOneClickApply);
+
+const vjaMarkAppliedButton = $("markApplied");
+if (vjaMarkAppliedButton && !vjaMarkAppliedButton.textContent.includes("Record")) {
+  vjaMarkAppliedButton.textContent = "Record applied";
+  vjaMarkAppliedButton.title = "Use only when you already submitted manually and only need to record it in the tracker.";
+}
+
+setTimeout(() => vjaRestoreSiteApplyResult().catch(() => {}), 500);
+
+function vjaPreferWebsiteApplyForHh() {
+  const button = $("applyHh");
+  if (!button) return;
+  // DOMTokenList.add can emit an attribute mutation even when the token exists.
+  // This function observes that same attribute: writes must be idempotent.
+  if (!button.classList.contains("hidden")) button.classList.add("hidden");
+  button.title = "Normal HH.ru applications use ✦ Apply. Official HH API OAuth is not required.";
+}
+
+vjaPreferWebsiteApplyForHh();
+const vjaHhApiButton = $("applyHh");
+if (vjaHhApiButton) {
+  new MutationObserver(vjaPreferWebsiteApplyForHh).observe(vjaHhApiButton, { attributes: true, attributeFilter: ["class"] });
+}
+
+
+// Simple popup launcher: only an explicit click on “✦ Apply” adds auto=1.
+const vjaAutoApplyFromLauncher = new URLSearchParams(location.search).get('auto') === '1';
+if (vjaAutoApplyFromLauncher) {
+  setTimeout(() => vjaOneClickApply().catch(error => showError(error?.message || String(error))), 450);
+}

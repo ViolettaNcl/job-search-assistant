@@ -1,0 +1,115 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f7f7f8; color: #16181d; }
+main { width: 410px; padding: 16px; }
+header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+header p { color: #6b7280; font-size: 11px; line-height: 1.4; }
+h1 { font-size: 18px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 14px 0 6px; }
+p { margin: 0; }
+.small { display: block; font-size: 11px; color: #6b7280; margin-bottom: 5px; }
+.muted { color: #666; font-size: 12px; line-height: 1.4; }
+.note { font-size: 11px; color: #6b7280; line-height: 1.4; margin-top: 10px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 12px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+input, textarea { width: 100%; border: 1px solid #d5d8df; border-radius: 8px; padding: 9px 10px; background: white; font: inherit; }
+textarea { resize: vertical; font-size: 12px; line-height: 1.45; }
+button { border: 0; border-radius: 8px; padding: 9px 12px; font-weight: 650; cursor: pointer; }
+button:disabled { opacity: .55; cursor: default; }
+.primary { background: #16181d; color: white; }
+.secondary { background: white; color: #16181d; border: 1px solid #d5d8df; }
+.full { width: 100%; margin-bottom: 12px; }
+.quickApplyCard { padding: 12px; margin-bottom: 12px; border: 1px solid #dce3ef; border-radius: 12px; background: white; box-shadow: 0 8px 24px rgba(28, 38, 55, .06); }
+.quickApplyCard .prepareButton { margin-top: 8px; }
+.quickApplyCard .safePreview { margin-bottom: 4px; }
+.modeBadge { display: inline-flex; padding: 3px 7px; border-radius: 999px; background: #eef4ff; color: #315ea8; font-size: 9px; font-weight: 750; }
+.toolPanel { margin: 9px 0; border: 1px solid #e0e4eb; border-radius: 10px; background: white; overflow: hidden; }
+.toolPanel summary { padding: 10px 11px; cursor: pointer; font-size: 11px; font-weight: 700; color: #313844; }
+.toolPanel[open] summary { border-bottom: 1px solid #eceef2; }
+.toolPanelBody { padding: 11px; }
+.toolPanelBody .full:last-child { margin-bottom: 0; }
+.compactFull { margin-top: -2px; font-size: 11px; padding: 7px 10px; }
+.dailyLoopCard { margin: 0; padding: 11px; border: 0; border-radius: 0; background: white; }
+.dailyLoopTop { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.dailyLoopTop > div { min-width: 0; }
+.dailyLoopTop > div > strong { display: block; font-size: 12px; line-height: 1.35; }
+.dailyLoopCompany { display: block; margin-top: 3px; font-size: 10px; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dailyLoopScore { flex: none; font-size: 17px; }
+.dailyLoopMeta { margin-top: 7px; color: #6b7280; font-size: 10px; line-height: 1.4; }
+.dailyLoopActions { margin-top: 9px; }
+.dailyLoopActions button { font-size: 10px; padding: 7px 8px; }
+.dailyQueueButton { margin: 7px 0 0; }
+.sessionBanner { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 9px; margin: 10px 0 12px; border: 1px solid #cfe2ff; border-radius: 9px; background: #f4f8ff; }
+.sessionBanner span { min-width: 0; font-size: 10px; line-height: 1.35; color: #334155; }
+.sessionBanner button { flex: none; padding: 5px 7px; font-size: 9px; }
+.stepCard { display: grid; gap: 4px; padding: 9px 10px; margin: -4px 0 12px; border: 1px solid #cfe3fb; border-radius: 9px; background: #f4f9ff; }
+.stepCard strong { display: block; font-size: 12px; line-height: 1.35; }
+.stepMeta { font-size: 10px; color: #52606d; line-height: 1.4; }
+.scoreRow { display: flex; justify-content: space-between; align-items: flex-end; padding: 12px; background: white; border: 1px solid #e3e5e9; border-radius: 10px; }
+.scoreRow strong { display: block; font-size: 24px; }
+.right { text-align: right; }
+.right strong { font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 9px 0; }
+.chips span { font-size: 10px; padding: 4px 6px; border-radius: 999px; background: #e9f8ef; border: 1px solid #c8ebd5; }
+.chips.warning span { background: #fff5e8; border-color: #f2d7ad; }
+.formPlan { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0; }
+.formPlan > div { background: white; border: 1px solid #e3e5e9; border-radius: 9px; padding: 8px; min-width: 0; }
+.formPlan strong { font-size: 12px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.readinessCard { border: 1px solid #e3e5e9; border-radius: 10px; background: white; padding: 10px; margin: -2px 0 12px; }
+.readinessHeader { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.readinessHeader > strong { font-size: 12px; line-height: 1.35; }
+.readinessState { flex: none; font-size: 9px; font-weight: 750; border-radius: 999px; padding: 3px 6px; background: #f3f4f6; color: #4b5563; }
+.readinessDetail { font-size: 10px; line-height: 1.4; color: #6b7280; margin-top: 5px; }
+.readiness-clear { border-color: #bde5ca; background: #f7fcf9; }
+.readiness-clear .readinessState { background: #e5f6eb; color: #166534; }
+.readiness-review { border-color: #f0d6a8; background: #fffbf4; }
+.readiness-review .readinessState { background: #fff0d5; color: #854d0e; }
+.readiness-blocked { border-color: #efc6cb; background: #fff8f8; }
+.readiness-blocked .readinessState { background: #fde8ea; color: #9f1239; }
+.readiness-neutral { color: #6b7280; }
+.readinessEmpty { font-size: 10px; line-height: 1.4; }
+.readinessList { list-style: none; padding: 0; margin: 9px 0 0; display: grid; gap: 6px; }
+.readinessItem { border-top: 1px solid #eceef1; padding-top: 6px; }
+.readinessItemTop { display: flex; gap: 6px; align-items: flex-start; }
+.readinessItemTop strong { font-size: 10px; line-height: 1.35; min-width: 0; }
+.readinessBadge { flex: none; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; padding: 2px 5px; border-radius: 999px; background: #fff0d5; color: #854d0e; }
+.readinessItem-blocked .readinessBadge { background: #fde8ea; color: #9f1239; }
+.readinessItem-failed .readinessBadge { background: #ffe8d9; color: #9a3412; }
+.readinessReason { display: block; color: #6b7280; font-size: 9px; line-height: 1.4; margin: 3px 0 0; }
+.readinessMore { font-size: 9px; color: #6b7280; margin-top: 7px; }
+.readinessCv { display: grid; gap: 2px; margin-top: 9px; padding: 7px 8px; border-radius: 8px; background: #f5f6f8; }
+.readinessCv strong { font-size: 10px; line-height: 1.35; }
+.readinessCv span { font-size: 9px; color: #6b7280; line-height: 1.35; }
+.readinessCv-inserted { background: #eaf8ef; }
+.readinessCv-check { background: #fff5e8; }
+.readinessDisclaimer { font-size: 9px; color: #6b7280; line-height: 1.4; margin-top: 8px; }
+.cvCard { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: white; border: 1px solid #e3e5e9; border-radius: 9px; padding: 10px; margin: 10px 0 12px; }
+.cvCard > div { min-width: 0; }
+.cvCard strong { display: block; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 225px; }
+.cvCard button { white-space: nowrap; font-size: 11px; padding: 7px 9px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #c3c7ce; margin-top: 5px; }
+.dot.ok { background: #16a34a; }
+.dot.bad { background: #dc2626; }
+.error { margin-top: 10px; padding: 9px; border-radius: 8px; color: #9f1239; background: #fff1f2; font-size: 12px; line-height: 1.4; }
+.hidden { display: none; }
+
+/* The same popup UI can live in a movable frame on a vacancy page. */
+html.floating, html.floating body { width:100%; min-width:0; background:rgba(249,250,255,.86); }
+html.floating main { width:100%; max-width:100%; }
+html.floating #pinPanel { display:none; }
+
+#browserSearchMode{width:auto;min-height:0;margin-right:8px}
+
+/* Recruiter chat assistant: analysis + review-only reply drafting. */
+.recruiterAssistant { border-color: #d9d6f5; background: linear-gradient(180deg,#ffffff 0%,#fbfaff 100%); }
+.recruiterTop { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:7px; }
+.recruiterTop > div strong { display:block; font-size:13px; margin-top:5px; }
+.reviewOnlyBadge { flex:none; padding:3px 7px; border-radius:999px; background:#f1efff; color:#5749a6; font-size:9px; font-weight:750; }
+.recruiterContext { font-size:11px; line-height:1.4; color:#4b5563; margin:0 0 8px; }
+.recruiterAnalysis { margin:0 0 9px; padding:7px 8px; border-radius:8px; background:#f7f7fb; }
+.recruiterActions { margin-bottom:9px; }
+#recruiterStatus[data-tone="ready"] { color:#166534; }
+#recruiterStatus[data-tone="warning"] { color:#9a3412; }
+#recruiterStatus[data-tone="working"] { color:#4f46a5; }
+.autopilotCard details{margin-top:8px}.autopilotCard details summary{cursor:pointer;font-size:11px;font-weight:700;color:#384152}.autopilotGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:10px}.autopilotGrid label{font-size:9px;color:#6b7280;line-height:1.35}.autopilotGrid input{margin-top:4px;padding:7px;font-size:11px}.autopilotCheck{display:flex;gap:7px;align-items:flex-start;margin-top:10px;font-size:10px;color:#4b5563}.autopilotCheck input{width:auto;margin-top:1px}
+
+.autopilotQueries{display:grid;gap:5px;margin-top:10px;font-size:10px;color:#4b5563}.autopilotQueries textarea{min-height:76px;font-size:10px;line-height:1.35;padding:7px}

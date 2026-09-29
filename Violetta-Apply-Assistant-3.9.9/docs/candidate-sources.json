@@ -1,0 +1,49 @@
+{
+  "sources": [
+    {
+      "id": "cv-ru-20260928",
+      "type": "cv",
+      "name": "Violetta_Nicolaou_CV_RU.pdf",
+      "receivedAt": "2026-09-28",
+      "sha256": "db1e8e32ce43612c859d1895d5272b97abf3eab873449f636642c4928d085fc0",
+      "priority": 60,
+      "verification": "user-provided-document",
+      "note": "Document contents are a candidate statement, not independent employment verification."
+    },
+    {
+      "id": "cv-en-20260928",
+      "type": "cv",
+      "name": "Violetta_Nicolaou_CV_EN.pdf",
+      "receivedAt": "2026-09-28",
+      "sha256": "e45fec8afef1b1e5629b95ed1893098c5b8fb0577fc52eb9c5022e1626590ea7",
+      "priority": 60,
+      "verification": "user-provided-document",
+      "note": "Document contents are a candidate statement, not independent employment verification."
+    },
+    {
+      "id": "cv-additional-20260928",
+      "type": "cv",
+      "name": "Violetta_Nicolaou_CV.pdf",
+      "receivedAt": "2026-09-28",
+      "sha256": "a6e37d0d645963260270db5a9b31c5470d15e3754ce138864254bcd64cbcd311",
+      "priority": 60,
+      "verification": "user-provided-document",
+      "note": "Document contents are a candidate statement, not independent employment verification."
+    },
+    {
+      "id": "hh-user-20260928",
+      "type": "user-confirmed",
+      "name": "HH experience text supplied by Violetta, 2026-09-28",
+      "receivedAt": "2026-09-28",
+      "priority": 90,
+      "verification": "user-reported",
+      "note": "Not fetched from the live HH account. More detailed user confirmation supplements the PDFs."
+    }
+  ],
+  "notes": [
+    "New HH work experience is user-reported and supplements older PDFs.",
+    "Overlapping jobs must not be added together as total years of experience.",
+    "French remains beginner: listing a language under translation does not imply fluency.",
+    "Teaching experience is not asserted by these sources. Add separately after explicit confirmation."
+  ]
+}

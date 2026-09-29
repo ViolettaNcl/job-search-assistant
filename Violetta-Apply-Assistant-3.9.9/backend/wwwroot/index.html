@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Violetta Job Operator</title>
+  <link rel="stylesheet" href="/operator.css" />
+  <link rel="stylesheet" href="/operator.css" />
+</head>
+<body>
+<div style="padding:12px 20px;background:#f3effa;color:#574471;border-bottom:1px solid #e0d5ef;font:14px/1.5 system-ui">✦ Violetta Copilot 3.0 · Автоматическая отправка отключена. Используйте Apply / Fill / AI в расширении. Финальные действия — только на сайте работодателя.</div>
+<div class="shell">
+  <header class="header">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">V</span><div><h1>Violetta Job Operator</h1><p>Поиск, отклики и ответы работодателей — в одном месте.</p></div></div>
+    <nav class="nav"><a class="btn secondary small" href="/followups.html">Повторные обращения</a><a class="btn secondary small" href="/analytics.html">Результаты</a><a class="btn secondary small" href="#autopilotSettings">Настройки</a></nav>
+  </header>
+
+  <section class="panel autopilot" aria-labelledby="autoTitle">
+    <div class="auto-top"><div><span class="eyebrow">Автоматические отклики · HH.ru · только удалённо</span><h2 id="autoTitle">Автопилот HH</h2><p>Находит подходящие удалённые junior-вакансии и стажировки, сразу отправляет резюме с письмом и проверяет результат. Оставьте программу и Chrome открытыми.</p></div><span id="autoState" class="state-pill">Проверяю…</span></div>
+    <div class="auto-body">
+      <div class="auto-main">
+        <details class="connection-details"><summary>Подключение и диагностика</summary><div class="setup-steps">
+          <div id="stepProgram" class="setup-step"><b>1. Разрешение</b><span>Проверяю</span></div>
+          <div id="stepHh" class="setup-step"><b>2. Аккаунт HH</b><span>Проверяю</span></div>
+          <div id="stepResume" class="setup-step"><b>3. Резюме</b><span>Проверяю</span></div>
+          <div id="stepAgent" class="setup-step"><b>4. Ассистент</b><span>Проверяю</span></div>
+        </div>
+        </details>
+        <div class="auto-result" role="status"><strong id="autoMessage">Загружаю состояние…</strong><span id="autoMeta">—</span></div>
+        <details class="search-details"><summary>Как отбираются вакансии</summary>
+        <div class="funnel">
+          <div><span>Новые HH</span><b id="funnelNew">0</b></div>
+          <div><span>Доступны вам</span><b id="funnelEligible">0</b></div>
+          <div><span>Выше порога</span><b id="funnelScore">0</b></div>
+          <div><span>Готовы сейчас</span><b id="funnelReady">0</b></div>
+        </div>
+        </details>
+      </div>
+      <div class="auto-controls" id="autopilotSettings">
+        <div class="setting-grid"><label>Индекс приоритета<input id="autoScore" type="number" min="50" max="100" value="85" /></label><label>Лимит в день<input id="autoLimit" type="number" min="1" max="200" value="25" /></label></div>
+        <div class="auto-actions"><button id="autoToggle" class="btn" onclick="toggleAutopilot()">Запустить автопилот</button><button id="autoSave" class="btn secondary" onclick="saveAutopilotSettings()">Сохранить порог и лимит</button><button id="autoRun" class="btn secondary" onclick="runAutopilotNow()">Обновить и проверить сейчас</button></div>
+        <div class="fine">Порог: 50–100. Лимит: 1–200 в день. Направления: разработка, frontend, QA-автоматизация, внедрение и техническая поддержка с API/SQL. Для junior допускается категория HH «1–3 года», если в описании нет обязательного стажа. Senior/lead, дубли и неподтверждённые страны не отправляются. Отправка останавливается при неизвестных обязательных ответах.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel today"><div class="today-head"><div><h2>Требует внимания</h2><p>Ответы работодателей и следующие шаги к интервью.</p></div></div><div id="todayActions" class="today-grid"></div>
+<p id="operatorSummary" class="help"></p><div id="operatorOpportunities"></div><details style="margin-top:16px"><summary>Разобрать сообщение рекрутера</summary><p class="help">Вставьте текст сообщения. Ассистент предложит следующий шаг; ответ останется у вас на проверке.</p><label for="recruiterText">Сообщение</label><textarea id="recruiterText" maxlength="12000" rows="4" style="width:100%;box-sizing:border-box"></textarea><button class="btn secondary" id="triageButton" onclick="triageRecruiter()">Разобрать</button><div id="triageResult" role="status" style="white-space:pre-wrap;margin-top:12px"></div></details></section>
+  <section class="summary" id="stats"></section>
+
+
+  <div class="workspace">
+    <main class="main">
+      <nav class="tabs" id="tabs" aria-label="Журнал работы">
+        <button class="tab active" data-view="pipeline">Отклики <span class="count" id="countPipeline">0</span></button>
+        <button class="tab" data-view="review">Нужна проверка <span class="count" id="countReview">0</span></button>
+        <button class="tab" data-view="all">Найденные вакансии <span class="count" id="countAll">0</span></button>
+      </nav>
+      <div id="vacancyView" class="hidden">
+        <p class="help" id="dashboardBridgeStatus" role="status">Проверяю расширение в этом браузере…</p>
+        <button class="btn secondary small" onclick="checkDashboardBridge()">Проверить подключение</button>
+        <nav id="sourceTabs" class="tabs" aria-label="Сайты вакансий"></nav>
+        <p class="help" id="sourceSummary"></p>
+        <div class="filters"><input id="search" type="search" placeholder="Должность или компания" oninput="renderJobs()" /><select id="typeFilter" onchange="renderJobs()"><option value="all">Все типы работы</option><option value="Full-time">Full-Time</option><option value="Contractor/B2B">Contractor / B2B</option><option value="Freelance/Project">Freelance / Project</option><option value="Internship">Стажировка</option></select></div>
+        <div class="list-head"><h2 id="listTitle">Подходящие вакансии</h2><span id="listMeta"></span></div><div id="jobs" class="jobs"></div>
+      </div>
+      <div id="pipelineView"><div class="list-head"><h2>Мои отклики</h2><span>Дата обнаружения, отправка и ответ работодателя</span></div><div id="pipeline" class="jobs"></div></div>
+    </main>
+
+    <aside class="side"><details class="panel"><summary>Инструменты и подключение</summary>
+      <section class="panel"><h3>Подключение HH</h3><div id="hhConnection" class="connection"><strong>Проверяю…</strong><span>—</span></div><div class="stack" style="margin-top:9px"><a id="hhConnect" class="btn small" href="/api/hh/oauth/start">Подключить аккаунт HH</a><button id="hhResumes" class="btn secondary small" onclick="loadResumes()">Выбрать HH-резюме</button></div><div id="resumes" class="help">После подключения выберите одно резюме для откликов.</div></section>
+      <section class="panel"><h3>Добавить ссылку</h3><div class="form-row"><input id="jobUrl" placeholder="Ссылка на вакансию" /><button class="btn small" onclick="importAny()">Добавить</button></div><p class="help">Для вакансии появятся оценка, письмо и действия.</p></section>
+      <section class="panel"><h3>Последнее обновление</h3><div id="lastCollected" class="help">—</div><button class="btn secondary small" style="margin-top:9px" onclick="collectJobs()">Обновить сейчас</button></section>
+    </details></aside>
+  </div>
+</div>
+
+<dialog id="opportunityDialog"><div class="dialog-body"><div class="dialog-head"><h3>Разбор вакансии</h3><button class="dialog-close" onclick="document.getElementById('opportunityDialog').close()" aria-label="Закрыть">×</button></div><div id="opportunityDetails"></div><button class="btn secondary" id="prepareOperator" onclick="prepareOperatorLetter()">Подготовить письмо</button><div id="operatorDraft" style="white-space:pre-wrap;margin-top:12px" role="status"></div></div></dialog>
+<div id="notice" class="notice" role="status"></div>
+<dialog id="letterDialog"><div class="dialog-body"><div class="dialog-head"><div><span class="eyebrow">Письмо по описанию вакансии</span><h3 id="letterTitle">Сопроводительное письмо</h3></div><button class="dialog-close" onclick="closeLetter()">✕</button></div><div id="letterText" class="letter"></div><div class="dialog-actions"><button class="btn secondary" onclick="copyLetter()">Скопировать</button><button class="btn" onclick="closeLetter()">Готово</button></div></div></dialog>
+
+<script src="/dashboard-apply.js"></script>
+<script>
+const $=id=>document.getElementById(id);const esc=s=>(s??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let state={view:'pipeline',source:'all',jobs:[],reviews:[],pipeline:[],queue:[],followups:[],outcomes:null,dashboard:null,automation:null};let noticeTimer;
+async function api(url,opt){const r=await fetch(url,{...opt,signal:AbortSignal.timeout(35000)});const txt=await r.text();let data;try{data=JSON.parse(txt)}catch{data=txt}if(!r.ok)throw new Error(typeof data==='string'?data:(data.message||data.errorText||JSON.stringify(data)));return data}
+function showNotice(text,ok=true){const el=$('notice');el.textContent=text;el.className='notice show'+(ok?'':' err');clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>el.className='notice',6000)}
+function fmtTime(value){return value?new Date(value).toLocaleString('ru-RU'):'ещё не выполнялась'}
+function statusLabel(s){return ({Applied:'Отклик отправлен',HrContact:'Ответ HR',HrInterview:'HR-интервью',TechInterview:'Техническое интервью',TestTask:'Тестовое задание',Rejected:'Отказ',Offer:'Оффер',Withdrawn:'Отозван',Closed:'Вакансия закрыта'})[s]||s}
+function statusTone(s){return ({HrContact:'contact',HrInterview:'interview',TechInterview:'interview',TestTask:'test',Rejected:'rejected',Offer:'offer'})[s]||''}
+function setStep(id,ok,title,detail){const el=$(id);el.className='setup-step '+(ok?'ok':'problem');el.innerHTML=`<b>${ok?'✓':'!'} ${esc(title)}</b><span>${esc(detail)}</span>`}
+async function load(){
+  const [d,all,saved,rawQueue,followups,outcomes,automation]=await Promise.all([api('/api/dashboard'),api('/api/vacancies?status=New'),api('/api/vacancies?status=Saved'),api('/api/application-queue?limit=100&minScore=50'),api('/api/followups?afterBusinessDays=5&limit=100&maxAttempts=2'),api('/api/analytics/outcomes'),api('/api/automation/status')]);
+  const queue=rawQueue.filter(v=>v.matchScore>=(automation.autoApplyMinimumScore??75));
+  const priorities=new Map(queue.map(x=>[x.vacancyId,x]));state.dashboard=d;state.jobs=all.map(v=>{const p=priorities.get(v.id);return {...v,recruitmentPriority:p?.priorityScore??-1,recruitmentLabel:p?.priority||'Проверить',priorityReason:p?.priorityReason||''}});state.reviews=[...saved,...all.filter(v=>v.eligibilityStatus==='Verify')];state.pipeline=d.pipeline||[];state.queue=queue;state.followups=followups;state.outcomes=outcomes;state.automation=automation;
+  const s=d.stats;$('stats').innerHTML=[['Готовы к отклику',queue.length],['Отправлено',s.applied],['Интервью',s.interviews],['Офферы',s.offers]].map(x=>`<div class="panel stat"><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join('');
+  $('countAll').textContent=all.length;$('countReview').textContent=state.reviews.length;$('countPipeline').textContent=state.pipeline.length;
+  $('lastCollected').textContent=d.state.lastCollectedAt?fmtTime(d.state.lastCollectedAt):'Поиск ещё не запускался.';renderToday();renderJobs();renderPipeline();renderAutomation();
+}
+function renderToday(){
+  const unread=state.pipeline.filter(x=>x.hhHasUpdates).length, interviews=state.pipeline.filter(x=>['HrInterview','TechInterview'].includes(x.status)).length, tasks=state.pipeline.filter(x=>x.status==='TestTask').length;
+  $('todayActions').innerHTML=`${tasks?`<a class="today-item" href="#pipeline" onclick="openPipeline(event)"><div><b>${tasks}</b><span>тестовых заданий — проверьте сроки</span></div><em>Открыть →</em></a>`:''}${interviews?`<a class="today-item" href="#pipeline" onclick="openPipeline(event)"><div><b>${interviews}</b><span>этапов интервью — подготовиться</span></div><em>Открыть →</em></a>`:''}${unread?`<a class="today-item" href="#pipeline" onclick="openPipeline(event)"><div><b>${unread}</b><span>обновлений HH — прочитать</span></div><em>Проверить →</em></a>`:''}<a class="today-item" href="/queue.html"><div><b>${state.queue.length}</b><span>подходящих вакансий в очереди</span></div><em>Открыть →</em></a><a class="today-item" href="/followups.html"><div><b>${state.followups.length}</b><span>повторных обращений для проверки</span></div><em>Проверить →</em></a>`;
+  loadOperatorToday();
+}
+async function loadOperatorToday(){try{const r=await api('/api/operator/today');$('operatorSummary').textContent=`Сегодня записано откликов: ${r.applicationsRecordedToday}. Вакансий для ручной проверки: ${r.needsReview}.`;$('operatorOpportunities').innerHTML=r.best.map(v=>`<button class="btn secondary small" onclick="inspectOpportunity('${v.id}')">${esc(v.title)} · ${esc(v.company)} · ${v.assessment.overallScore}/100</button>`).join(' ')||'<p class="help">Подтверждённо подходящих вакансий пока нет. Обновите поиск или проверьте ограничения.</p>';}catch(e){$('operatorSummary').textContent=e.message}}
+
+let inspectedOpportunityId=null;
+async function inspectOpportunity(id){
+  try{const r=await api(`/api/operator/vacancies/${id}`),a=r.assessment,t=r.strategy;inspectedOpportunityId=id;
+  $('opportunityDetails').innerHTML=`<p><b>${esc(a.understanding.roleFamily)} · ${a.overallScore}/100 · ${esc(a.decision)}</b></p><p class="help">Индекс приоритета, не процент соответствия и не вероятность найма. ${esc(a.reasoningMode)}</p><p>${esc(a.eligibilityReason)}</p><ul>${a.matches.map(m=>`<li>${esc(m.requirement.skill)} (${esc(m.requirement.importance)}): ${esc(m.state)} · ${esc(m.projectIds.join(', '))}</li>`).join('')}</ul><p><b>Стратегия:</b> ${esc(t.headline)}</p>${t.projects.map(p=>`<p>${esc(p.name)} · ${esc(p.experienceKind)}<br>${p.sources.map(s=>`<a target="_blank" rel="noopener" href="${esc(s.url)}">Исходный код</a>`).join(' · ')}</p>`).join('')}<ul>${a.dimensions.map(d=>`<li>${esc(d.name)}: ${d.score??'неизвестно'} — ${esc(d.explanation)}</li>`).join('')}</ul><p>${a.reviewReasons.map(esc).join('<br>')}</p>`;
+  $('operatorDraft').textContent='';$('opportunityDialog').showModal();}catch(e){showNotice(e.message,false)}
+}
+async function prepareOperatorLetter(){
+  const id=inspectedOpportunityId;if(!id)return;$('prepareOperator').disabled=true;$('operatorDraft').textContent='Готовлю письмо…';
+  try{const r=await api(`/api/operator/vacancies/${id}/prepare`,{method:'POST'});$('operatorDraft').textContent=`${r.application.reasoningMode==='ai-assisted-suggestion'?'Вариант AI — проверьте каждое утверждение.':'Письмо по подтверждённым проектам. AI не использован.'}\n${r.providerStatus==='provider-unavailable-fallback'?'Провайдер недоступен; использован резервный режим.\n':''}${r.application.letter}\n\n${r.application.reviewReasons.join('\n')}`;}catch(e){$('operatorDraft').textContent=e.message}finally{$('prepareOperator').disabled=false}
+}
+async function triageRecruiter(){
+  $('triageButton').disabled=true;try{const r=await api('/api/operator/recruiter/triage',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text:$('recruiterText').value})});$('triageResult').textContent=`${r.urgency} · ${r.intents.join(', ')}\n${r.nextAction}\n${r.unknownFacts.join('\n')}\n\nЧерновик для проверки (не отправлен):\n${r.suggestedReply}`;}catch(e){$('triageResult').textContent=e.message}finally{$('triageButton').disabled=false}
+}
+function openPipeline(event){event?.preventDefault();const tab=document.querySelector('[data-view="pipeline"]');tab?.click();$('pipelineView').scrollIntoView({behavior:'smooth',block:'start'})}
+let autoSettingsDirty=false;
+for(const id of ['autoScore','autoLimit'])$(id).addEventListener('input',()=>{autoSettingsDirty=true});
+function renderAutomation(){
+  const a=state.automation||{},enabled=Boolean(a.autoApplyEnabled),running=Boolean(a.ready),browserMode=a.automationMode==='browser-extension',setupReady=Boolean(a.allowed&&(a.apiReady||a.browserConnected)),f=a.diagnostics||{};
+  $('autoState').textContent=running?(a.browserRunning?'Отправляет':a.collection?.running?'Ищет вакансии':'Ожидает'):enabled?'Нужна настройка':'На паузе';$('autoState').className='state-pill '+(running?'running':enabled?'setup':'');
+  if(!autoSettingsDirty){$('autoScore').value=a.autoApplyMinimumScore??85;$('autoLimit').value=a.dailyAutoApplyLimit??25;}
+  setStep('stepProgram',Boolean(a.allowed),'Разрешение',a.allowed?'Автоотправка разрешена':'Отключена в настройках');
+  setStep('stepHh',Boolean(a.apiReady||a.browserConnected),browserMode?'Расширение Chrome':'Аккаунт HH',browserMode?'Расширение подключено к программе':a.apiReady?'HH API подключён':a.browserConnected?'Расширение подключено':'Откройте Chrome с установленным расширением');
+  setStep('stepResume',Boolean(browserMode||a.resumeSelected),'Резюме',browserMode?'Используется выбранное на сайте HH':a.resumeSelected?'Резюме выбрано':'Нужно выбрать резюме');
+  setStep('stepAgent',running,'Ассистент',running?(browserMode?'Работает через Chrome':'Работает через HH API'):enabled?'Ждёт подключения расширения':'Нажмите «Запустить»');
+  $('autoToggle').textContent=enabled?'Остановить автопилот':'Запустить автопилот';$('autoToggle').className='btn'+(enabled?' danger':'');$('autoToggle').disabled=!enabled&&!setupReady;$('autoRun').disabled=Boolean(a.collection?.running);
+  $('autoMessage').textContent=a.collection?.running?'Ищу вакансии в фоне…':[...new Set([a.lastMessage,a.collection?.error,...(a.collection?.result?.errors||[])].filter(Boolean))].join(' · ')||(setupReady?'Готов к запуску.':'Завершите отмеченные шаги.');$('autoMeta').textContent=`Сегодня отправлено: ${a.appliedToday||0} · осталось: ${a.remainingToday||0} · последняя проверка: ${fmtTime(a.lastRunAt)}`;
+  $('funnelNew').textContent=f.newHhVacancies||0;$('funnelEligible').textContent=f.eligible||0;$('funnelScore').textContent=f.aboveMinimumScore||0;$('funnelReady').textContent=f.readyToApply||0;
+  const hc=$('hhConnection'),hr=$('hhResumes'),resumeHelp=$('resumes');if(browserMode){hc.innerHTML='<strong>Браузерный режим подключён</strong><span>Оставьте Chrome и программу открытыми. Client ID и Secret не нужны.</span>';$('hhConnect').classList.add('hidden');hr.classList.add('hidden');resumeHelp.textContent='Используется резюме, выбранное на сайте HH.'}else if(!a.hhConfigured){hc.innerHTML='<strong>Откройте расширение Chrome</strong><span>Используйте актуальное расширение Violetta Apply Assistant — оно подключится автоматически и использует ваш вход на HH.</span>';$('hhConnect').classList.add('hidden');hr.classList.add('hidden');resumeHelp.textContent='Войдите на HH.ru в том же профиле Chrome.'}else if(!a.hhConnected){hc.innerHTML='<strong>Аккаунт не подключён</strong><span>Нажмите кнопку ниже и войдите в HH.</span>';$('hhConnect').classList.remove('hidden');hr.classList.remove('hidden');resumeHelp.textContent='После подключения выберите одно резюме для API-режима.'}else{hc.innerHTML='<strong>HH подключён через API</strong><span>Можно выбрать резюме и запускать автопилот.</span>';$('hhConnect').classList.add('hidden');hr.classList.remove('hidden')}
+}
+function renderSourceTabs(){
+  const jobs=state.view==='review'?state.reviews:state.jobs;
+  const sources=new Map([['all','Все сайты'],['hh','HH.ru'],['remotive','Remotive'],['adzuna','Adzuna']]);
+  for(const v of jobs)if(!sources.has(v.source))sources.set(v.source,v.sourceLabel||v.source);
+  const nav=$('sourceTabs');nav.replaceChildren();
+  for(const [key,label] of sources){const button=document.createElement('button');button.className='tab'+(state.source===key?' active':'');button.dataset.source=key;button.textContent=label+' · '+(key==='all'?jobs.length:jobs.filter(v=>v.source===key).length);button.onclick=()=>{state.source=key;renderJobs()};nav.append(button);}
+  $('sourceSummary').textContent=state.source==='hh'?'Отклики с письмом через расширение или подключённый HH API.':state.source==='adzuna'?'Международный поиск Adzuna требует настроенных App ID и App Key.':state.source==='remotive'?'Удалённые технические вакансии Remotive. Лента обновляется раз в 6 часов; отправка — через форму работодателя.':'Поиск по подключённым источникам; LinkedIn не используется. Автоотправка пока доступна только для HH.';
+  const errors=state.automation?.collection?.result?.errors||[];const sourceErrors=errors.filter(x=>state.source==='all'||x.toLowerCase().includes(state.source==='hh'?'hh':state.source));if(sourceErrors.length)$('sourceSummary').textContent+=' '+sourceErrors.join(' ');
+}
+function filteredJobs(){let items=[...(state.view==='review'?state.reviews:state.jobs)],q=$('search').value.trim().toLowerCase(),type=$('typeFilter').value;if(state.source!=='all')items=items.filter(v=>v.source===state.source);if(state.view==='russia')items=items.filter(v=>v.market==='Russia');if(state.view==='international')items=items.filter(v=>v.market==='International');if(state.view==='internship')items=items.filter(v=>v.opportunityType==='Internship');if(state.view==='strong')items=items.filter(v=>v.recruitmentPriority>=0);if(type!=='all')items=items.filter(v=>v.opportunityType===type);if(q)items=items.filter(v=>(v.title+' '+v.company+' '+v.sourceLabel).toLowerCase().includes(q));return items.sort((a,b)=>b.recruitmentPriority-a.recruitmentPriority||b.matchScore-a.matchScore)}
+function renderJobs(){if(state.view==='pipeline')return;renderSourceTabs();const items=filteredJobs(),titles={all:'Найденные вакансии',review:'Нужна ваша проверка',strong:'Лучшие совпадения',russia:'Удалённая работа в России',international:'Международная удалённая работа',internship:'Стажировки'};$('listTitle').textContent=titles[state.view]||titles.all;$('listMeta').textContent=`Найдено: ${items.length}`;
+  $('jobs').innerHTML=items.map(v=>{const external=v.source!=='hh',apply=external?`<a class="primary" target="_blank" rel="noopener" href="${esc(v.applyUrl||v.url)}">Открыть отклик</a><button onclick="markApplied('${v.id}')">Я откликнулась</button>`:dashboardApplyButton(v),scoreTone=v.matchScore>=85?'high':v.matchScore>=65?'good':'';return `<article class="panel card"><div class="card-head"><div><div class="badges"><span class="badge ${v.market==='Russia'?'russia':'world'}">${esc(v.marketLabel)}</span><span class="badge ${v.opportunityType==='Internship'?'intern':''}">${esc(v.opportunityTypeLabel)}</span><span class="badge">${esc(v.sourceLabel)}</span>${v.recruitmentPriority>=0?`<span class="badge strong">${esc(v.recruitmentLabel)}</span>`:''}</div><h3>${esc(v.title)}</h3><div class="company">${esc(v.company)}</div><div class="meta">${esc(v.locationText||v.country||'Место не указано')}${v.salaryText?' · '+esc(v.salaryText):''}</div></div><div class="score ${scoreTone}">${v.matchScore}/100<small>${v.recruitmentPriority>=0?`приоритет ${v.recruitmentPriority}`:esc(v.matchLevel)}</small></div></div><div class="dates"><span>Найдена <b>${esc(fmtTime(v.firstSeenAt))}</b></span></div>${v.reviewNote?`<p class="reason">${esc(v.reviewNote.replace(/QueueDeferredUntil=[^\n]+/g,'').trim()||'Отложена для проверки')}</p>`:''}<div class="skills"><div>Совпадает: ${esc(v.matchedSkills||'уточняется по описанию')}</div>${v.missingSkills?`<div>Проверить: ${esc(v.missingSkills)}</div>`:''}</div>${dashboardApplyStatus(v.id)}<div class="actions">${apply}<a target="_blank" rel="noopener" href="${esc(v.url)}">Посмотреть вакансию</a><button onclick="inspectOpportunity('${v.id}')">Почему подходит</button><button onclick="previewLetter('${v.id}')">Посмотреть письмо</button><button onclick="statusJob('${v.id}','Saved')">Сохранить</button><button onclick="statusJob('${v.id}','Skipped')">Пропустить</button></div></article>`}).join('')||'<div class="empty">По этому фильтру вакансий пока нет. Автопилот добавит их после поиска.</div>'
+}
+function renderPipeline(){const items=[...state.pipeline].sort((a,b)=>Number(b.hhHasUpdates)-Number(a.hhHasUpdates)||new Date(b.updatedAt)-new Date(a.updatedAt));$('pipeline').innerHTML=items.map(v=>`<article class="panel card pipeline-card"><div><div class="badges"><span class="status ${statusTone(v.status)}">${esc(statusLabel(v.status))}</span>${v.hhHasUpdates?'<span class="badge intern">Обновление на HH</span>':''}</div><h3>${esc(v.title)}</h3><div class="company">${esc(v.company)}</div><div class="meta">${v.automatic?'Автопилот':'Вручную'} · ${v.coverLetterIncluded?'письмо приложено':'письмо не сохранено'} · ${v.appliedAt?'отправка зафиксирована':'отправка не зафиксирована'}</div><div class="dates"><span>Найдена <b>${esc(fmtTime(v.firstSeenAt))}</b></span><span>Отправлено <b>${v.appliedAt?esc(fmtTime(v.appliedAt)):'Нет подтверждённой даты'}</b></span></div>${v.latestEvent?.note?`<div class="meta">${esc(v.latestEvent.note)}</div>`:''}</div><details class="pipeline-actions"><summary>Изменить этап</summary><div class="actions"><button onclick="statusJob('${v.id}','HrContact')">Ответ HR</button><button onclick="statusJob('${v.id}','HrInterview')">HR-интервью</button><button onclick="statusJob('${v.id}','TechInterview')">Тех. интервью</button><button onclick="statusJob('${v.id}','TestTask')">Тестовое</button><button onclick="statusJob('${v.id}','Rejected')">Отказ</button><button onclick="statusJob('${v.id}','Withdrawn')">Отозван</button><button onclick="statusJob('${v.id}','Closed')">Вакансия закрыта</button><button onclick="statusJob('${v.id}','Offer')">Оффер</button><a target="_blank" rel="noopener" href="${esc(v.url)}">Открыть вакансию</a></div></details></article>`).join('')||'<div class="empty">Откликов пока нет.</div>'}
+document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');state.view=btn.dataset.view;const pipeline=state.view==='pipeline';$('vacancyView').classList.toggle('hidden',pipeline);$('pipelineView').classList.toggle('hidden',!pipeline);if(!pipeline)renderJobs()}));
+async function collectJobs(){try{showNotice('Ищу свежие вакансии…');await api('/api/collect/start',{method:'POST'});showNotice('Поиск запущен в фоне. Результат появится автоматически.');await load()}catch(e){showNotice(e.message,false)}}
+async function importAny(){try{const url=$('jobUrl').value.trim();if(!url)return;const hh=/hh\.ru\/vacancy\//i.test(url),endpoint=hh?'/api/import/hh':'/api/import/manual',body=hh?{url}:{url,title:null,company:null};const r=await api(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});showNotice(`Добавлено: ${r.title||'вакансия'}`);$('jobUrl').value='';await load()}catch(e){showNotice(e.message,false)}}
+async function statusJob(id,status){try{await api(`/api/vacancies/${id}/status`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({status,note:'Обновлено на дашборде'})});await load()}catch(e){showNotice(e.message,false)}}
+
+async function markApplied(id){try{await api(`/api/vacancies/${id}/mark-applied`,{method:'POST'});showNotice('Отклик сохранён.');await load()}catch(e){showNotice(e.message,false)}}
+async function loadResumes(){try{const rs=await api('/api/hh/resumes');$('resumes').innerHTML=rs.map(r=>`<button class="btn secondary small" onclick="setResume('${esc(r.id)}')">${esc(r.title||r.id)}</button>`).join(' ')||'Резюме не найдены.'}catch(e){$('resumes').textContent=e.message;showNotice(e.message,false)}}
+async function setResume(id){try{await api('/api/settings/resume',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({resumeId:id})});$('resumes').textContent='Резюме выбрано.';showNotice('HH-резюме выбрано.');await load()}catch(e){showNotice(e.message,false)}}
+async function toggleAutopilot(){notify('Автоматическая отправка отключена. Используйте ✦ Apply / Fill в расширении и отправляйте заявку на сайте сами.');}
+async function saveAutopilotSettings(){const minimumScore=Math.max(50,Math.min(100,Number($('autoScore').value)||85)),dailyLimit=Math.max(1,Math.min(200,Number($('autoLimit').value)||25));try{$('autoSave').disabled=true;await api('/api/settings/autoapply/preferences',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({minimumScore,dailyLimit})});autoSettingsDirty=false;showNotice(`Настройки сохранены: от ${minimumScore}/100, до ${dailyLimit} откликов в день.`);await load()}catch(e){showNotice(e.message,false)}finally{$('autoSave').disabled=false}}
+async function runAutopilotNow(){try{$('autoRun').disabled=true;showNotice('Обновляю вакансии и проверяю очередь…');const r=await api('/api/automation/run',{method:'POST'});showNotice(r.cycle?.message||'Проверка завершена.',Boolean(r.cycle?.ready));await load()}catch(e){showNotice(e.message,false)}finally{$('autoRun').disabled=false}}
+async function previewLetter(id){try{const d=await api(`/api/vacancies/${id}/application-draft`);$('letterTitle').textContent=d.recommendedHeadline;$('letterText').textContent=d.coverLetter;$('letterDialog').showModal()}catch(e){showNotice(e.message,false)}}
+function closeLetter(){$('letterDialog').close()}async function copyLetter(){try{await navigator.clipboard.writeText($('letterText').textContent);showNotice('Письмо скопировано.')}catch(e){showNotice(e.message,false)}}
+let dashboardRefreshing=false;
+load().catch(e=>showNotice(e.message,false));
+// Refresh receipts and review stops even when collection itself has not completed.
+async function refreshDashboard(){if(dashboardRefreshing)return;dashboardRefreshing=true;try{await load()}catch(e){showNotice('Не удалось обновить журнал: '+e.message,false)}finally{dashboardRefreshing=false}}
+setInterval(refreshDashboard,10000);
+</script>
+</body>
+</html>

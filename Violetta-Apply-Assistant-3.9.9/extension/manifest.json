@@ -1,0 +1,123 @@
+{
+  "manifest_version": 3,
+  "name": "Violetta Apply Assistant",
+  "version": "3.9.9",
+  "description": "Violetta 3.9.9: постоянная память Analysis/откликов по vacancy ID и автоматическое заполнение форм после перехода из списка вакансий.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "unlimitedStorage",
+    "clipboardWrite",
+    "alarms",
+    "scripting",
+    "tabs",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://hh.ru/*",
+    "https://*.hh.ru/*",
+    "https://headhunter.kg/*",
+    "https://*.headhunter.kg/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html",
+  "action": {
+    "default_title": "Violetta Apply Assistant",
+    "default_popup": "home.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "dashboard-apply-content.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://hh.ru/*",
+        "https://*.hh.ru/*",
+        "https://headhunter.kg/*",
+        "https://*.headhunter.kg/*"
+      ],
+      "all_frames": true,
+      "js": [
+        "copilot-core.js",
+        "ats-structured.js",
+        "ats-controls.js",
+        "field-verification.js",
+        "chat-reader.js",
+        "site-adapters.js",
+        "copilot-ui.js",
+        "content.js",
+        "hh-discovery-navigation.js",
+        "hh-discovery-content.js",
+        "cv-upload.js",
+        "review-navigator-content.js",
+        "final-submit-control.js",
+        "final-submit-locator.js",
+        "submission-receipt.js",
+        "submission-receipt-content.js",
+        "site-apply.js",
+        "site-apply-content.js",
+        "hh-list-quick-apply-core.js",
+        "hh-list-quick-apply.js",
+        "application-state-machine.js",
+        "universal-content.js",
+        "recruiter-chat.js",
+        "quick-replies.js",
+        "recruiter-chat-content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "minimum_chrome_version": "120",
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "commands": {
+    "suggested-reply": {
+      "suggested_key": {
+        "default": "Alt+Shift+1"
+      },
+      "description": "Основной быстрый ответ (без отправки)"
+    },
+    "thank-you-reply": {
+      "suggested_key": {
+        "default": "Alt+Shift+2"
+      },
+      "description": "Спасибо / буду ждать (без отправки)"
+    },
+    "contacts-reply": {
+      "suggested_key": {
+        "default": "Alt+Shift+3"
+      },
+      "description": "Контакты (без отправки)"
+    },
+    "open-ai": {
+      "suggested_key": {
+        "default": "Alt+Shift+A"
+      },
+      "description": "Открыть ✎ AI в активном чате"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

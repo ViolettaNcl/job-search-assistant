@@ -1,0 +1,664 @@
+function vjaSiteText(el) {
+  return String(el?.innerText || el?.textContent || el?.value || el?.getAttribute?.('aria-label') || el?.getAttribute?.('title') || '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function vjaSiteVisible(el) {
+  if (!el || el.disabled || el.getAttribute?.('aria-disabled') === 'true') return false;
+  const style = getComputedStyle(el);
+  return el.offsetParent !== null && style.display !== 'none' && style.visibility !== 'hidden';
+}
+
+function vjaSiteLabel(el) {
+  const parts = [vjaSiteText(el), el?.name || '', el?.id || '', el?.getAttribute?.('placeholder') || '', el?.getAttribute?.('aria-label') || ''];
+  if (el?.id) {
+    try {
+      const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+      if (label) parts.push(vjaSiteText(label));
+    } catch { }
+  }
+  const parent = el?.closest?.('label');
+  if (parent) parts.push(vjaSiteText(parent));
+  const group = el?.closest?.('fieldset, [role="group"], [class*="field"], [class*="question"], [data-qa*="resume" i]');
+  if (group) parts.push(vjaSiteText(group).slice(0, 300));
+  return [...new Set(parts.map(x => String(x || '').trim()).filter(Boolean))].join(' ').slice(0, 800);
+}
+
+function vjaSiteIsHh() {
+  if (window.vjaSiteApply?.isHhUrl) return window.vjaSiteApply.isHhUrl(location.href);
+  return /(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(location.hostname);
+}
+
+function vjaSiteApplicationContainer() {
+  const isHh = vjaSiteIsHh();
+  const matches = value => window.vjaSiteApply?.isApplicationContainerText?.(value, isHh)
+    ?? (isHh
+      ? /выберите резюме|резюме для отклика|сопроводительное письмо|отправить отклик|откликнуться/i.test(String(value || ''))
+      : /apply|application|resume|cv|cover letter|отклик|резюме|сопровод|отправить/i.test(String(value || '')));
+  const dialogs = [...document.querySelectorAll('[role="dialog"], dialog')].filter(vjaSiteVisible);
+  const applicationDialogs = dialogs.filter(dialog => matches(vjaSiteText(dialog)));
+  if (applicationDialogs.length === 1) return applicationDialogs[0];
+  if (dialogs.length === 1) return dialogs[0];
+
+  const forms = [...document.querySelectorAll('form')].filter(vjaSiteVisible).filter(form => {
+    const text = vjaSiteText(form).toLowerCase();
+    return matches(text);
+  });
+  if (forms.length === 1) return forms[0];
+  return null;
+}
+
+function vjaSiteStartCandidates() {
+  const currentVacancyId = location.pathname.match(/\/vacancy\/(\d+)/i)?.[1] || '';
+  return [...document.querySelectorAll('button, a, [role="button"]')]
+    .filter(vjaSiteVisible)
+    .map(el => {
+      const href = el.getAttribute?.('href') || '';
+      let targetVacancyId = '';
+      try { targetVacancyId = new URL(href, location.href).searchParams.get('vacancyId') || ''; } catch { }
+      return {
+        el,
+        label: vjaSiteText(el).slice(0, 160),
+        metadata: {
+          href,
+          currentJob: Boolean(currentVacancyId && targetVacancyId === currentVacancyId),
+          inForm: Boolean(el.closest?.('form')),
+          inDialog: Boolean(el.closest?.('[role="dialog"], dialog')),
+          primary: /primary|accent|success|purple|violet/i.test(String(el.className || ''))
+        }
+      };
+    });
+}
+
+function vjaHhCoverLetterAction() {
+  const candidates = [...document.querySelectorAll('button, a, [role="button"]')]
+    .filter(vjaSiteVisible)
+    .map(el => ({ el, label: vjaSiteText(el).slice(0, 160) }));
+  return window.vjaSiteApply?.chooseHhCoverLetterAction?.(candidates) || { found: false, ambiguous: false, count: 0 };
+}
+
+function vjaHhCoverLetterSubmitAction(container = document) {
+  const scope = container && container !== document ? container : document;
+  const candidates = [...scope.querySelectorAll('button, input[type="submit"], input[type="button"], [role="button"]')]
+    .filter(vjaSiteVisible)
+    .map(el => ({ el, label: vjaSiteText(el).slice(0, 160) }));
+  return window.vjaSiteApply?.chooseHhCoverLetterSubmit?.(candidates) || { found: false, ambiguous: false, count: 0 };
+}
+
+async function vjaSiteWaitForHhCoverLetterSubmit(container = document, timeoutMs = 5000) {
+  const started = Date.now();
+  let choice = { found: false, ambiguous: false, count: 0 };
+  while (Date.now() - started < timeoutMs) {
+    choice = vjaHhCoverLetterSubmitAction(container);
+    if (choice.found || choice.ambiguous) return choice;
+    await vjaSiteWait(180);
+  }
+  return choice;
+}
+
+function vjaSiteCoverLetterField(container = document) {
+  const fields = [...container.querySelectorAll('textarea, input[type="text"], [contenteditable="true"][role="textbox"], [contenteditable="true"]')]
+    .filter(vjaSiteVisible)
+    .map(el => ({
+      el,
+      label: vjaSiteLabel(el),
+      metadata: { textarea: el instanceof HTMLTextAreaElement || el.isContentEditable, required: Boolean(el.required || el.getAttribute?.('aria-required') === 'true') }
+    }));
+  const choice = window.vjaSiteApply?.chooseCoverLetterField?.(fields) || { found: false };
+  if (choice.found) return choice.candidate.el;
+  const textareas = fields.filter(x => x.metadata.textarea);
+  return textareas.length === 1 ? textareas[0].el : null;
+}
+
+function vjaSiteSetText(el, value) {
+  if (!el || !value) return false;
+  if (el.isContentEditable) {
+    el.focus();
+    el.textContent = value;
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+    return vjaSiteText(el).length > 0;
+  }
+  const prototype = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+  descriptor?.set?.call(el, value);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  el.dispatchEvent(new Event('blur', { bubbles: true }));
+  return String(el.value || '').trim().length > 0;
+}
+
+function vjaSiteFieldValue(el) {
+  return el?.isContentEditable ? vjaSiteText(el) : String(el?.value || '').trim();
+}
+
+async function vjaSiteSetTextVerified(el, value) {
+  if (Number(el?.maxLength) > 0 && String(value || "").length > Number(el.maxLength)) return false;
+  const expected = String(value || '').trim();
+  if (!el || !expected) return false;
+  const normalize = window.vjaSiteApply?.clean || (input => String(input || '').replace(/\s+/g, ' ').trim());
+  for (let attempt = 0; attempt < 3; attempt++) {
+    vjaSiteSetText(el, expected);
+    await vjaSiteWait(120 + attempt * 80);
+    const actual = vjaSiteFieldValue(el);
+    if (normalize(actual) === normalize(expected)) return true;
+  }
+  return false;
+}
+
+function vjaSiteRequiredFields(container = document) {
+  const nodes = [...container.querySelectorAll('input[required], textarea[required], select[required], [aria-required="true"]')]
+    .filter(el => !el.disabled)
+    .map(el => ({
+      label: vjaSiteLabel(el),
+      required: true,
+      disabled: Boolean(el.disabled),
+      hidden: !vjaSiteVisible(el) || (el instanceof HTMLInputElement && el.type === 'hidden'),
+      type: el instanceof HTMLInputElement ? el.type : (el instanceof HTMLSelectElement ? 'select' : 'text'),
+      group: el instanceof HTMLInputElement && el.type === 'radio' ? (el.name || vjaSiteLabel(el)) : '',
+      value: 'value' in el ? String(el.value || '') : '',
+      checked: Boolean(el.checked),
+      fileCount: el instanceof HTMLInputElement && el.type === 'file' ? Number(el.files?.length || 0) : 0
+    }));
+  return window.vjaSiteApply?.unresolvedRequired?.(nodes) || [];
+}
+
+function vjaSiteSensitiveControls(container = document) {
+  const nodes=[...container.querySelectorAll('input[type="checkbox"], input[type="radio"]')].map(el=>({
+    label:vjaSiteLabel(el),disabled:Boolean(el.disabled),hidden:!vjaSiteVisible(el),checked:Boolean(el.checked),reviewed:el.dataset?.vjaUserReviewed==='1'
+  }));
+  return window.vjaSiteApply?.unreviewedSensitive?.(nodes) || [];
+}
+
+document.addEventListener('change',event=>{
+  const el=event.target;
+  if(event.isTrusted && el instanceof HTMLInputElement && /^(checkbox|radio)$/i.test(el.type))el.dataset.vjaUserReviewed='1';
+},true);
+
+function vjaSiteFinalChoice(container = document) {
+  const applicationRoute = /application|candidate|apply|response|respond|negotiation|vacancy/i.test(location.pathname + location.search);
+  const candidates = [...container.querySelectorAll('button, input[type="submit"], input[type="button"], [role="button"]')]
+    .filter(vjaSiteVisible)
+    .map(el => ({
+      el,
+      label: vjaSiteText(el).slice(0, 160),
+      metadata: {
+        submitType: Boolean(el.matches?.('button[type="submit"], input[type="submit"]')),
+        inForm: Boolean(el.closest?.('form') || el.closest?.('[role="dialog"], dialog')),
+        applicationRoute
+      }
+    }));
+  const choice = window.vjaFinalSubmitControl?.choose?.(candidates) || { found: false, ambiguous: false, count: 0 };
+  if (choice.found || choice.ambiguous) return choice;
+  const submitButtons = candidates.filter(item => item.metadata.submitType);
+  if (submitButtons.length === 1 && container !== document) {
+    return { found: true, ambiguous: false, count: 1, candidate: { ...submitButtons[0], score: 8, fallback: 'single-submit-control' } };
+  }
+  return choice;
+}
+
+function vjaSiteReceipt() {
+  const detector = window.vjaSubmissionReceipt;
+  if (!detector?.detect) return { confirmed: false, score: 0, signal: 'detector-unavailable' };
+  const result = detector.detect({
+    url: location.href,
+    title: document.title,
+    text: String(document.body?.innerText || document.body?.textContent || '').slice(0, 50000)
+  });
+  return { confirmed: Boolean(result.confirmed), score: Number(result.score || 0), signal: String(result.signal || 'none') };
+}
+
+function vjaSiteWait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function vjaSiteStorageGet(key) {
+  const response = await chrome.runtime.sendMessage({ type: 'vjaSiteApplyStorage', operation: 'get', key });
+  return response?.ok ? response.value : undefined;
+}
+
+async function vjaSiteStorageSet(key, value) {
+  const response = await chrome.runtime.sendMessage({ type: 'vjaSiteApplyStorage', operation: 'set', key, value });
+  if (!response?.ok) throw new Error(response?.error || 'Could not save application continuation state.');
+}
+
+async function vjaSiteStorageRemove(key) {
+  const response = await chrome.runtime.sendMessage({ type: 'vjaSiteApplyStorage', operation: 'remove', key });
+  if (!response?.ok) throw new Error(response?.error || 'Could not clear application continuation state.');
+}
+
+async function vjaSiteWaitForHhCoverLetterAction(timeoutMs = 12000) {
+  const started = Date.now();
+  let choice = { found: false, ambiguous: false, count: 0 };
+  while (Date.now() - started < timeoutMs) {
+    choice = vjaHhCoverLetterAction();
+    if (choice.found || choice.ambiguous) return choice;
+    await vjaSiteWait(250);
+  }
+  return choice;
+}
+
+async function vjaSiteWaitForCoverLetterField(timeoutMs = 9000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const container = vjaSiteApplicationContainer();
+    const field = vjaSiteCoverLetterField(container || document);
+    if (field) return { found: true, container, field };
+    await vjaSiteWait(250);
+  }
+  return { found: false, container: vjaSiteApplicationContainer(), field: null };
+}
+
+async function vjaSiteWaitForCoverLetterSubmission(field, timeoutMs = 6000) {
+  if (!field) return false;
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (!document.contains(field) || !vjaSiteVisible(field)) return true;
+    await vjaSiteWait(250);
+  }
+  return !document.contains(field) || !vjaSiteVisible(field);
+}
+
+function vjaSiteHasExplicitCoverLetterField() {
+  return [...document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"][role="textbox"], [contenteditable="true"]')]
+    .filter(vjaSiteVisible)
+    .some(el => /сопровод|cover letter|motivation letter/i.test(vjaSiteLabel(el)));
+}
+
+async function vjaSiteWaitForApplicationUi(timeoutMs = 9000, options = {}) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const container = vjaSiteApplicationContainer();
+    if (container) return true;
+    if (vjaSiteIsHh()) {
+      if (vjaSiteHasExplicitCoverLetterField()) return true;
+      if (options.acceptReceipt && (vjaSiteReceipt().confirmed || vjaHhCoverLetterAction().found)) return true;
+    } else if (document.querySelector('input[type="file"], textarea, [contenteditable="true"], [data-qa*="resume" i], input[type="radio"]')) {
+      return true;
+    }
+    await vjaSiteWait(250);
+  }
+  return false;
+}
+
+function vjaHhResumeCandidates(container = document) {
+  const all = [...container.querySelectorAll('input[type="radio"], [role="radio"]')];
+  return all.map(el => {
+    const wrapper = el.closest?.('label, [data-qa*="resume" i], [class*="resume" i], [role="group"], fieldset') || el.parentElement;
+    const label = `${vjaSiteLabel(el)} ${vjaSiteText(wrapper)}`.replace(/\s+/g, ' ').trim().slice(0, 1000);
+    const resumeRelated = /резюме|resume|cv|профил/i.test(label)
+      || /resume/i.test(String(el.getAttribute?.('data-qa') || ''))
+      || /resume/i.test(String(el.getAttribute?.('name') || ''));
+    if (!resumeRelated) return null;
+    const selected = Boolean(el.checked)
+      || el.getAttribute?.('aria-checked') === 'true'
+      || wrapper?.getAttribute?.('aria-checked') === 'true'
+      || /selected|checked|active/i.test(String(wrapper?.className || ''));
+    return {
+      el,
+      wrapper,
+      label,
+      metadata: {
+        selected,
+        disabled: Boolean(el.disabled || el.getAttribute?.('aria-disabled') === 'true'),
+        visible: vjaSiteVisible(el) || vjaSiteVisible(wrapper)
+      }
+    };
+  }).filter(item => item && item.metadata.visible);
+}
+
+async function vjaHhSelectResume(container = document, plan = {}) {
+  if (!vjaSiteIsHh()) return { ok: true, found: false, reason: 'not-hh', label: '' };
+  const candidates = vjaHhResumeCandidates(container);
+  if (!candidates.length) {
+    return { ok: true, found: false, reason: 'hh-uses-current-account-resume', label: 'HH account resume' };
+  }
+  const choice = window.vjaSiteApply?.chooseHhResumeChoice?.(candidates, plan.resumeHint || '') || { found: false, ambiguous: true };
+  if (!choice.found) {
+    return {
+      ok: false,
+      found: true,
+      reason: 'hh-resume-choice-required',
+      choices: candidates.map(item => item.label).filter(Boolean).slice(0, 5)
+    };
+  }
+
+  const candidate = choice.candidate;
+  if (!candidate.metadata?.selected) {
+    candidate.wrapper?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    if (candidate.el instanceof HTMLInputElement) {
+      candidate.el.click();
+      candidate.el.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      (candidate.wrapper || candidate.el).click();
+    }
+    await vjaSiteWait(180);
+  }
+
+  const nowSelected = candidate.el instanceof HTMLInputElement
+    ? Boolean(candidate.el.checked)
+    : candidate.el.getAttribute?.('aria-checked') === 'true' || candidate.wrapper?.getAttribute?.('aria-checked') === 'true';
+  if (!candidate.metadata?.selected && !nowSelected) {
+    return { ok: false, found: true, reason: 'hh-resume-selection-not-persisted', choices: candidates.map(item => item.label).filter(Boolean).slice(0, 5) };
+  }
+
+  return { ok: true, found: true, reason: choice.reason || 'selected', label: candidate.label || 'HH account resume' };
+}
+
+async function vjaSiteLoadCv(plan) {
+  if (plan?.fileData?.base64) return plan.fileData;
+  return null;
+}
+
+async function vjaSiteStoreResult(plan, result) {
+  const payload = {
+    id: plan?.id || '',
+    trackedId: plan?.trackedId || '',
+    sourceUrl: plan?.sourceUrl || '',
+    coverLetter: String(plan?.coverLetter || ''),
+    result,
+    createdAt: Date.now()
+  };
+  await vjaSiteStorageSet('vjaSiteApplyResult', payload);
+  if (result?.submitted || result?.status === 'needs-review') {
+    const pending = await vjaSiteStorageGet('vjaPendingSiteApply');
+    if (pending?.id === plan?.id) await vjaSiteStorageRemove('vjaPendingSiteApply');
+  }
+}
+
+async function vjaRunSiteApply(plan = {}, options = {}) {
+  if (plan.finalClicked) {
+    await vjaSiteWait(1200);
+    const receipt = vjaSiteReceipt();
+    const coverLetterFilled = Boolean(plan.coverLetterFilledBeforeFinal);
+    const result = window.vjaSiteApply?.canAcceptReceipt?.({ finalClicked: true, receiptConfirmed: receipt.confirmed })
+      ? { submitted: true, status: 'confirmed', receipt, resumed: true, coverLetterFilled, resumeLabel: plan.resumeLabel || '' }
+      : { submitted: false, status: 'verification-needed', receipt, coverLetterFilled, resumeLabel: plan.resumeLabel || '', reason: 'The final employer action was already clicked, but submission could not be verified automatically.' };
+    await vjaSiteStoreResult(plan, result);
+    return result;
+  }
+
+  const coverLetter = String(plan.coverLetter || '').trim();
+  const coverLetterRequired = vjaSiteIsHh() && Boolean(coverLetter);
+  let startActionSubmitted = false;
+  let container = vjaSiteApplicationContainer();
+  let preparedCoverField = null;
+  let applicationUiFound = Boolean(container || (!vjaSiteIsHh() && document.querySelector('input[type="file"], textarea, [contenteditable="true"], input[required], select[required], [aria-required="true"]')));
+
+  const immediateLetterAction = coverLetterRequired ? vjaHhCoverLetterAction() : { found: false, ambiguous: false };
+  const explicitCoverLetterField = coverLetterRequired ? vjaSiteCoverLetterField(container || document) : null;
+  if (coverLetterRequired && !explicitCoverLetterField && (options.resumed || immediateLetterAction.found || immediateLetterAction.ambiguous)) {
+    const existingLetterAction = immediateLetterAction.found || immediateLetterAction.ambiguous
+      ? immediateLetterAction
+      : await vjaSiteWaitForHhCoverLetterAction();
+    if (existingLetterAction.found) {
+      startActionSubmitted = true;
+      existingLetterAction.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      existingLetterAction.candidate.el.click();
+      const letterUi = await vjaSiteWaitForCoverLetterField();
+      container = letterUi.container;
+      preparedCoverField = letterUi.field;
+      applicationUiFound = letterUi.found;
+    } else {
+      const result = {
+        submitted: false,
+        resumeSubmitted: vjaSiteReceipt().confirmed,
+        status: 'submitted-needs-letter',
+        reason: existingLetterAction.ambiguous ? 'hh-cover-letter-action-ambiguous' : 'hh-cover-letter-action-not-found'
+      };
+      await vjaSiteStoreResult(plan, result);
+      return result;
+    }
+  }
+
+  if (!container && !applicationUiFound) {
+    const startChoice = window.vjaSiteApply?.chooseStartAction?.(vjaSiteStartCandidates()) || { found: false };
+    if (!startChoice.found) {
+      const result = { submitted: false, status: 'needs-review', reason: startChoice.ambiguous ? 'Several Apply/Откликнуться buttons were found.' : 'No safe Apply/Откликнуться button was found.' };
+      await vjaSiteStoreResult(plan, result);
+      return result;
+    }
+    const receiptBeforeStart = vjaSiteReceipt();
+    startChoice.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    plan = {...plan,startClicked:true};
+    await vjaSiteStorageSet('vjaPendingSiteApply', plan);
+    startChoice.candidate.el.click();
+    applicationUiFound = await vjaSiteWaitForApplicationUi(9000, { acceptReceipt: true });
+
+    const postStartReceipt = vjaSiteReceipt();
+    const postStartLetterAction = vjaHhCoverLetterAction();
+    const disposition = window.vjaSiteApply?.startReceiptDisposition?.({
+      receiptConfirmed: !receiptBeforeStart.confirmed && postStartReceipt.confirmed,
+      isHh: vjaSiteIsHh(),
+      coverLetterRequired,
+      coverLetterActionFound: Boolean(postStartLetterAction.found)
+    }) || 'continue';
+    if (disposition === 'accept') {
+      const result = { submitted: true, status: 'confirmed', receipt: postStartReceipt, startActionSubmitted: true };
+      await vjaSiteStoreResult(plan, result);
+      return result;
+    }
+    if (disposition === 'attach-cover-letter') {
+      startActionSubmitted = true;
+      const letterAction = postStartLetterAction.found
+        ? postStartLetterAction
+        : await vjaSiteWaitForHhCoverLetterAction();
+      if (!letterAction.found) {
+        const result = {
+          submitted: false,
+          resumeSubmitted: true,
+          status: 'submitted-needs-letter',
+          receipt: postStartReceipt,
+          startActionSubmitted: true,
+          reason: letterAction.ambiguous ? 'hh-cover-letter-action-ambiguous' : 'hh-cover-letter-action-not-found'
+        };
+        await vjaSiteStoreResult(plan, result);
+        return result;
+      }
+      letterAction.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      letterAction.candidate.el.click();
+      const letterUi = await vjaSiteWaitForCoverLetterField();
+      container = letterUi.container;
+      preparedCoverField = letterUi.field;
+      applicationUiFound = letterUi.found;
+    }
+    container = container || vjaSiteApplicationContainer();
+  }
+
+  const scope = container || document;
+  const coverField = preparedCoverField || vjaSiteCoverLetterField(scope);
+  let coverLetterFilled = false;
+  if (coverField && coverLetter) {
+    coverLetterFilled = await vjaSiteSetTextVerified(coverField, coverLetter);
+    if (!coverLetterFilled) {
+      const result = { submitted: false, status: 'needs-review', reason: 'cover-letter-not-persisted', coverLetterFilled: false };
+      await vjaSiteStoreResult(plan, result);
+      return result;
+    }
+  }
+  if (coverLetterRequired && !coverLetterFilled) {
+    const result = { submitted: false, status: 'needs-review', reason: 'cover-letter-not-persisted', coverLetterFilled: false };
+    await vjaSiteStoreResult(plan, result);
+    return result;
+  }
+
+  // HH sends the resume first and then opens a dedicated cover-letter modal.
+  // In that state the modal's exact «Отправить» button is the letter-submit action,
+  // not a generic final application button. Handle it explicitly so the flow does
+  // not stop with final-action-not-found after successfully opening the modal.
+  if (vjaSiteIsHh() && coverLetterRequired && startActionSubmitted && coverLetterFilled) {
+    const letterSubmit = await vjaSiteWaitForHhCoverLetterSubmit(scope);
+    if (!letterSubmit.found) {
+      const result = {
+        submitted: false,
+        resumeSubmitted: true,
+        status: 'submitted-needs-letter',
+        reason: letterSubmit.ambiguous ? 'hh-cover-letter-submit-ambiguous' : 'hh-cover-letter-submit-not-found',
+        coverLetterFilled: true,
+        startActionSubmitted: true
+      };
+      await vjaSiteStoreResult(plan, result);
+      return result;
+    }
+    const receiptBeforeLetter = vjaSiteReceipt();
+    letterSubmit.candidate.el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    letterSubmit.candidate.el.click();
+    const letterStepCompleted = await vjaSiteWaitForCoverLetterSubmission(coverField, 8000);
+    const receipt = vjaSiteReceipt();
+    const result = letterStepCompleted
+      ? { submitted: true, status: 'confirmed', receipt, coverLetterFilled: true, resumeSubmitted: true, startActionSubmitted: true, letterStepCompleted: true, resumeLabel: plan.resumeLabel || 'HH account resume' }
+      : { submitted: false, status: 'clicked-unverified', receipt, coverLetterFilled: true, resumeSubmitted: true, startActionSubmitted: true, letterStepCompleted: false, reason: 'Cover-letter Send was clicked, but the modal did not close.' };
+    await vjaSiteStoreResult(plan, result);
+    return result;
+  }
+
+  const hhResume = await vjaHhSelectResume(scope, plan);
+  if (!hhResume.ok) {
+    const result = {
+      submitted: false,
+      status: 'needs-review',
+      reason: hhResume.reason,
+      unresolved: hhResume.choices || [],
+      coverLetterFilled,
+      resumeLabel: ''
+    };
+    await vjaSiteStoreResult(plan, result);
+    return result;
+  }
+
+  const fileInputPresent = !vjaSiteIsHh() && Boolean(scope.querySelector?.('input[type="file"]'));
+  const fileData = fileInputPresent ? await vjaSiteLoadCv(plan) : null;
+  let cvUploaded = false;
+  let cvResult = null;
+  if (fileInputPresent) {
+    if (!fileData?.base64) {
+      const result = { submitted: false, status: 'needs-review', reason: 'This application has a CV upload field, but the recommended CV is not available in the local CV Vault.' };
+      await vjaSiteStoreResult(plan, result);
+      return result;
+    }
+    cvResult = typeof vjaUploadCv === 'function' ? vjaUploadCv(fileData) : { success: false, error: 'CV uploader is unavailable.' };
+    cvUploaded = Boolean(cvResult?.success);
+  }
+
+  await vjaSiteWait(180);
+  const unresolved = vjaSiteRequiredFields(scope);
+  const finalChoice = vjaSiteFinalChoice(scope);
+  const sensitive = vjaSiteSensitiveControls(scope);
+  const permission = window.vjaSiteApply?.canSubmit?.({
+    applicationUiFound,
+    coverLetterRequired,
+    coverLetterFilled,
+    unresolvedRequired: unresolved.length,
+    cvFieldPresent: fileInputPresent,
+    cvUploaded,
+    unreviewedSensitive: sensitive.length,
+    finalFound: Boolean(finalChoice.found),
+    finalAmbiguous: Boolean(finalChoice.ambiguous)
+  }) || { ok: false, reason: 'site-apply-model-unavailable' };
+
+  if (!permission.ok) {
+    const result = {
+      submitted: false,
+      status: 'needs-review',
+      reason: permission.reason,
+      unresolved: permission.reason==='manual-risk-fields'?sensitive.map(x=>x.label).filter(Boolean).slice(0,8):unresolved.map(x => x.label).filter(Boolean).slice(0, 8),
+      coverLetterFilled,
+      cvUploaded,
+      cvResult,
+      resumeLabel: hhResume.label || ''
+    };
+    await vjaSiteStoreResult(plan, result);
+    return result;
+  }
+
+  const pending = {
+    ...plan,
+    finalClicked: true,
+    finalClickedAt: Date.now(),
+    coverLetterFilledBeforeFinal: coverLetterFilled,
+    resumeLabel: hhResume.label || ''
+  };
+  await vjaSiteStorageSet('vjaPendingSiteApply', pending);
+  const receiptBeforeFinal = vjaSiteReceipt();
+  finalChoice.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  finalChoice.candidate.el.click();
+  const letterStepCompleted = coverLetterRequired
+    ? await vjaSiteWaitForCoverLetterSubmission(coverField)
+    : (await vjaSiteWait(2200), true);
+
+  const receipt = vjaSiteReceipt();
+  const common = { coverLetterFilled, cvUploaded, cvResult, resumeLabel: hhResume.label || '', startActionSubmitted, letterStepCompleted };
+  const receiptAdvanced = !receiptBeforeFinal.confirmed && receipt.confirmed;
+  const submissionConfirmed = window.vjaSiteApply?.finalSubmissionConfirmed?.({
+    isHh: vjaSiteIsHh(),
+    coverLetterRequired,
+    startActionSubmitted,
+    letterStepCompleted,
+    receiptConfirmed: receipt.confirmed,
+    receiptAdvanced
+  }) ?? false;
+  const result = submissionConfirmed
+    ? { submitted: true, status: 'confirmed', receipt, ...common }
+    : { submitted: false, status: 'clicked-unverified', receipt, letterStepCompleted, ...common, reason: 'Final employer action was clicked; reopen the extension if the site did not show a confirmation.' };
+
+  if (receipt.confirmed) await vjaSiteStoreResult(plan, result);
+  else await vjaSiteStorageSet('vjaSiteApplyResult', { id: plan?.id || '', trackedId: plan?.trackedId || '', sourceUrl: plan?.sourceUrl || '', coverLetter: String(plan?.coverLetter || ''), result, createdAt: Date.now() });
+  return result;
+}
+
+// Navigation recovery and the worker command can arrive together. Share one run.
+const vjaSiteRuns = new Map();
+function vjaRunSiteApplyOnce(plan, options = {}) {
+  if (!vjaSiteRuns.has(plan.id)) {
+    const run = (async () => {
+      const samePage = window.vjaSiteApply?.sameJobUrl?.(plan.sourceUrl,location.href);
+      const continuation = window.vjaSiteApply?.canResume?.({sourceUrl:plan.sourceUrl,currentUrl:location.href,
+        jobTitle:plan.jobTitle,pageText:document.title+' '+String(document.body?.innerText || '').slice(0,20000)});
+      if (!samePage && !continuation?.ok) throw new Error('Вкладка открыла другую вакансию. Отклик остановлен.');
+      const saved = await vjaSiteStorageGet('vjaSiteApplyResult');
+      if (saved?.id === plan.id && saved.result?.submitted && saved.result.status === 'confirmed') return saved.result;
+      const pending = await vjaSiteStorageGet('vjaPendingSiteApply');
+      const current = pending?.id === plan.id ? {...plan,...pending} : plan;
+      return vjaRunSiteApply(current, {...options,resumed:Boolean(options.resumed || current.startClicked)});
+    })().finally(() => vjaSiteRuns.delete(plan.id));
+    vjaSiteRuns.set(plan.id,run);
+  }
+  return vjaSiteRuns.get(plan.id);
+}
+
+async function vjaResumePendingSiteApply() {
+  const pending = await vjaSiteStorageGet('vjaPendingSiteApply');
+  if (!pending || (!pending.startClicked && !pending.finalClicked)) return;
+  const expiresAt = Number(pending.expiresAt || 0);
+  if (expiresAt && Date.now() > expiresAt) {
+    await vjaSiteStorageRemove('vjaPendingSiteApply');
+    return;
+  }
+  const continuation = window.vjaSiteApply?.canResume?.({
+    sourceUrl: pending.sourceUrl,
+    currentUrl: location.href,
+    jobTitle: pending.jobTitle,
+    pageText: `${document.title}\n${String(document.body?.innerText || document.body?.textContent || '').slice(0, 50000)}`
+  });
+  if (!continuation?.ok) return;
+  await vjaSiteWait(700);
+  await vjaRunSiteApplyOnce(pending, { resumed: true });
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'vjaSiteApplyReady') {sendResponse({ready:true});return false;}
+  if (message?.type !== 'siteApplyNow') return false;
+  vjaRunSiteApplyOnce(message.plan || {}, {resumed:Boolean(message.plan?.startClicked)})
+    .then(sendResponse)
+    .catch(error => sendResponse({ submitted: false, status: 'error', error: error?.message || String(error) }));
+  return true;
+});
+
+vjaResumePendingSiteApply().catch(() => {});
+
+if (/^(?:localhost|127\.0\.0\.1)$/i.test(location.hostname)) {
+  const wakeBrowserAutopilot = () => chrome.runtime.sendMessage({ type: 'vjaBrowserAutopilotWake' }).catch(() => {});
+  wakeBrowserAutopilot();
+  setInterval(wakeBrowserAutopilot, 10000);
+}

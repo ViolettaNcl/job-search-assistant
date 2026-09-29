@@ -1,0 +1,63 @@
+name: site-apply-regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'browser-extension/**'
+      - 'tests/browser_e2e.py'
+      - 'tests/fixtures/**'
+      - '.github/workflows/site-apply-regression.yml'
+  pull_request:
+    paths:
+      - 'browser-extension/**'
+      - 'tests/browser_e2e.py'
+      - 'tests/fixtures/**'
+      - '.github/workflows/site-apply-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  site-apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check current extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in background.js site-apply.js site-apply-content.js copilot-background.js universal-content.js site-adapters.js hh-list-quick-apply.js recruiter-chat-content.js; do
+            node --check "browser-extension/$file"
+          done
+      - name: Run application-focused tests
+        run: |
+          node browser-extension/site-apply.test.js
+          node browser-extension/final-submit-control.test.js
+          node browser-extension/browser-autopilot.test.js
+          node browser-extension/v360-integration.test.js
+
+  floating-panel-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Playwright
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Verify floating Apply, chat AI, quick apply and SPA recovery
+        run: python tests/browser_e2e.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: site-apply-browser-results
+          path: test-results/
+          if-no-files-found: ignore
