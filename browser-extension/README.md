@@ -1,4 +1,4 @@
-# Violetta Apply Assistant — Chrome extension 3.8.0
+# Violetta Apply Assistant — Chrome extension 3.9.5
 
 Единая память кандидата по CV и подтверждённым владельцем данным HH, отбор фактов по вакансии, короткие сопроводительные письма и ответы на последнее сообщение работодателя.
 
@@ -13,4 +13,8 @@
 
 Подробнее: [стратегия](../docs/WRITING_STRATEGY_3.8.md), [архитектура](../ARCHITECTURE.md), [проверки](../TESTING_GUIDE.md), [ограничения площадок](../SUPPORTED_SITES.md).
 
-Никаких обещаний обхода AI-детекторов или фильтров ATS. Данные AppXite предоставлены владельцем; автоматической проверки трудоустройства нет. Исходные PDF не переписываются.
+Никаких обещаний обхода AI-детекторов или фильтров ATS. Текущие сведения о Technical Support / Integration Support предоставлены владельцем; название работодателя хранится как source metadata, но не вставляется в сопроводительное письмо. Автоматической проверки трудоустройства нет. Исходные PDF не переписываются.
+
+## Exact list-card context (3.9.5)
+
+On HH/HeadHunter search results, every injected `✦ Отклик + письмо` control is bound to one vacancy ID. The extension reads the full linked vacancy in the background before writing. Search headings such as `Найдено N вакансий` are rejected and cannot seed a cover letter. If identity cannot be confirmed, the flow stops instead of sending a generic draft.

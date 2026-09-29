@@ -1,4 +1,4 @@
-# Тестирование · 3.8.0
+# Тестирование · 3.9.5
 
 В source clone используйте `browser-extension/`; в Windows ZIP — `extension/`. Тестовый bridge автоматически различает две структуры.
 
@@ -26,7 +26,9 @@ Fixtures используют реальные модули worker/content scrip
 
 ## Новые сценарии
 
-Миграция/приоритет источников; сохранение ручных CV; AppXite; разные проекты для WPF/PHP/backend; исключение Crowne; beginner French; отсутствие выдуманного Jira/стажа/зарплаты; последнее сообщение работодателя; несколько открытых вопросов; stale A→B; пустой чат; подтверждение неизвестного автора; full vacancy before HH-list letter; модель/локальный режим и содержимое model payload.
+Миграция/приоритет источников; сохранение ручных CV; актуальный Technical Support / Integration Support опыт; разные проекты для WPF/PHP/backend; отсутствие названий прежних работодателей в cover letter; исключение hospitality из technical letters; профильное образование без названия учебного заведения; beginner French; отсутствие выдуманного Jira/стажа/зарплаты; последнее сообщение работодателя; несколько открытых вопросов; stale A→B; пустой чат; подтверждение неизвестного автора; full vacancy before HH-list letter; модель/локальный режим и содержимое model payload.
+
+Отдельный HH fixture воспроизводит текущий двухэтапный flow со скриншота: `Откликнуться` → receipt «Ваш отклик отправлен работодателю» → `Приложить сопроводительное письмо` → modal textarea → `Отправить`. Проверяется, что письмо реально записано в textarea, dedicated Send нажат, modal закрыт и результат отмечен как confirmed.
 
 ## Windows / реальный аккаунт
 
@@ -35,3 +37,18 @@ Fixtures используют реальные модули worker/content scrip
 PowerShell-публикатор этой поставки проверен по структуре/ограничениям и Git-плану, но не исполнялся под Windows PowerShell. Windows backend EXE не запускался в Linux-среде; совпадение файлов не является runtime-тестом.
 
 Локальные отчёты и screenshots относятся к `test-results/` и не коммитятся. Числа фактического финального прогона находятся в `TEST_REPORT.md` Windows-пакета и отдельном отчёте поставки.
+
+
+## 3.9.5 CI refresh
+
+GitHub workflows now validate the current `browser-extension/` source rather than old exact popup text from pre-3.9 UI. `package-windows` packages the current root launcher, and CodeQL uses .NET 10 manual build for C# plus no-build JavaScript analysis.
+
+## 3.9.5 exact list-card regression
+
+- Search page with heading `Найдено 19 718 вакансий` and multiple vacancy cards.
+- Each card must get its own `✦ Отклик + письмо`.
+- Clicking one card must persist that exact vacancy ID and full vacancy title.
+- The search-page heading must never appear in the cover letter.
+- Hidden detail-tab reading must confirm the same vacancy ID before accepting text.
+- Manual `✦ Fill` inside a list/modal must reuse the selected vacancy context.
+- Both HH cover-letter variants remain covered: required-before-submit and append-after-response.

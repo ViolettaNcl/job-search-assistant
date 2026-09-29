@@ -1,4 +1,4 @@
-# Architecture · 3.8.0
+# Architecture · 3.9.5
 
 ## Единый путь текста в расширении
 
@@ -19,6 +19,19 @@ flowchart LR
 `context-reply.js` определяет последнее сообщение работодателя, ранее обсуждённые вопросы и пропуски. `chat-reader.js` ограничивает чтение активной панелью чата; боковой список переписок не является историей. Неизвестный автор не подменяется работодателем. Если разметка не даёт достаточно признаков, интерфейс показывает прочитанный текст и просит подтвердить его автора.
 
 `writing-provider.js` — необязательный транспорт к явно настроенному Chat Completions API. `writing-background.js` связывает правила с существующими worker/storage. Старый canned `/triage` больше не выдаётся за анализ моделью.
+
+## Standalone extension-first runtime
+
+Core browsing features do not wait for `127.0.0.1:8080`.
+
+- `universal-content.js` renders ✦ Apply from local page detection.
+- `recruiter-chat-content.js` renders ✎ AI from the active chat DOM.
+- `copilot-background.js` provides Candidate Truth/Profile/letter/chat logic inside the extension service worker.
+- `setup-readiness.js` treats the local backend as optional for core Apply/Chat functions.
+- `cpRepairSupportedTabs()` reconnects already-open HH tabs after install/startup when Chrome allows it.
+- lightweight SPA watchdogs re-run page/chat detection after route/content changes.
+
+The local .NET backend remains an advanced service for the autonomous queue/dashboard path.
 
 ## Места интеграции
 

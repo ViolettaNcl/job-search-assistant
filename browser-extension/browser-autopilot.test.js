@@ -3,6 +3,7 @@ const autopilot = require('./browser-autopilot.js');
 
 assert.equal(autopilot.isHhVacancy('https://hh.ru/vacancy/123'), true);
 assert.equal(autopilot.isHhVacancy('https://spb.hh.ru/vacancy/123?from=search'), true);
+assert.equal(autopilot.isHhVacancy('https://headhunter.kg/vacancy/137861116?hhtmFrom=vacancy_search_list'), true);
 assert.equal(autopilot.isHhVacancy('https://linkedin.com/jobs/123'), false);
 assert.equal(autopilot.shouldRun({ autoApplyEnabled: true, allowed: true, remainingToday: 5, automationMode: 'browser-extension' }), true);
 assert.equal(autopilot.shouldRun({ autoApplyEnabled: true, allowed: true, remainingToday: 5, automationMode: 'hh-api', apiReady: true }), false);

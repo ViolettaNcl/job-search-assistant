@@ -1,21 +1,25 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "3.8.0",
-  "description": "Violetta: Apply, Autopilot и ответы по текущему чату с памятью CV/HH и отбором подтвержденных фактов под вакансию.",
+  "version": "3.9.5",
+  "description": "Violetta 3.9.5: постоянные ✦ Apply/✎ AI; точный «Отклик + письмо» по выбранной HH-карточке; поиск/счётчик вакансий не может стать заголовком письма; vacancy-first writing и Cover Letter Memory.",
   "permissions": [
     "activeTab",
     "storage",
     "unlimitedStorage",
     "clipboardWrite",
     "alarms",
-    "scripting"
+    "scripting",
+    "tabs",
+    "webNavigation"
   ],
   "host_permissions": [
     "http://localhost/*",
     "http://127.0.0.1/*",
     "https://hh.ru/*",
-    "https://*.hh.ru/*"
+    "https://*.hh.ru/*",
+    "https://headhunter.kg/*",
+    "https://*.headhunter.kg/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -23,7 +27,12 @@
   "options_page": "options.html",
   "action": {
     "default_title": "Violetta Apply Assistant",
-    "default_popup": "home.html"
+    "default_popup": "home.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
   },
   "content_scripts": [
     {
@@ -39,7 +48,9 @@
     {
       "matches": [
         "https://hh.ru/*",
-        "https://*.hh.ru/*"
+        "https://*.hh.ru/*",
+        "https://headhunter.kg/*",
+        "https://*.headhunter.kg/*"
       ],
       "all_frames": true,
       "js": [
@@ -102,5 +113,11 @@
       },
       "description": "Открыть ✎ AI в активном чате"
     }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }

@@ -184,6 +184,10 @@
     const item=m.command==='suggested-reply'?quick[0]:lib.find(x=>x.id===hotkeyReplyId);
     if(item)void quickInsert(item,s);respond({ok:Boolean(item),sent:false});return false;
   });
+  // Keep the pencil attached on SPA chat switches and older HH conversations even
+  // when the site updates route/state without emitting a navigation event.
+  const chatVisibilityWatch=setInterval(()=>{if(document.visibilityState!=='hidden')void scan();},1200);
+  addEventListener('pagehide',()=>clearInterval(chatVisibilityWatch),{once:true});
   root.vjaLiveChat={snapshot,analyze,openAiMenu,insertText,mergeHistory,loadHistory,scan};
   void scan();
 })(globalThis);

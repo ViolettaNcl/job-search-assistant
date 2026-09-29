@@ -20,7 +20,7 @@
   function isHhVacancy(value) {
     try {
       const url = new URL(String(value || ""));
-      return url.protocol === 'https:' && (url.hostname === "hh.ru" || url.hostname.endsWith(".hh.ru")) && /^\/vacancy\/\d+\/?$/i.test(url.pathname);
+      return url.protocol === 'https:' && (url.hostname === "hh.ru" || url.hostname.endsWith(".hh.ru") || url.hostname === "headhunter.kg" || url.hostname.endsWith(".headhunter.kg")) && /^\/vacancy\/\d+\/?$/i.test(url.pathname);
     } catch { return false; }
   }
   function shouldRun(status = {}) {

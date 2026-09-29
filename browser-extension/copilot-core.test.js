@@ -6,6 +6,7 @@ const A=(id,applicationId='app-'+id)=>({id:'record-'+id,applicationId,vacancy:V(
 for(const [input,role] of [['Technical Support Specialist','technical_support'],['Junior .NET Developer','developer'],['Helpdesk agent','technical_support'],['Customer Support','customer_support'],['Manual QA','qa'],['Implementation specialist','implementation'],['Back office administrator','operations'],['Преподаватель программирования','education']])test('role: '+input,()=>assert.equal(C.classifyRole(input,'Developer tools, SQL'),role));
 test('role title beats incidental stack in description',()=>assert.equal(C.classifyRole('Technical Support','C# .NET development'),'technical_support'));
 test('provider uses domain boundary, not substring',()=>assert.equal(C.provider('https://hh.ru.attacker.invalid/vacancy/1'),'generic'));
+test('HeadHunter.kg is the same HH provider family',()=>{assert.equal(C.provider('https://headhunter.kg/vacancy/137861116'),'hh');assert.equal(C.provider('https://evilheadhunter.kg.attacker.invalid/vacancy/1'),'generic');});
 test('query identities are not stripped',()=>assert.notEqual(C.canonicalUrl('https://example.test/jobs?jobId=1'),C.canonicalUrl('https://example.test/jobs?jobId=2')));
 test('tracking canonicalization retains vacancy identity',()=>assert.equal(C.canonicalUrl('https://hh.ru/vacancy/1?utm_source=x&hhtmFrom=z'),C.canonicalUrl('https://hh.ru/vacancy/1')));
 test('same title and company never merge distinct job IDs',()=>assert.equal(C.sameVacancy(V('1'),V('2')),false));

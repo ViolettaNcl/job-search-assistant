@@ -26,7 +26,7 @@ function vjaSiteLabel(el) {
 
 function vjaSiteIsHh() {
   if (window.vjaSiteApply?.isHhUrl) return window.vjaSiteApply.isHhUrl(location.href);
-  return /(^|\.)hh\.ru$/i.test(location.hostname);
+  return /(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(location.hostname);
 }
 
 function vjaSiteApplicationContainer() {
@@ -75,6 +75,25 @@ function vjaHhCoverLetterAction() {
     .filter(vjaSiteVisible)
     .map(el => ({ el, label: vjaSiteText(el).slice(0, 160) }));
   return window.vjaSiteApply?.chooseHhCoverLetterAction?.(candidates) || { found: false, ambiguous: false, count: 0 };
+}
+
+function vjaHhCoverLetterSubmitAction(container = document) {
+  const scope = container && container !== document ? container : document;
+  const candidates = [...scope.querySelectorAll('button, input[type="submit"], input[type="button"], [role="button"]')]
+    .filter(vjaSiteVisible)
+    .map(el => ({ el, label: vjaSiteText(el).slice(0, 160) }));
+  return window.vjaSiteApply?.chooseHhCoverLetterSubmit?.(candidates) || { found: false, ambiguous: false, count: 0 };
+}
+
+async function vjaSiteWaitForHhCoverLetterSubmit(container = document, timeoutMs = 5000) {
+  const started = Date.now();
+  let choice = { found: false, ambiguous: false, count: 0 };
+  while (Date.now() - started < timeoutMs) {
+    choice = vjaHhCoverLetterSubmitAction(container);
+    if (choice.found || choice.ambiguous) return choice;
+    await vjaSiteWait(180);
+  }
+  return choice;
 }
 
 function vjaSiteCoverLetterField(container = document) {
@@ -460,6 +479,36 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
   }
   if (coverLetterRequired && !coverLetterFilled) {
     const result = { submitted: false, status: 'needs-review', reason: 'cover-letter-not-persisted', coverLetterFilled: false };
+    await vjaSiteStoreResult(plan, result);
+    return result;
+  }
+
+  // HH sends the resume first and then opens a dedicated cover-letter modal.
+  // In that state the modal's exact «Отправить» button is the letter-submit action,
+  // not a generic final application button. Handle it explicitly so the flow does
+  // not stop with final-action-not-found after successfully opening the modal.
+  if (vjaSiteIsHh() && coverLetterRequired && startActionSubmitted && coverLetterFilled) {
+    const letterSubmit = await vjaSiteWaitForHhCoverLetterSubmit(scope);
+    if (!letterSubmit.found) {
+      const result = {
+        submitted: false,
+        resumeSubmitted: true,
+        status: 'submitted-needs-letter',
+        reason: letterSubmit.ambiguous ? 'hh-cover-letter-submit-ambiguous' : 'hh-cover-letter-submit-not-found',
+        coverLetterFilled: true,
+        startActionSubmitted: true
+      };
+      await vjaSiteStoreResult(plan, result);
+      return result;
+    }
+    const receiptBeforeLetter = vjaSiteReceipt();
+    letterSubmit.candidate.el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    letterSubmit.candidate.el.click();
+    const letterStepCompleted = await vjaSiteWaitForCoverLetterSubmission(coverField, 8000);
+    const receipt = vjaSiteReceipt();
+    const result = letterStepCompleted
+      ? { submitted: true, status: 'confirmed', receipt, coverLetterFilled: true, resumeSubmitted: true, startActionSubmitted: true, letterStepCompleted: true, resumeLabel: plan.resumeLabel || 'HH account resume' }
+      : { submitted: false, status: 'clicked-unverified', receipt, coverLetterFilled: true, resumeSubmitted: true, startActionSubmitted: true, letterStepCompleted: false, reason: 'Cover-letter Send was clicked, but the modal did not close.' };
     await vjaSiteStoreResult(plan, result);
     return result;
   }

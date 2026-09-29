@@ -15,7 +15,7 @@
   function isHhUrl(value) {
     const parsed = safeUrl(value);
     const host = (parsed?.hostname || "").toLowerCase();
-    return host === "hh.ru" || host.endsWith(".hh.ru");
+    return host === "hh.ru" || host.endsWith(".hh.ru") || host === "headhunter.kg" || host.endsWith(".headhunter.kg");
   }
 
   function sameJobUrl(left, right) {
@@ -171,6 +171,21 @@
     return { found: true, ambiguous: false, count: 1, candidate: matches[0] };
   }
 
+  function chooseHhCoverLetterSubmit(candidates = []) {
+    const matches = candidates
+      .map((item, index) => ({ ...item, index, label: clean(item?.label) }))
+      .filter(item => /^(?:отправить(?:\s+(?:письмо|сопроводительное письмо))?|send(?:\s+(?:cover letter|letter))?)$/i.test(item.label));
+    if (!matches.length) return { found: false, ambiguous: false, count: 0 };
+    if (matches.length > 1) {
+      const labels = matches.map(item => clean(item.label).toLowerCase());
+      if (labels.every(label => label === labels[0])) {
+        return { found: true, ambiguous: false, count: matches.length, candidate: matches[0], equivalentDuplicates: true };
+      }
+      return { found: false, ambiguous: true, count: matches.length };
+    }
+    return { found: true, ambiguous: false, count: 1, candidate: matches[0] };
+  }
+
   function isApplicationContainerText(value, isHh = false) {
     const text = clean(value);
     if (isHh) return /выберите резюме|резюме для отклика|сопроводительное письмо|отправить отклик|откликнуться/i.test(text);
@@ -291,5 +306,5 @@
     return Boolean(input.receiptConfirmed && input.letterStepCompleted);
   }
 
-  return { clean, safeUrl, isHhUrl, sameJobUrl, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, chooseHhCoverLetterAction, isApplicationContainerText, startReceiptDisposition, scoreCoverLetterField, chooseCoverLetterField, chooseHhResumeChoice, unresolvedRequired, unreviewedSensitive, canSubmit, finalSubmissionConfirmed };
+  return { clean, safeUrl, isHhUrl, sameJobUrl, hostFamily, tenantKey, isApplicationLike, titleMatches, canResume, canAcceptReceipt, scoreStartAction, chooseStartAction, chooseHhCoverLetterAction, chooseHhCoverLetterSubmit, isApplicationContainerText, startReceiptDisposition, scoreCoverLetterField, chooseCoverLetterField, chooseHhResumeChoice, unresolvedRequired, unreviewedSensitive, canSubmit, finalSubmissionConfirmed };
 });

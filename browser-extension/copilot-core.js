@@ -5,13 +5,13 @@
   if (root) root.vjaCopilotCore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   'use strict';
-  const VERSION = '3.8.0';
+  const VERSION = '3.9.5';
   function newId(){if(globalThis.crypto?.randomUUID)return globalThis.crypto.randomUUID();const b=new Uint8Array(16);globalThis.crypto.getRandomValues(b);b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;const h=Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');return [h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-');}
   const clean = v => String(v ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
   const clip = (v, n = 12000) => clean(v).slice(0, n);
   const hash = value => { let h = 2166136261; for (const c of String(value)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0).toString(16); };
   const domains = [
-    ['hh', ['hh.ru']], ['linkedin', ['linkedin.com']], ['indeed', ['indeed.com','indeed.co.uk']],
+    ['hh', ['hh.ru','headhunter.kg']], ['linkedin', ['linkedin.com']], ['indeed', ['indeed.com','indeed.co.uk']],
     ['glassdoor', ['glassdoor.com','glassdoor.co.uk']], ['habr', ['career.habr.com']], ['superjob', ['superjob.ru']],
     ['geekjob', ['geekjob.ru']], ['greenhouse', ['greenhouse.io','greenhouse.com']], ['lever', ['lever.co']],
     ['workday', ['myworkdayjobs.com','myworkdaysite.com']], ['smartrecruiters', ['smartrecruiters.com']],
@@ -52,6 +52,11 @@
       if (['lever','ashby','greenhouse'].includes(p)) return `${p}:${u.hostname}:${u.pathname.split('/').filter(Boolean)[0] || ''}`;
       return p === 'hh' ? 'hh' : `${p}:${u.hostname}`;
     } catch { return p; }
+  }
+  function suspiciousVacancyTitle(value = '') {
+    const t = clean(value);
+    if (!t || t.length < 3) return true;
+    return /^(?:найдено\s+[\d\s.,]+\s+ваканс(?:ий|ии|ия)|вакансии|поиск\s+вакансий|результаты\s+поиска|jobs?|job\s+search|search\s+jobs?)(?:\s|$)/i.test(t);
   }
   function vacancy(v = {}) {
     const url = canonicalUrl(v.url || v.vacancyUrl || v.sourceUrl || '');
@@ -289,5 +294,5 @@
     if(highRisk(draft) && /(?:согласна|подтверждаю|принимаю|i accept|i agree|i confirm|authorized to work)/i.test(draft))return {ok:false,reason:'personal-commitment'};
     return {ok:true,text:draft,needsReview:true};
   }
-  return {VERSION,newId,clean,clip,hash,provider,domains,canonicalUrl,idFromUrl,tenant,vacancy,vacancyKey,sameVacancy,identity,contextKey,sameContext,conversationKey,roles,labels,classifyRole,language,profile,confirmed,roleProfile,cvSelection,cvKey,cvValid,highRisk,fieldDecision,safeNavigation,safeApplyLink,application,resolveConversation,stage,threadMemory,isItVacancy,coverLetter,guardDraft};
+  return {VERSION,newId,clean,clip,hash,provider,domains,canonicalUrl,idFromUrl,tenant,suspiciousVacancyTitle,vacancy,vacancyKey,sameVacancy,identity,contextKey,sameContext,conversationKey,roles,labels,classifyRole,language,profile,confirmed,roleProfile,cvSelection,cvKey,cvValid,highRisk,fieldDecision,safeNavigation,safeApplyLink,application,resolveConversation,stage,threadMemory,isItVacancy,coverLetter,guardDraft};
 });

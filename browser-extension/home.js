@@ -2,10 +2,14 @@
 const homeNode=id=>document.getElementById(id);
 const homeRequest=(op,args={})=>chrome.runtime.sendMessage({type:'vjaCopilot',op,...args});
 let homeTab=null,homePage='UNKNOWN';
+function homePermissionOrigins(url){
+ const u=new URL(url);if(/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(u.hostname))return u.hostname.endsWith('headhunter.kg')?['https://headhunter.kg/*','https://*.headhunter.kg/*']:['https://hh.ru/*','https://*.hh.ru/*'];
+ return [u.origin+'/*'];
+}
 let homeAutopilotStatus=null,homeAutopilotBusy=false;
 const homeAutopilotDefaults={programmingOnly:true,remoteOnly:true,sessionLimit:5,searchQueries:['Junior C# .NET','Junior ASP.NET Core','Junior Backend C#','Junior Full-Stack .NET','Junior QA Automation C#','Junior Manual QA','Technical Support remote']};
 async function homeApiBase(){const x=await chrome.storage.sync.get({apiBase:'http://127.0.0.1:8080'});return String(x.apiBase||'http://127.0.0.1:8080').replace(/\/$/,'');}
-async function homeJson(url,options={}){const c=new AbortController(),timer=setTimeout(()=>c.abort(),8000);try{const r=await fetch(url,{...options,signal:c.signal});const text=await r.text();let data=null;try{data=text?JSON.parse(text):null;}catch{data=text;}if(!r.ok)throw new Error(typeof data==='string'?data:(data?.message||`HTTP ${r.status}`));return data;}catch(e){if(c.signal.aborted)throw new Error('Локальная программа не ответила. Запустите start-assistant.cmd.');throw e;}finally{clearTimeout(timer);}}
+async function homeJson(url,options={}){const c=new AbortController(),timer=setTimeout(()=>c.abort(),8000);try{const r=await fetch(url,{...options,signal:c.signal});const text=await r.text();let data=null;try{data=text?JSON.parse(text):null;}catch{data=text;}if(!r.ok)throw new Error(typeof data==='string'?data:(data?.message||`HTTP ${r.status}`));return data;}catch(e){if(c.signal.aborted)throw new Error('Расширенный автопилот сейчас без локального сервиса. ✦ Apply и ✎ AI продолжают работать автономно.');throw e;}finally{clearTimeout(timer);}}
 async function homeAutopilotPrefs(){const s=await chrome.storage.sync.get(['vjaAutopilotPreferences','vjaHhBrowserSearch']);return {...homeAutopilotDefaults,...(s.vjaAutopilotPreferences||{}),browserSearch:s.vjaHhBrowserSearch!==false};}
 async function homeAutopilotSession(){try{if(chrome.storage.session?.get){const x=await chrome.storage.session.get('vjaAutopilotSession');return x.vjaAutopilotSession||{count:0};}}catch{}return {count:0};}
 function renderHomeAutopilot(status,prefs,session){
@@ -18,7 +22,7 @@ function renderHomeAutopilot(status,prefs,session){
  stats.hidden=false;stats.textContent=`Порог ${score}/100 · сессия ${sessionCount}/${sessionLimit} · сегодня ${today}/${daily}`;
  button.disabled=homeAutopilotBusy||(!active&&status?.allowed===false);
 }
-async function refreshHomeAutopilot(){if(homeAutopilotBusy)return;try{const [prefs,session,api]=await Promise.all([homeAutopilotPrefs(),homeAutopilotSession(),homeApiBase()]);const status=await homeJson(`${api}/api/automation/status`);homeAutopilotStatus=status;renderHomeAutopilot(status,prefs,session);}catch(e){homeAutopilotStatus=null;const b=homeNode('rocketAutopilotHome'),state=homeNode('autopilotState');b.disabled=false;b.textContent='🚀 Запустить автопилот';b.classList.remove('running');state.textContent='нет связи';state.className='autopilotState error';homeNode('autopilotHomeStatus').textContent=e.message;homeNode('autopilotHomeStats').hidden=true;}}
+async function refreshHomeAutopilot(){if(homeAutopilotBusy)return;try{const [prefs,session,api]=await Promise.all([homeAutopilotPrefs(),homeAutopilotSession(),homeApiBase()]);const status=await homeJson(`${api}/api/automation/status`);homeAutopilotStatus=status;renderHomeAutopilot(status,prefs,session);}catch(e){homeAutopilotStatus=null;const b=homeNode('rocketAutopilotHome'),state=homeNode('autopilotState');b.disabled=true;b.textContent='🚀 Автопилот · расширенный режим';b.classList.remove('running');state.textContent='опционально';state.className='autopilotState off';homeNode('autopilotHomeStatus').textContent='✦ Apply и ✎ AI работают без терминала. Для фонового 🚀 Автопилота нужен локальный сервис.';homeNode('autopilotHomeStats').hidden=true;}}
 async function toggleHomeAutopilot(){if(homeAutopilotBusy)return;homeAutopilotBusy=true;homeNode('rocketAutopilotHome').disabled=true;try{
  const api=await homeApiBase(),prefs=await homeAutopilotPrefs();let current=homeAutopilotStatus; if(!current)current=await homeJson(`${api}/api/automation/status`);const enabling=!current.autoApplyEnabled;
  if(enabling){const score=Number(current.autoApplyMinimumScore??80),daily=Number(current.dailyAutoApplyLimit??15);if(!confirm(`Запустить AI-автопилот?\n\nОн сам найдёт подходящие удалённые IT-вакансии, проверит соответствие вашему уровню/CV и будет отправлять отклики с коротким сопроводительным письмом.\n\nПорог: ${score}/100\nЛимит: ${daily} в день · ${prefs.sessionLimit} за эту сессию\n\nНепонятные обязательные поля будут оставлены на проверку.`))return;
@@ -33,8 +37,9 @@ async function inspectHome(){
   [homeTab]=await chrome.tabs.query({active:true,currentWindow:true});
   if(!homeTab?.id||!/^https?:\/\//.test(homeTab.url||''))throw new Error('Откройте вакансию, форму или переписку с работодателем.');
   homeNode('page').textContent=new URL(homeTab.url).hostname;
-  const granted=await chrome.permissions.contains({origins:[new URL(homeTab.url).origin+'/*']});
-  if(!granted){homeNode('enable').hidden=false;homeNode('status').textContent='Разрешите доступ только к этому сайту. Другие вкладки не читаются.';return;}
+  const permissionOrigins=homePermissionOrigins(homeTab.url);
+  const granted=await chrome.permissions.contains({origins:permissionOrigins});
+  if(!granted){homeNode('enable').hidden=false;homeNode('status').textContent=/(?:hh\.ru|headhunter\.kg)$/i.test(new URL(homeTab.url).hostname)?'Chrome отключил постоянный доступ к HeadHunter. Нажмите «Разрешить» один раз — после этого ✦ Apply и ✎ AI будут появляться автоматически на всех HH-вкладках.':'Разрешите доступ к этому сайту один раз.';return;}
   const injected=await homeRequest('inject',{tabId:homeTab.id});if(!injected?.ok)throw new Error(injected?.error||'Обновите вкладку и повторите.');
   const r=await chrome.tabs.sendMessage(homeTab.id,{type:'vjaCopilotPage',action:'inspect'},{frameId:0});homePage=r?.pageType||'UNKNOWN';
   const names={RECRUITER_CHAT:'Переписка с работодателем',JOB_DESCRIPTION:'Вакансия',APPLICATION_FORM:'Форма отклика',JOB_LIST:'Список вакансий',UNKNOWN:'Вакансия или форма пока не найдена',COMPANY_PAGE:'Страница компании',INTERVIEW_PAGE:'Страница собеседования'};
@@ -47,8 +52,8 @@ async function inspectHome(){
 homeNode('enable').addEventListener('click',async()=>{
  try{
   // Must happen directly within this explicit click to retain browser user activation.
-  const origin=new URL(homeTab.url).origin;
-  if(!await chrome.permissions.request({origins:[origin+'/*']})){homeNode('status').textContent='Доступ не выдан. На сайте ничего не изменено.';return;}
+  const origin=new URL(homeTab.url).origin,origins=homePermissionOrigins(homeTab.url);
+  if(!await chrome.permissions.request({origins})){homeNode('status').textContent='Доступ не выдан. Для постоянных ✦ Apply / ✎ AI включите доступ к HH.ru в настройках расширения.';return;}
   const r=await homeRequest('register-origin',{origin});if(!r.ok)throw new Error(r.error);await inspectHome();
  }catch(e){homeNode('status').textContent=e.message;}
 });

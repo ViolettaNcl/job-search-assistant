@@ -63,7 +63,9 @@ function cpAssertEmbeddedVacancy(sender,vInput={}){
   const pageProvider=cpCore.provider(page.href),targetProvider=cpCore.provider(target.href);
   if(pageProvider!==targetProvider)throw new Error('Вакансия относится к другому сайту.');
   if(pageProvider==='hh'){
-    if(!/(^|\.)hh\.ru$/i.test(page.hostname)||!/(^|\.)hh\.ru$/i.test(target.hostname)||!v.vacancyId)throw new Error('Не удалось подтвердить HH-вакансию из списка.');
+    const hhHost=h=>/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(h);
+    if(!hhHost(page.hostname)||!hhHost(target.hostname)||!v.vacancyId)throw new Error('Не удалось подтвердить HeadHunter-вакансию из списка.');
+    if(cpCore.suspiciousVacancyTitle?.(v.title))throw new Error('Выбранная карточка не содержит название конкретной вакансии.');
     return;
   }
   if(page.origin!==target.origin)throw new Error('Вакансия относится к другой странице.');
@@ -121,18 +123,23 @@ async function cpUpdateReminderBadge(){
   await chrome.action.setTitle?.({title:count?`Violetta Apply Assistant · ${count} действий требуют внимания`:'Violetta Apply Assistant'});
   return count;
 }
+function cpNeedsHhLetter(job){
+  if(!job)return false;const app=cpCore.application(job),memory=job.context?.coverLetterMemory||{},site=job.result?.result||{};
+  const applied=['Applied','Viewed','Recruiter Replied','HR Interview','Technical Interview','Test Assignment','Offer','Rejected','Closed'].includes(app.status)||Boolean(job.completed||site.submitted);
+  return applied&&app.vacancy?.provider==='hh'&&!memory.submittedAt&&!site.coverLetterFilled;
+}
 async function cpPrepare(vInput,sender,legacyPlan=null,options={}){
   if(options.embedded)cpAssertEmbeddedVacancy(sender,vInput);else cpAssertPage(sender,vInput.url);
   const v=options.safePreparation?cpCore.vacancy(vInput):await cpCompleteVacancy(vInput,sender,{embedded:Boolean(options.embedded)});if(!v.title||!cpCore.vacancyKey(v))throw new Error('Не удалось однозначно определить вакансию.');
   const previousJob=(await applicationJobs()).find(j=>cpCore.sameVacancy(cpCore.application(j).vacancy,v));
-  if(previousJob&&['Applied','Viewed','Recruiter Replied','HR Interview','Technical Interview','Test Assignment','Offer','Rejected','Closed'].includes(cpCore.application(previousJob).status))return {duplicate:true,application:cpCore.application(previousJob)};
+  if(previousJob&&['Applied','Viewed','Recruiter Replied','HR Interview','Technical Interview','Test Assignment','Offer','Rejected','Closed'].includes(cpCore.application(previousJob).status)&&!cpNeedsHhLetter(previousJob))return {duplicate:true,application:cpCore.application(previousJob)};
   const data=await cpData(), role=cpCore.classifyRole(v.title,v.description),lang=cpCore.language(v.title+' '+v.description);
   const writing=await cpCreateLetter(data.profile,v);
   let record;
   await applicationStateChange(async()=>{
     const jobs=await applicationJobs();
     let job=jobs.find(j=>cpCore.sameVacancy(cpCore.application(j).vacancy,v));
-    if(job && ['Applied','Viewed','Recruiter Replied','HR Interview','Technical Interview','Test Assignment','Offer','Rejected','Closed'].includes(cpCore.application(job).status)) {record={duplicate:true,application:cpCore.application(job)};return;}
+    if(job && ['Applied','Viewed','Recruiter Replied','HR Interview','Technical Interview','Test Assignment','Offer','Rejected','Closed'].includes(cpCore.application(job).status)&&!cpNeedsHhLetter(job)) {record={duplicate:true,application:cpCore.application(job)};return;}
     const p=data.profile;
     const cvKeys=['cvVaultRu','cvVaultEn'];
     const stored=await chrome.storage.local.get(cvKeys);
@@ -163,6 +170,8 @@ async function cpAutoApply(vInput,sender){
   if(!String(prepared.coverLetter||'').trim())throw new Error('Не удалось создать сопроводительное письмо.');
   const id=prepared.application.id;
   let job=await applicationJob(id);if(!job)throw new Error('Отклик не найден после подготовки.');
+  const letterContinuation=cpNeedsHhLetter(job);
+  if(letterContinuation){job=await updateApplicationJob(id,{completed:false,review:false,result:null,reason:null,dispatched:false})||job;}
   const oldResult=job.result?.result;
   if(oldResult?.reason==='user-submit-required'&&!job.dispatched){
     job=await updateApplicationJob(id,{review:false,result:null,reason:null});
@@ -219,8 +228,9 @@ async function cpRememberPrepared(message,sender){
 }
 async function cpReadVacancy(url,sender){
   const canonical=cpCore.canonicalUrl(url);if(!canonical)throw new Error('Некорректная ссылка на вакансию.');
+  const expectedId=cpCore.idFromUrl(canonical), expectedProvider=cpCore.provider(canonical);
   const key='vjaVacancyCache:'+cpCore.hash(canonical);const cached=(await chrome.storage.local.get(key))[key];
-  if(cached?.vacancy && ['full-dom','full-structured','full-fetch'].includes(cached.vacancy.descriptionCoverage) && cpCore.canonicalUrl(cached.vacancy.url)===canonical && Date.now()-cached.at<15*60*1000)return cached.vacancy;
+  if(cached?.vacancy && ['full-dom','full-structured','full-fetch'].includes(cached.vacancy.descriptionCoverage) && cpCore.canonicalUrl(cached.vacancy.url)===canonical && (!expectedId||cached.vacancy.vacancyId===expectedId) && !cpCore.suspiciousVacancyTitle?.(cached.vacancy.title) && Date.now()-cached.at<15*60*1000)return cached.vacancy;
   const u=new URL(canonical), source=new URL(sender.url);
   // No access to arbitrary private-network endpoints on behalf of a web page.
   if(u.origin!==source.origin && /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[)/i.test(u.hostname))throw new Error('Небезопасный адрес вакансии.');
@@ -228,14 +238,28 @@ async function cpReadVacancy(url,sender){
   let tab;
   try{
     tab=await chrome.tabs.create({url:canonical,active:false});
-    await browserAutopilotWaitForTab(tab.id,10000);
+    let loaded=null;
+    for(let attempt=0;attempt<2;attempt++){
+      loaded=await browserAutopilotWaitForTab(tab.id,12000);
+      const loadedUrl=cpCore.canonicalUrl(loaded?.url||'');
+      const loadedId=cpCore.idFromUrl(loadedUrl),loadedProvider=cpCore.provider(loadedUrl);
+      if(loadedProvider===expectedProvider&&(!expectedId||loadedId===expectedId))break;
+      if(attempt===0){await chrome.tabs.update(tab.id,{url:canonical});await browserAutopilotWait(450);continue;}
+      throw new Error('HeadHunter открыл не выбранную вакансию. Письмо не создано.');
+    }
     await cpInject(tab.id);
-    const result=await browserAutopilotWithTimeout(chrome.tabs.sendMessage(tab.id,{type:'vjaCopilotPage',action:'vacancy'},{frameId:0}),6000,'Не удалось прочитать вакансию.');
-    if(!result?.vacancy?.description)throw new Error('Сайт не предоставил текст вакансии.');
-    const v=cpCore.vacancy(result.vacancy);
-    if(!v.descriptionCoverage)v.descriptionCoverage='full-dom';
-    if(v.provider!==cpCore.provider(canonical)||cpCore.idFromUrl(canonical)&&v.vacancyId!==cpCore.idFromUrl(canonical))throw new Error('Ссылка открыла другую вакансию.');
-    await chrome.storage.local.set({[key]:{vacancy:v,at:Date.now()}});return v;
+    let result=null;
+    for(let attempt=0;attempt<3;attempt++){
+      result=await browserAutopilotWithTimeout(chrome.tabs.sendMessage(tab.id,{type:'vjaCopilotPage',action:'vacancy',expectedVacancyId:expectedId},{frameId:0}),7000,'Не удалось прочитать вакансию.');
+      const raw=result?.vacancy||{},v=cpCore.vacancy(raw);
+      if(v.description&&(!expectedId||v.vacancyId===expectedId)&&v.provider===expectedProvider&&!cpCore.suspiciousVacancyTitle?.(v.title)){
+        if(!v.descriptionCoverage)v.descriptionCoverage='full-dom';
+        await chrome.storage.local.set({[key]:{vacancy:v,at:Date.now()}});return v;
+      }
+      await browserAutopilotWait(450);
+    }
+    if(cpCore.suspiciousVacancyTitle?.(result?.vacancy?.title))throw new Error('Вместо выбранной вакансии HeadHunter вернул заголовок страницы поиска. Письмо не отправлено.');
+    throw new Error('Не удалось подтвердить полное описание именно выбранной вакансии.');
   }finally{if(tab?.id)await chrome.tabs.remove(tab.id).catch(()=>{});}
 }
 async function cpResolve(snapshot,sender){
@@ -309,16 +333,47 @@ async function cpInject(tabId){
   // allFrames batch and redeclare legacy globals in an already loaded frame.
   await chrome.scripting.executeScript({target:{tabId,frameIds:[0]},files:script.js});
 }
+async function cpRepairSupportedTabs(){
+  if(!chrome.tabs?.query||!chrome.scripting?.executeScript)return;
+  let tabs=[];
+  try{tabs=await chrome.tabs.query({url:['https://hh.ru/*','https://*.hh.ru/*','https://headhunter.kg/*','https://*.headhunter.kg/*']});}catch{return;}
+  for(const tab of tabs){
+    if(!tab?.id)continue;
+    try{await cpInject(tab.id);}catch{/* Chrome site access may still be set to On click. */}
+  }
+}
+async function cpRepairHhTab(tabId,url,delays=[80,500,1400]){
+  try{const u=new URL(url||'');if(!/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(u.hostname))return;}catch{return;}
+  for(const delay of delays)setTimeout(()=>void cpInject(tabId).catch(()=>{}),delay);
+}
 async function cpRegisterOrigin(origin){
   const pattern=new URL(origin).origin+'/*';
   if(!await chrome.permissions.contains({origins:[pattern]}))throw new Error('Разрешение на сайт не выдано.');
   const scripts=chrome.runtime.getManifest().content_scripts.find(s=>s.js.includes('copilot-core.js')).js;
-  if(['hh.ru','www.hh.ru'].includes(new URL(origin).hostname)||new URL(origin).hostname.endsWith('.hh.ru'))return {ok:true};
+  if(/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(new URL(origin).hostname))return {ok:true};
   const id='vja-site-'+cpCore.hash(pattern);
   const existing=await chrome.scripting.getRegisteredContentScripts({ids:[id]});
   if(!existing.length)await chrome.scripting.registerContentScripts([{id,matches:[pattern],js:scripts,allFrames:true,runAt:'document_idle',persistAcrossSessions:true}]);
   return {ok:true};
 }
+chrome.runtime.onInstalled.addListener(()=>setTimeout(()=>void cpRepairSupportedTabs(),250));
+chrome.runtime.onStartup.addListener(()=>setTimeout(()=>void cpRepairSupportedTabs(),250));
+chrome.tabs?.onUpdated?.addListener((tabId,change,tab)=>{
+  if(!change.url&&change.status!=='loading'&&change.status!=='complete')return;
+  void cpRepairHhTab(tabId,change.url||tab?.url||'');
+});
+chrome.tabs?.onActivated?.addListener(async info=>{
+  try{const tab=await chrome.tabs.get(info.tabId);void cpRepairHhTab(info.tabId,tab?.url||'', [20,350]);}catch{}
+});
+// HH is a SPA: vacancy transitions can use history.pushState without a traditional
+// page load. Repair the top-frame surfaces on those navigation events as well.
+const cpHhNavigationFilter={url:[{schemes:['https'],hostSuffix:'hh.ru'},{schemes:['https'],hostSuffix:'headhunter.kg'}]};
+chrome.webNavigation?.onHistoryStateUpdated?.addListener(details=>{
+  if(details.frameId===0)void cpRepairHhTab(details.tabId,details.url,[0,120,500]);
+},cpHhNavigationFilter);
+chrome.webNavigation?.onCommitted?.addListener(details=>{
+  if(details.frameId===0)void cpRepairHhTab(details.tabId,details.url,[40,450,1200]);
+},cpHhNavigationFilter);
 chrome.commands?.onCommand.addListener(async(command,tab)=>{
   try{
     if(!tab?.id)[tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab?.id)return;
@@ -326,9 +381,10 @@ chrome.commands?.onCommand.addListener(async(command,tab)=>{
     await chrome.tabs.sendMessage(tab.id,{type:'vjaCopilotPage',action:'command',command},{frameId:focus?.frameId||0});
   }catch{/* On ungranted sites the toolbar explains how to grant this site only. */}
 });
-chrome.permissions?.onRemoved.addListener(async()=>{
+chrome.permissions?.onRemoved?.addListener(async()=>{
   try{for(const script of await chrome.scripting.getRegisteredContentScripts())if(script.id.startsWith('vja-site-')&&!await chrome.permissions.contains({origins:script.matches}))await chrome.scripting.unregisterContentScripts({ids:[script.id]});}catch{}
 });
+chrome.permissions?.onAdded?.addListener(()=>setTimeout(()=>void cpRepairSupportedTabs(),80));
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(message?.type!=='vjaCopilot')return false;
   (async()=>{

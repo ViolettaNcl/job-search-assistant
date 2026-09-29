@@ -6,6 +6,15 @@
   const documentId=C.newId();let bar=null,panel=null,toast=null,working=false,prepared=null,scanTimer=null,lastPage='',generation=0,applyState='IDLE',applyMeta=null;
   const request=(op,args={})=>chrome.runtime.sendMessage({type:'vjaCopilot',op,...args});
   const current=()=>A.make(document,location.href);
+  function effectivePageType(adapter=current()){
+    const type=adapter.detectPageType();
+    if(type!=='UNKNOWN')return type;
+    try{
+      const u=new URL(location.href);
+      if(/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(u.hostname)&&/\/vacancy\/\d+/i.test(u.pathname))return 'JOB_DESCRIPTION';
+    }catch{}
+    return type;
+  }
   const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   function context(){return location.href+'|'+C.vacancyKey(current().extractVacancy());}
   function alive(key,epoch){return epoch===generation&&key===context();}
@@ -70,8 +79,12 @@
     working=true;const key=context(),epoch=++generation;const p=show(),status=p.status('Читаю вакансию…');
     try{
       const adapter=current();if(adapter.detectPageType()==='RECRUITER_CHAT')throw new Error('Для переписки используйте ✎ AI.');
+      const pinned=root.vjaHhListQuickApplyRuntime?.selectedVacancy?.()||null;
       const resumed=await request('pending',{url:location.href});
-      const data=resumed.pending||await request('prepare',{vacancy:adapter.extractVacancy(),legacyPlan});
+      // If Fill is pressed inside an HH list/application modal, keep the exact
+      // vacancy card selected by the user. Never derive a cover letter from the
+      // search-results page heading/body.
+      const data=resumed.pending||(pinned?await request('quick-list-prepare',{vacancy:pinned}):await request('prepare',{vacancy:adapter.extractVacancy(),legacyPlan}));
       if(!alive(key,epoch))return {submitted:false,status:'needs-review',reason:'stale-context'};
       if(data.ok===false)throw new Error(data.error);
       if(data.duplicate){status.textContent='На эту вакансию уже есть отклик. Повторная отправка не выполняется.';return {submitted:false,status:'needs-review',reason:'already-applied'};}
@@ -97,7 +110,7 @@
   }
   async function autoApply(){
     if(working)return {submitted:false,status:'busy',reason:'application-in-progress'};
-    const a=current();if(a.detectPageType()==='RECRUITER_CHAT')return {submitted:false,status:'wrong-page'};
+    const a=current();if(effectivePageType(a)==='RECRUITER_CHAT')return {submitted:false,status:'wrong-page'};
     const vacancy=a.extractVacancy();if(!vacancy?.title){setApplyState('FAILED','Не удалось прочитать текущую вакансию.','bad');return {submitted:false,status:'failed'};}
     working=true;setApplyState('ANALYZING','Анализирую вакансию…');
     try{
@@ -123,18 +136,18 @@
     }finally{working=false;renderBar();}
   }
   async function refreshVacancyStatus(){
-    const a=current();if(a.detectPageType()!=='JOB_DESCRIPTION')return;
+    const a=current();if(effectivePageType(a)!=='JOB_DESCRIPTION')return;
     try{const vacancy=a.extractVacancy();if(!vacancy?.title)return;const r=await request('vacancy-status',{vacancy});if(!r?.ok)return;if(r.applied){applyMeta=r.application;applyState='DUPLICATE';}else if(!working&&['DUPLICATE','CONFIRMED'].includes(applyState)){applyState='IDLE';}renderBar();}catch{}
   }
   function renderBar(){
-    const adapter=current(),type=adapter.detectPageType();bar?.remove();bar=null;
+    const adapter=current(),type=effectivePageType(adapter);bar?.remove();bar=null;
     if(type==='RECRUITER_CHAT'||!['JOB_DESCRIPTION','APPLICATION_FORM'].includes(type))return;
     if(type==='APPLICATION_FORM')bar=U.bar([{label:'✦ Fill',primary:true,onClick:()=>void prepare({open:true})},{label:'⋯',onClick:()=>void request('open-options')}]);
     else bar=U.bar([{label:applyLabel(),primary:true,onClick:()=>void autoApply()},{label:'⋯',onClick:()=>void request('open-options')}]);
     toast?.place?.();
   }
   function scan(){
-    const adapter=current(),type=adapter.detectPageType(),signature=type+'|'+location.href;
+    const adapter=current(),type=effectivePageType(adapter),signature=type+'|'+location.href;
     if(signature===lastPage&&bar?.host?.isConnected){bar.place();toast?.place?.();return;}
     lastPage=signature;
     if(type!=='JOB_DESCRIPTION'&&!working){applyState='IDLE';applyMeta=null;}
@@ -151,12 +164,16 @@
   chrome.runtime.onMessage.addListener((m,_s,respond)=>{
     if(m?.type!=='vjaCopilotPage')return false;
     if(m.action==='ping'){respond({ok:true});return false;}
-    if(m.action==='vacancy'){respond({ok:true,vacancy:current().extractVacancy()});return false;}
+    if(m.action==='vacancy'){const v=current().extractVacancy();if(m.expectedVacancyId&&String(v?.vacancyId||'')!==String(m.expectedVacancyId)){respond({ok:false,error:'wrong-vacancy',vacancy:null});return false;}respond({ok:true,vacancy:v});return false;}
     if(m.action==='inspect'){respond({ok:true,pageType:current().detectPageType(),provider:current().provider});return false;}
     if(m.action==='prepare'){prepare().then(respond);return true;}
     if(m.action==='auto-apply'){void autoApply();respond({ok:true,started:true});return false;}
     return false;
   });
+  // HH and other SPA pages can change route/content without popstate. This small
+  // watchdog only re-runs cheap detection and keeps ✦ Apply visible after navigation.
+  const visibilityWatch=setInterval(()=>{if(document.visibilityState!=='hidden')scan();},1200);
+  addEventListener('pagehide',()=>clearInterval(visibilityWatch),{once:true});
   root.vjaUniversal={prepare,autoApply,scan,refreshVacancyStatus,documentId,get prepared(){return prepared;},get applyState(){return applyState;}};
   scan();
   // Continue only a explicitly persisted application/form URL in this tab.

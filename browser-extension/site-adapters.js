@@ -57,7 +57,21 @@
     const provider=C.provider(url), cfg=profiles[provider]||profiles.generic;
     function extractVacancy(scope=doc){
       const j=scope===doc?structured(doc):null;
-      const v={provider,url,title:j?.title||first([...(cfg.title||[]),...generic.title],scope),company:(typeof j?.hiringOrganization==='string'?j.hiringOrganization:j?.hiringOrganization?.name)||first([...(cfg.company||[]),...generic.company],scope),description:j?.description?root.vjaAtsStructured.htmlToText(j.description):first([...(cfg.description||[]),...generic.description],scope),vacancyId:String(j?.identifier?.value||attr(scope,['data-vacancy-id','data-job-id','data-requisition-id'])||C.idFromUrl(url)),location:j?.jobLocation?.address?.addressLocality||first(['[data-qa="vacancy-view-location"]','[class="location"]'],scope),experience:j?.experienceRequirements||'',employmentType:j?.employmentType||'',salary:j?.baseSalary||null,remote:/TELECOMMUTE/i.test(j?.jobLocationType||''),requirements:j?.qualifications||j?.skills||'',descriptionCoverage:scope===doc?(j?'full-structured':'full-dom'):'partial'};
+      let title=j?.title||first(cfg.title||[],scope)||first(generic.title,scope);
+      // Search pages can contain an H1 such as “Найдено 19 718 вакансий”.
+      // That is never a vacancy title. On direct HH vacancy pages prefer a
+      // non-search H1 or document.title only after validating the vacancy URL.
+      if(provider==='hh'&&C.suspiciousVacancyTitle?.(title)){
+        const direct=/\/vacancy\/\d+/i.test(new URL(url).pathname);
+        if(direct){
+          title=all('h1',scope).filter(visible).map(el=>text(el,500)).find(x=>!C.suspiciousVacancyTitle?.(x))||'';
+          if(!title&&scope===doc){
+            const dt=String(doc.title||'').replace(/\s*[|—-]\s*(?:hh\.ru|HeadHunter).*$/i,'').replace(/^Вакансия\s+/i,'').trim();
+            if(!C.suspiciousVacancyTitle?.(dt))title=dt;
+          }
+        }else title='';
+      }
+      const v={provider,url,title,company:(typeof j?.hiringOrganization==='string'?j.hiringOrganization:j?.hiringOrganization?.name)||first([...(cfg.company||[]),...generic.company],scope),description:j?.description?root.vjaAtsStructured.htmlToText(j.description):first([...(cfg.description||[]),...generic.description],scope),vacancyId:String(j?.identifier?.value||attr(scope,['data-vacancy-id','data-job-id','data-requisition-id'])||C.idFromUrl(url)),location:j?.jobLocation?.address?.addressLocality||first(['[data-qa="vacancy-view-location"]','[class="location"]'],scope),experience:j?.experienceRequirements||'',employmentType:j?.employmentType||'',salary:j?.baseSalary||null,remote:/TELECOMMUTE/i.test(j?.jobLocationType||''),requirements:j?.qualifications||j?.skills||'',descriptionCoverage:scope===doc?(j?'full-structured':'full-dom'):'partial'};
       return C.vacancy(v);
     }
     function getReplyInput(){
@@ -82,7 +96,7 @@
         if(node.matches('main,[data-conversation-id],[data-thread-id],[data-chat-id]'))return node;
       }
       const roots=all('[role="log"],[data-conversation-id],[data-thread-id]',doc).filter(visible);
-      return roots.length===1?roots[0]:input.closest('main')||null;
+      return roots.length===1?roots[0]:input.closest('main')||doc.querySelector('main')||doc.body||null;
     }
     function fallbackMessageBlocks(scope,input=getReplyInput()){
       if(!scope||!input)return [];
@@ -165,17 +179,36 @@
       return {detected:true,provider,url,conversationId,identityConfidence:weak?'weak':'direct',applicationId:attr(scope,['data-application-id','data-response-id']),vacancyId,vacancyUrl:ref?.url||'',vacancy:ref?C.vacancy({...ref,provider,vacancyId,company}):null,messages,latestInbound,recruiterName,company,hasComposer:true,historyPartial:true,unknownSender:!employerMessage};
     }
     function detectApplicationForm(){
-      const candidates=all('form,[role="dialog"],[data-application-form]',doc).filter(visible).filter(el=>formFields(el).length>=1&&(/apply|application|resume|résumé|cv|candidate|отклик|резюме|анкет|кандидат/i.test(text(el,1500)+' '+el.id+' '+(el.getAttribute('action')||'')+' '+url)||Boolean(el.querySelector('[name="email"]')&&el.querySelector('input[type="file"]'))));
+      const candidates=all('form,[role="dialog"],[data-application-form]',doc).filter(visible).filter(el=>{
+        const fields=formFields(el);if(fields.length<1)return false;
+        // IMPORTANT: classify the form by its own semantics, never by the page URL.
+        // HH vacancy pages contain search/filter forms; the old URL-based check made
+        // every form on /vacancy/<id> look like an application form and hid ✦ Apply.
+        const own=(text(el,2200)+' '+(el.id||'')+' '+(el.getAttribute('action')||'')+' '+(el.getAttribute('aria-label')||'')).trim();
+        const semantic=/apply|application|resume|résumé|cv|candidate|cover.?letter|отклик|резюме|сопровод|анкет|кандидат/i.test(own);
+        const strong=Boolean(el.querySelector('input[type="file"],textarea[name*="cover" i],[data-qa*="vacancy-response" i],[data-qa*="resume" i]'))||Boolean(el.querySelector('[name="email"]')&&el.querySelector('input[type="file"]'));
+        const hhDialog=provider==='hh'&&el.matches('[role="dialog"]')&&/отклик|резюме|сопровод|ваканси/i.test(own);
+        return semantic||strong||hhDialog;
+      });
       return candidates.filter(el=>!candidates.some(other=>other!==el&&el.contains(other)))[0]||null;
     }
     function detectPageType(){
+      const parsed=new URL(url),path=parsed.pathname;
       if(conversation().detected)return 'RECRUITER_CHAT';
+      // HH recruiter pages sometimes drop stable message wrappers during SPA updates.
+      // Keep the pencil available as long as the active page is clearly a negotiation/chat
+      // and a reply composer is present.
+      if(provider==='hh'&&/(?:\/applicant\/negotiations|\/negotiations|\/chat|\/messages)/i.test(path)&&getReplyInput())return 'RECRUITER_CHAT';
       if(detectApplicationForm())return 'APPLICATION_FORM';
       const v=extractVacancy();
+      // A direct HH vacancy URL is authoritative enough to keep the launcher visible
+      // even while description blocks are still loading.
+      if(provider==='hh'&&/\/vacancy\/\d+/i.test(path))return 'JOB_DESCRIPTION';
       if(v.title&&(structured(doc)||v.description&&(/vacancy|job|career|position|requisition/i.test(url)||cfg.description?.length)))return 'JOB_DESCRIPTION';
-      if(/(?:jobs|vacancies|search)/i.test(new URL(url).pathname)&&all('a[href*="/vacancy/"],a[href*="/jobs/"]',doc).length>2)return 'JOB_LIST';
-      if(/interview|собеседование/i.test(new URL(url).pathname))return 'INTERVIEW_PAGE';
-      if(/compan(?:y|ies)|about/i.test(new URL(url).pathname))return 'COMPANY_PAGE';
+      if(v.title&&/vacancy|job|career|position|requisition/i.test(url))return 'JOB_DESCRIPTION';
+      if(/(?:jobs|vacancies|search)/i.test(path)&&all('a[href*="/vacancy/"],a[href*="/jobs/"]',doc).length>2)return 'JOB_LIST';
+      if(/interview|собеседование/i.test(path))return 'INTERVIEW_PAGE';
+      if(/compan(?:y|ies)|about/i.test(path))return 'COMPANY_PAGE';
       return 'UNKNOWN';
     }
     function detectApplyButton(){

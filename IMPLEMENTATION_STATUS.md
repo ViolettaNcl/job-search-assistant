@@ -1,4 +1,4 @@
-# Статус 3.8.0
+# Статус 3.9.5
 
 | Пункт стратегии | Реализация |
 |---|---|
@@ -18,6 +18,15 @@
 | Reply verification | Пропуски вынесены отдельно; проверяются evidence IDs, язык, вопросы, длина и ряд ложных утверждений. Проверка не является формальным доказательством. |
 | Memory separation | Переписка/черновики не обновляют глобальные личные факты автоматически. |
 | Свободная AI-генерация | Реальный необязательный Chat Completions transport; нужен endpoint/model/key и согласие. Без модели — локальный фактический режим. |
+| Employer-neutral cover letters | Названия прежних работодателей/учебного заведения не пишутся в cover letter; используются роль, обязанности, проекты и профильное образование. |
+| HH cover-letter continuation | После штатного отклика распознаётся «Приложить сопроводительное письмо», поле заполняется и отдельная HH-кнопка `Отправить` нажимается без generic `final-action-not-found`. |
 | Публикация Git | Whitelist/hash checks, обычный commit/push, резервная копия. Нет force/reset/mirror/delete. |
+| Standalone core | ✦ Apply, ✎ AI, local memory/CV/quick replies не требуют backend readiness. |
+| Persistent page UI | HH vacancy URL fallback, chat fallback scope, SPA watchdog и repair уже открытых HH-вкладок. |
+| Extension icon | Новый Violet icon set 16/32/48/128 и toolbar action icon. |
+| Advanced backend | Локальный .NET сервис остаётся для 🚀 Autopilot queue/dashboard и не блокирует core readiness. |
 
 Не выполнено: подтверждение трудоустройства внешними источниками, переписывание backend ranking/компиляция сервера, реальный логин HH, live-тест внешней модели, запуск Windows EXE и PowerShell на Windows. Это не заявлено выполненным.
+
+| Search-page heading isolation | ✅ 3.9.5: выбранная карточка закрепляется по vacancy ID; `Найдено N вакансий` отклоняется как title |
+| Manual Fill in HH list modal | ✅ 3.9.5: использует pinned vacancy context, а не body страницы поиска |

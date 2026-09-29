@@ -32,6 +32,8 @@ assert.equal(start.ambiguous, true);
 
 assert.equal(apply.isHhUrl('https://hh.ru/vacancy/123'), true);
 assert.equal(apply.isHhUrl('https://spb.hh.ru/vacancy/123'), true);
+assert.equal(apply.isHhUrl('https://headhunter.kg/vacancy/137861116?hhtmFrom=vacancy_search_list'), true);
+assert.equal(apply.sameJobUrl('https://headhunter.kg/vacancy/137861116?hhtmFrom=vacancy_search_list', 'https://hh.ru/vacancy/137861116'), true);
 assert.equal(apply.isHhUrl('https://career.habr.com/vacancies/123'), false);
 assert.equal(apply.sameJobUrl('https://hh.ru/vacancy/130452758?from=search', 'https://spb.hh.ru/vacancy/130452758'), true);
 assert.equal(apply.sameJobUrl('https://hh.ru/vacancy/130452758', 'https://hh.ru/vacancy/137044225'), false);
@@ -47,6 +49,10 @@ let letterAction = apply.chooseHhCoverLetterAction([
 ]);
 assert.equal(letterAction.found, true);
 assert.match(letterAction.candidate.label, /^Приложить сопроводительное письмо/);
+const letterSubmit = apply.chooseHhCoverLetterSubmit([{ label: 'Закрыть' }, { label: 'Отправить' }]);
+assert.equal(letterSubmit.found, true);
+assert.equal(letterSubmit.candidate.label, 'Отправить');
+assert.equal(apply.chooseHhCoverLetterSubmit([{ label: 'Отправить' }, { label: 'Отправить письмо' }]).ambiguous, true);
 letterAction = apply.chooseHhCoverLetterAction([
   { label: 'Приложить сопроводительное письмо' },
   { label: 'Приложить сопроводительное письмо' }

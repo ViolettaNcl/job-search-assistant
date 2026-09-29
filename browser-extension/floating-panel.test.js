@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const panel = require('./floating-panel.js');
 assert.equal(panel.automatic('https://volgograd.hh.ru/vacancy/123'), true);
+assert.equal(panel.automatic('https://headhunter.kg/vacancy/137861116?hhtmFrom=vacancy_search_list'), true);
 assert.equal(panel.automatic('https://hh.ru/search/vacancy'), false);
 assert.equal(panel.automatic('https://hh.ru.attacker.invalid/vacancy/123'), false);
 assert.equal(panel.allowed('https://www.linkedin.com/jobs/123'), false);

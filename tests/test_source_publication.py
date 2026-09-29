@@ -6,7 +6,7 @@ import hashlib, json, re, shutil, subprocess, tempfile, unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / 'source-sync-manifest.json'
-ALLOWED = re.compile(r'^(browser-extension/|tests/|docs/|tools/|scripts/|\.github/workflows/candidate-memory-regression\.yml$|README\.md$|ARCHITECTURE\.md$|IMPLEMENTATION_STATUS\.md$|SUPPORTED_SITES\.md$|TESTING_GUIDE\.md$|WHAT_CHANGED\.md$|START_HERE\.txt$|SECURITY\.md$|ROADMAP\.md$|start-assistant\.cmd$|STOP_ASSISTANT\.cmd$|BACKEND_DIAGNOSTICS\.cmd$|UPDATE_EXISTING\.cmd$|user-settings\.example\.cmd$)')
+ALLOWED = re.compile(r'^(browser-extension/|tests/|docs/|tools/|scripts/|\.github/workflows/(?:ci|codeql|package-windows|site-apply-regression|candidate-memory-regression)\.yml$|README\.md$|ARCHITECTURE\.md$|IMPLEMENTATION_STATUS\.md$|SUPPORTED_SITES\.md$|TESTING_GUIDE\.md$|WHAT_CHANGED\.md$|START_HERE\.txt$|SECURITY\.md$|ROADMAP\.md$|start-assistant\.cmd$|STOP_ASSISTANT\.cmd$|BACKEND_DIAGNOSTICS\.cmd$|UPDATE_EXISTING\.cmd$|user-settings\.example\.cmd$)')
 FORBIDDEN = re.compile(r'(?i)\.(dll|exe|pdb|zip|log|db|woff2?|ttf|otf)$|(^|/)node_modules/|test-results/|(^|/)\.env$|candidate\.private\.json$|appsettings\.local\.json$|(^|/)user-settings\.cmd$')
 
 def safe(root, relative):
@@ -19,7 +19,7 @@ def safe(root, relative):
     return result
 
 def validate(data):
-    if data.get('version') != '3.8.0' or data.get('repository') != 'ViolettaNcl/job-search-assistant':
+    if data.get('version') != '3.9.5' or data.get('repository') != 'ViolettaNcl/job-search-assistant':
         raise ValueError('wrong release')
     seen = set()
     for row in data['files']:
@@ -48,7 +48,9 @@ class PublicationPlanTests(unittest.TestCase):
     def test_every_hash_and_whitelisted_target(self):
         targets = validate(self.data)
         self.assertIn('browser-extension/manifest.json', targets)
-        self.assertIn('.github/workflows/candidate-memory-regression.yml', targets)
+        
+        for workflow in ['ci.yml','codeql.yml','package-windows.yml','site-apply-regression.yml','candidate-memory-regression.yml']:
+            self.assertIn('.github/workflows/'+workflow, targets)
         self.assertIn('scripts/start-assistant-windows.cmd', targets)
         self.assertFalse(any(t.startswith(('backend/', 'extension/', 'src/')) for t in targets))
 
@@ -74,7 +76,7 @@ class PublicationPlanTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'duplicate'): validate(self.data)
 
     def test_publisher_checks_exit_codes_and_never_force_resets(self):
-        script = (ROOT/'Publish-Violetta-3.8.0.ps1').read_text(encoding='utf-8-sig')
+        script = (ROOT/'Publish-Violetta-3.9.5.ps1').read_text(encoding='utf-8-sig')
         self.assertIn('$LASTEXITCODE', script)
         self.assertIn("@('diff','--cached','--quiet') -Accepted @(0,1)", script)
         self.assertIn("@('push','origin','HEAD:main')", script)

@@ -43,9 +43,10 @@ const backendDown = readiness.build({
   backend: { reachable: false, ready: false }, candidate: { coreReady: true }, contacts: { phone: true },
   cv: { english: true, russian: true }, queue: { strongCount: 5 }
 });
-assert.equal(backendDown.state, "blocked");
-assert.equal(backendDown.capabilities.externalAts, false);
-assert.equal(backendDown.capabilities.hhDirect, false);
+assert.equal(backendDown.state, "attention");
+assert.equal(backendDown.capabilities.externalAts, true);
+assert.equal(backendDown.capabilities.hhDirect, true);
+assert.equal(backendDown.items.find(x => x.id === "backend").level, "optional", "backend item is optional for standalone core");
 
 const candidateIncomplete = readiness.build({
   backend: { reachable: true, ready: true }, candidate: { coreReady: false }, contacts: { phone: true },

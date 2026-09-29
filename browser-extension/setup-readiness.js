@@ -17,7 +17,7 @@
     const queueOk = queueCount > 0;
 
     const items = [
-      item("backend", "Backend", backendOk, "required", backendOk ? "Backend is reachable and ready." : "Start/fix the Job Search Assistant backend before using the application autopilot.", "backend"),
+      item("backend", "Local service", backendOk, "optional", backendOk ? "Local service is connected for advanced Autopilot/dashboard features." : "Optional: ✦ Apply and ✎ AI work in standalone extension mode; start the local service only for advanced Autopilot/dashboard.", "backend"),
       item("candidate", "Candidate profile", candidateOk, "required", candidateOk ? "Verified core candidate facts are available." : "Required candidate facts are incomplete or could not be verified.", "candidate"),
       item("contacts", "Reusable phone", contactsReady, "recommended", contactsReady ? "Phone is available from the verified backend profile or this browser's local contact profile." : "Add your phone once so common contact fields do not need repeated manual entry.", "contacts"),
       item("english-cv", "English CV Vault", enCv, "recommended", enCv ? "English CV is stored locally for employer sites that upload a PDF." : "Store the English PDF once for European/international employer forms that require an upload.", "cv"),
@@ -27,10 +27,10 @@
 
     let state = "ready";
     let title = "Ready to apply";
-    let detail = "Core setup is ready. Apply / Fill prepares employer-site forms, including the normal HH.ru website flow. Final submission is manual.";
-    if (!backendOk || !candidateOk) {
-      state = "blocked"; title = "Setup blocked"; detail = "Fix the required setup items before relying on the application assistant.";
-    } else if (!contactsReady || !bothCvs || !queueOk) {
+    let detail = "Core extension setup is ready. ✦ Apply, Fill and ✎ AI do not require the local service. The local service is optional for advanced Autopilot/dashboard features.";
+    if (!candidateOk) {
+      state = "blocked"; title = "Setup blocked"; detail = "Complete the candidate profile before relying on generated applications.";
+    } else if (!backendOk || !contactsReady || !bothCvs || !queueOk) {
       state = "attention"; title = "Usable, but setup needs attention"; detail = "Applications can still be prepared and HH.ru can use the selected account resume, but finishing the recommended setup will reduce manual work on other sites.";
     }
 
@@ -38,11 +38,11 @@
     return {
       state, title, detail, passed, total: items.length, items,
       capabilities: {
-        externalAts: backendOk && candidateOk,
+        externalAts: candidateOk,
         contactAutofill: contactsReady,
         cvAutoload: bothCvs,
         dailyQueue: backendOk && queueOk,
-        hhDirect: backendOk && candidateOk
+        hhDirect: candidateOk
       }
     };
   }

@@ -103,15 +103,31 @@
     const chosen=[...core,...projects,...supporting];
     return {analysis:a,core,projects,supporting,excluded,evidence:chosen.map(x=>x.fact),allRanked:ranked,requirementMap:a.requirements.map(r=>({text:r,evidenceIds:chosen.filter(x=>topics(r).some(t=>x.matches.includes(t))).map(x=>x.fact.id)}))};
   }
+  function coverText(f,lang='ru') {
+    if(!f)return '';
+    const l=lang==='en'?'en':'ru';
+    const neutral={
+      'exp-appxite':{ru:'Сейчас работаю как Technical Support / Integration Support Specialist с SaaS-платформой и внутренними системами.',en:'I currently work as a Technical Support / Integration Support Specialist with a SaaS platform and internal systems.'},
+      'exp-crowne':{ru:'Есть опыт Customer Service с международными клиентами: обработка запросов, письменная и телефонная коммуникация, работа с внутренними системами и координация решения нестандартных ситуаций.',en:'I have customer-service experience with international clients, including request handling, written and phone communication, internal systems and coordination of non-standard cases.'},
+      'education-top':{ru:'У меня профильное образование в области информационных систем и программирования, квалификация программиста и диплом с отличием.',en:'I have a technical education in Information Systems and Programming, a programmer qualification and an honours diploma.'}
+    };
+    if(neutral[f.id])return neutral[f.id][l];
+    let text=T.factText(f,l);
+    if(f.company){
+      const escaped=String(f.company).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      text=text.replace(new RegExp(escaped,'ig'),'').replace(/\s{2,}/g,' ').replace(/\b(?:в|at|for)\s+(?=[,.;])/ig,'').trim();
+    }
+    return text;
+  }
   function localCover(p,v,lang){
     const s=select(p,v),a=s.analysis,l=lang||a.language;
-    const facts=T.evidence(p),by=id=>facts.find(f=>f.id===id),say=f=>f?T.factText(f,l):'';
+    const facts=T.evidence(p),by=id=>facts.find(f=>f.id===id),say=f=>f?coverText(f,l):'';
     const variant=parseInt(T.hash((v.url||v.vacancyId||'')+'|'+v.title),16)%3;
     const intro=l==='ru'?[`Здравствуйте! Откликаюсь на вакансию «${v.title}».`,`Здравствуйте! Пишу по вакансии «${v.title}».`,`Здравствуйте! Хочу обсудить вакансию «${v.title}».`][variant]:`Hello! I am applying for the ${v.title} role.`;
     const selected=[],add=f=>{if(f&&!selected.some(x=>x.id===f.id))selected.push(f);};
-    if(a.role==='developer'){add(by('exp-freelance-dev'));add(s.projects[0]?.fact);const task=s.allRanked.find(x=>x.fact.kind==='task'&&x.fact.employmentId==='exp-freelance-dev');add(task?.fact);}
-    else if(['technical_support','implementation'].includes(a.role)){add(by('exp-appxite'));const tasks=s.allRanked.filter(x=>x.fact.employmentId==='exp-appxite').slice(0,3);tasks.forEach(x=>add(x.fact));if(!tasks.length)add(s.projects[0]?.fact);}
-    else if(a.role==='qa'){add(by('appxite-testing'));add(by('appxite-api'));add(s.projects[0]?.fact?.id==='project-dental'?by('project-dental-api'):s.projects[0]?.fact);}
+    if(a.role==='developer'){add(by('exp-freelance-dev'));add(s.projects[0]?.fact);const task=s.allRanked.find(x=>x.fact.kind==='task'&&x.fact.employmentId==='exp-freelance-dev');add(task?.fact);add(by('education-top'));}
+    else if(['technical_support','implementation'].includes(a.role)){add(by('exp-appxite'));const tasks=s.allRanked.filter(x=>x.fact.employmentId==='exp-appxite').slice(0,2);tasks.forEach(x=>add(x.fact));add(by('education-top'));if(!tasks.length)add(s.projects[0]?.fact);}
+    else if(a.role==='qa'){add(by('appxite-testing'));add(by('appxite-api'));add(s.projects[0]?.fact?.id==='project-dental'?by('project-dental-api'):s.projects[0]?.fact);add(by('education-top'));}
     else {const items=s.allRanked.filter(x=>!['skill','project','project_detail'].includes(x.fact.kind));items.slice(0,3).forEach(x=>add(x.fact));}
     if(!selected.length)return {ok:false,text:'',code:'no-evidence',selection:s,errors:['Недостаточно подтверждённых фактов для этой вакансии.']};
     const github=technical(a.role,v)&&/^https:\/\/github\.com\/[a-z0-9-]+\/?$/i.test(p.github||'')?p.github:'';
@@ -119,14 +135,26 @@
     const text=[parts.slice(0,github?-1:parts.length).join(' '),github?parts.at(-1):''].filter(Boolean).join('\n\n');
     const validation=verify(text,p,{vacancy:v,kind:'cover',factIds:selected.map(f=>f.id),allowedFacts:selected});
     if(l==='en'&&selected.some(f=>!f.textEn&&/[а-яё]/i.test(f.text))){validation.errors.push('translation-required');validation.ok=false;}
-    return {ok:validation.ok,text,source:'local-evidence',factIds:selected.map(f=>f.id),selection:s,validation,version:'3.8-evidence'};
+    return {ok:validation.ok,text,source:'local-evidence',factIds:selected.map(f=>f.id),selection:s,validation,version:'3.9.5-evidence'};
+  }
+  function vacancySpecificity(text,vacancy={}){
+    const draft=trim(text,20000).toLowerCase(),title=trim(vacancy.title,500).toLowerCase(),desc=trim(vacancy.description,16000).toLowerCase();
+    if(!draft||!title)return {ok:false,matches:[]};
+    if(draft.includes(title))return {ok:true,matches:[title]};
+    const stop=new Set(['вакансия','вакансии','работа','работе','работы','позиция','позиции','специалист','менеджер','сотрудник','компания','команде','работодатель','работодателя','with','the','and','for','role','position','job','company','specialist','manager']);
+    const words=(title+' '+desc).match(/[a-zа-яё0-9#+.]{4,}/gi)||[];
+    const candidates=[...new Set(words.map(x=>x.toLowerCase()).filter(x=>!stop.has(x)))].slice(0,120);
+    const matches=candidates.filter(x=>draft.includes(x)).slice(0,12);
+    return {ok:matches.length>=1,matches};
   }
   function verify(text,p,{vacancy={},kind='reply',factIds=[],allowedFacts=null,latestInbound=''}={}){
     const draft=trim(text,20000),errors=[],warnings=[],a=analyze(vacancy);
     const facts=T.evidence(p),valid=new Set(facts.map(f=>f.id)),ground=facts.map(f=>[f.text,f.textEn,f.textRu,f.company,f.startDate,f.endDate].filter(Boolean).join(' ')).join('\n');
     if(!draft)errors.push('empty');
+    if(kind==='cover'&&draft&&!vacancySpecificity(draft,vacancy).ok)errors.push('vacancy-specificity');
     if(factIds.some(id=>!valid.has(id)))errors.push('unknown-evidence-id');
     if(kind==='cover'&&technical(a.role,vacancy)&&/crowne\s+plaza|front\s+desk|receptionist|официант|бармен|барбершоп|преподава/i.test(draft))errors.push('irrelevant-experience');
+    if(kind==='cover'&&/appxite|crowne\s+plaza|top\s+academy|академи[яи]\s+топ/i.test(draft))errors.push('previous-employer-name');
     for(const match of draft.matchAll(/(\d+[.,]?\d*)\s*(?:\+?\s*years?|лет|года?|месяц|months?|руб|₽|€|\$)/ig)){
       const n=Number(match[1]),before=draft.slice(Math.max(0,match.index-45),match.index);
       const isCalendar=n>=1900&&n<=2100&&ground.includes(match[1])&&/январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр|since|from/i.test(before);
@@ -151,5 +179,5 @@
     if(kind==='cover'&&warnings.includes('generic-promotional-language'))errors.push('generic-promotional-language');
     return {ok:errors.length===0,errors:[...new Set(errors)],warnings:[...new Set(warnings)],wordCount:words,evidenceIds:factIds,needsReview:kind==='reply',heuristic:true};
   }
-  return {TOPICS,TECH_CATALOG,hasTerm,topics,language,route,technical,analyze,select,localCover,verify};
+  return {TOPICS,TECH_CATALOG,hasTerm,topics,language,route,technical,analyze,select,coverText,localCover,vacancySpecificity,verify};
 });

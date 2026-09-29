@@ -6,7 +6,7 @@
   function automatic(url) {
     try {
       const u = new URL(url);
-      return /(^|\.)hh\.ru$/.test(u.hostname) && /^\/vacancy\/\d+/.test(u.pathname);
+      return /(^|\.)(?:hh\.ru|headhunter\.kg)$/.test(u.hostname) && /^\/vacancy\/\d+/.test(u.pathname);
     } catch { return false; }
   }
   function allowed(url) {

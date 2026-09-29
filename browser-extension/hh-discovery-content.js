@@ -1,7 +1,7 @@
 // Read only ordinary, accessible HH pages. Never interact with login or challenge forms.
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message?.type !== 'vjaReadHhDiscovery' || window.top !== window) return false;
-  if (!/(^|\.)hh\.ru$/.test(location.hostname)) { respond({blocked:'Открыта страница вне HH.'}); return false; }
+  if (!/(^|\.)(?:hh\.ru|headhunter\.kg)$/.test(location.hostname)) { respond({blocked:'Открыта страница вне HH.'}); return false; }
   const text = document.body?.innerText || '';
   if (/captcha|account\/login|\/security\//i.test(location.pathname)
       || document.querySelector('input[name*="captcha"], iframe[src*="captcha"], [data-qa="account-login-submit"]')
@@ -13,7 +13,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const path=location.pathname.replace(/\/+$/,'');
   if (path === '/search/vacancy') {
     const links = [...document.querySelectorAll('a[data-qa="serp-item__title"], a[data-qa="vacancy-serp__vacancy-title"]')]
-      .map(a => {try {const u = new URL(a.href);return /(^|\.)hh\.ru$/.test(u.hostname) && /^\/vacancy\/\d+\/?$/.test(u.pathname) ? u.origin+u.pathname : null;}catch{return null;}}).filter(Boolean);
+      .map(a => {try {const u = new URL(a.href);return /(^|\.)(?:hh\.ru|headhunter\.kg)$/.test(u.hostname) && /^\/vacancy\/\d+\/?$/.test(u.pathname) ? u.origin+u.pathname : null;}catch{return null;}}).filter(Boolean);
     respond({pageUrl,links:[...new Set(links)].slice(0,10),emptyConfirmed:links.length===0&&Boolean(document.querySelector('[data-qa=\"vacancy-serp__results\"]'))&&/ничего не найдено|вакансии не найдены/i.test(text)}); return false;
   }
   if (/^\/vacancy\/\d+$/.test(path)) {

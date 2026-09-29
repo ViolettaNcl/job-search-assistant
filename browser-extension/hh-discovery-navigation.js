@@ -2,7 +2,7 @@
   function parse(value){
     try {
       const u=new URL(value);
-      if(u.protocol!=='https:'||u.port||u.username||u.password||!/(^|\.)hh\.ru$/.test(u.hostname))return null;
+      if(u.protocol!=='https:'||u.port||u.username||u.password||!/(^|\.)(?:hh\.ru|headhunter\.kg)$/.test(u.hostname))return null;
       const path=u.pathname.replace(/\/+$/,'');
       return {url:u,path,id:/^\/vacancy\/(\d+)$/.exec(path)?.[1]};
     } catch{return null;}

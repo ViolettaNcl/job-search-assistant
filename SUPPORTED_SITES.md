@@ -1,6 +1,8 @@
-# Поддержка сайтов · 3.8.0
+# Поддержка сайтов · 3.9.5
 
-## HH.ru — основной сценарий
+## HH.ru / HeadHunter.kg — основной сценарий
+
+3.9.5 treats `hh.ru` and `headhunter.kg` as the same HeadHunter provider family. Persistent content scripts, floating `✦ Apply`, recruiter `✎ AI`, vacancy identity and the dedicated cover-letter continuation are enabled on both domains.
 
 Реализованы существующие vacancy Apply, автопилот, native list quick apply, recruiter chat и новые правила доказательств. Для письма из карточки полное описание читается в неактивной вкладке. Изменения DOM, вход/капча, анкеты и резюме аккаунта могут потребовать ручного шага.
 
