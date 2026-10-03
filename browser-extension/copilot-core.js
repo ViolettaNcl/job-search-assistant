@@ -5,7 +5,7 @@
   if (root) root.vjaCopilotCore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   'use strict';
-  const VERSION = '3.9.9';
+  const VERSION = '3.9.13';
   function newId(){if(globalThis.crypto?.randomUUID)return globalThis.crypto.randomUUID();const b=new Uint8Array(16);globalThis.crypto.getRandomValues(b);b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;const h=Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');return [h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-');}
   const clean = v => String(v ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
   const clip = (v, n = 12000) => clean(v).slice(0, n);

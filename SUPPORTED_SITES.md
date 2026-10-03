@@ -1,18 +1,46 @@
-# Поддержка сайтов · 3.9.9
+# Supported Sites · 3.9.13
 
-## HH.ru / HeadHunter.kg — основной сценарий
+## HeadHunter family
 
-3.9.7 treats `hh.ru` and `headhunter.kg` as the same HeadHunter provider family. Persistent content scripts, floating `✦ Apply`, recruiter `✎ AI`, vacancy identity and the dedicated cover-letter continuation are enabled on both domains.
+### Supported core hosts
 
+- `hh.ru`
+- `*.hh.ru`
+- `headhunter.kg`
+- `*.headhunter.kg`
 
-В 3.9.9 HH list memory хранит результат Analysis и прогресс отклика по точному vacancy ID. Переход на HH-анкету может быть продолжен в той же вкладке: подтверждённые контактные данные, письмо и CV заполняются автоматически, а неизвестные/юридические/зарплатные ответы остаются на ручную проверку. Возврат к выдаче восстанавливает сохранённый статус карточки. Финальная отправка такой анкеты автоматически не нажимается.
+### Supported page classes
 
-Реализованы существующие vacancy Apply, автопилот, native list quick apply, recruiter chat и новые правила доказательств. Для письма из карточки полное описание читается в неактивной вкладке. Изменения DOM, вход/капча, анкеты и резюме аккаунта могут потребовать ручного шага.
+| Page | Support |
+|---|---|
+| Vacancy search/list | Analysis + quick apply card actions |
+| Direct vacancy | Core apply / context extraction |
+| HH application questionnaire | Smart Questionnaire Autofill |
+| Recruiter chat | `✎ AI` draft assistant |
+| Local dashboard | Advanced backend mode |
 
-Чат ограничен открытой панелью, не списком бесед. При неизвестных авторах нужен явный выбор, а при недоступных сообщениях анализ останавливается. История может быть неполной. Проверены синтетические DOM-сценарии, а не авторизованный production-аккаунт.
+## HH API
 
-## Другие платформы
+Extension host permission includes:
 
-Сохранены селекторные профили и generic handler для LinkedIn, Indeed, Greenhouse, Lever, Ashby, Workday и других ATS. Название адаптера не означает подтверждённую совместимость со всеми формами сайта. При необходимости пользователь выдаёт доступ отдельному origin.
+```text
+https://api.hh.ru/*
+```
 
-Не поддерживаются автоматически: CAPTCHA/MFA, закрытый Shadow DOM, недоступный canvas, cross-origin iframe без разрешения, неизвестные юридические/зарплатные/визовые решения. Неоднозначные финальные кнопки и отсутствие полного описания — причина остановки, а не угадывания.
+The API is used as a fallback for exact-vacancy reading when background DOM access is not reliable.
+
+## Generic / external employer forms
+
+Support is conservative. The questionnaire engine can understand standard text fields, textarea, radio/select/checkbox controls when the extension has access to the page and the question context is readable.
+
+Not guaranteed:
+
+- arbitrary third-party ATS portals;
+- CAPTCHA-protected forms;
+- MFA flows;
+- inaccessible cross-origin iframes;
+- custom canvas/shadow controls without usable semantics.
+
+## Permission model
+
+Chrome can keep site access in `On click` mode if the user configured it manually. The extension cannot bypass that setting. Grant persistent site access to supported HH hosts if automatic reinjection is required.

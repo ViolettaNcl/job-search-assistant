@@ -1,4 +1,4 @@
-"""Focused 3.9.9 Chromium regression: persistent list memory + HH form continuation.
+"""Focused 3.9.10 Chromium regression: persistent list memory + HH form continuation.
 Uses actual extension JS/service-worker JS with mocked Chrome/HTTP boundaries; no live HH account.
 """
 import asyncio, base64, json, shutil
@@ -49,12 +49,12 @@ async def main():
             form='''<html><body><h1>Junior .NET Backend Developer</h1><form id="application" data-step="1"><label>First name<input name="firstName"></label><label>Email<input type="email" name="email"></label><label>Cover letter<textarea name="coverLetter"></textarea></label><label>Expected salary<input name="salary"></label><label>I agree to terms<input type="checkbox" name="consent"></label><label>Resume<input type="file" name="resume" accept="application/pdf"></label><button type="submit">Submit application</button></form><script>window.submits=0;application.addEventListener('submit',e=>{e.preventDefault();window.submits++});</script></body></html>'''
             fp=await open_page('/applicant/vacancy_response?vacancyId=784',form,tab_id);await fp.wait_for_function("document.querySelector('[name=resume]').files.length===1",timeout=8000)
             check('HH questionnaire auto-fills confirmed profile/letter/CV',await fp.locator('[name=firstName]').input_value()=='Violetta' and await fp.locator('[name=email]').input_value()=='violettanicolaou@gmail.com' and len(await fp.locator('[name=coverLetter]').input_value())>20 and await fp.locator('[name=resume]').evaluate('(e)=>e.files[0]?.name')=='english-fixture.pdf')
-            check('unknown salary and legal consent are left for review',await fp.locator('[name=salary]').input_value()=='' and not await fp.locator('[name=consent]').is_checked())
+            salary=await fp.locator('[name=salary]').input_value();check('unconfirmed salary gets a reviewable neutral draft while legal consent stays untouched',len(salary)>20 and ('обсуд' in salary.lower() or 'discuss' in salary.lower()) and not await fp.locator('[name=consent]').is_checked())
             check('form continuation never auto-clicks final Submit',await fp.evaluate('window.submits')==0)
             state=await call(op='get');job=next(v for k,v in state['data'].items() if k.startswith('vjaApplicationJob:') and v.get('plan',{}).get('vacancyId')=='784');check('form progress is stored in application memory',job.get('context',{}).get('formMemory',{}).get('reviewCount')==2 and job.get('context',{}).get('formMemory',{}).get('filled',0)>=4);await fp.close()
             back='''<html><body><div data-qa="vacancy-serp__vacancy" id="b"><a data-qa="serp-item__title" href="https://hh.ru/vacancy/784">Junior .NET Backend Developer</a><div data-qa="vacancy-serp__vacancy-employer">Fixture Forms</div><p>C# ASP.NET Core SQL</p><button>Откликнуться</button></div></body></html>'''
             bp=await open_page('/search/vacancy?text=forms',back,tab_id);await bp.locator('#b .vja-card-fast-apply').filter(has_text='! Форма: 2 проверить').wait_for(timeout=5000);check('Back/list restores saved form-review state',await bp.locator('#b .vja-card-fast-apply').get_attribute('data-state')=='review');await bp.close()
         finally:
             await browser.close();proc.terminate();await proc.wait();reader_task.cancel()
-    print(f'{len(passed)} focused 3.9.9 browser assertions passed.',flush=True)
+    print(f'{len(passed)} focused 3.9.10 browser assertions passed.',flush=True)
 if __name__=='__main__': asyncio.run(main())

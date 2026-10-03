@@ -1,83 +1,108 @@
-# Тестирование · 3.9.9
+# Testing Guide · 3.9.13
 
+## Goals
 
+Tests protect four areas:
 
-## 3.9.9 persistent-memory regression
+1. extension logic;
+2. browser/HH integration fixtures;
+3. source publication and repository hygiene;
+4. backend build/tests.
 
-Focused Chromium test `tests/browser_memory_399.py` verifies the requested flow end to end with mocked Chrome/HH boundaries:
+## Extension unit/regression tests
 
-- Analysis reaches a confirmed state and a duplicate card restores it without another click;
-- quick-list application context is persisted before navigation;
-- an HH questionnaire fills confirmed profile fields, cover letter and selected CV;
-- unknown salary and legal consent stay unresolved;
-- final Submit is not auto-clicked;
-- form progress is written back to vacancy memory;
-- returning to the list restores the saved review state instead of resetting the card.
-
-Run it with:
+From the release/source root:
 
 ```powershell
-python .\tests\browser_memory_399.py
-if ($LASTEXITCODE -ne 0) { throw '3.9.9 memory regression failed' }
+node --test browser-extension/*.test.js
 ```
 
-## 3.9.8 already-viewed HH regression
-
-Browser regression opens a synthetic HH list card, submits a cover letter, returns `Отклик уже просмотрен работодателем.`, and verifies that the extension clicks the modal's unique `Закрыть`, removes the dialog, sets the card action to `✓ Уже просмотрен`, records `Viewed`, and does not claim `coverLetterFilled=true`.
-
-В source clone используйте `browser-extension/`; в Windows ZIP — `extension/`. Тестовый bridge автоматически различает две структуры.
-
-## Node
+In FULL bundle the extension source is under `extension/`:
 
 ```powershell
-$ext = if (Test-Path .\browser-extension) { '.\browser-extension' } else { '.\extension' }
-$cases = Get-ChildItem $ext -Filter '*.test.js' -File | Select-Object -ExpandProperty FullName
-node --test @cases
-if ($LASTEXITCODE -ne 0) { throw 'Node tests failed' }
+node --test extension/*.test.js
 ```
 
-## Chromium
-
-Требуются Python, Playwright и Chromium. Linux runner использует системный `chromium`; без него Playwright должен иметь установленный браузер.
+## JavaScript syntax
 
 ```powershell
-python -m pip install playwright
-python -m playwright install chromium
-python .\tests\browser_e2e.py
-if ($LASTEXITCODE -ne 0) { throw 'Browser tests failed' }
+Get-ChildItem .\extension -Filter *.js | ForEach-Object {
+  node --check $_.FullName
+}
 ```
 
-Fixtures используют реальные модули worker/content scripts, но подменяют Chrome API, HTTP, вкладки загрузки вакансий и ответ модели. Они не отправляют реальные отклики и не расходуют AI-кредиты.
+## Focused browser fixtures
 
-## Новые сценарии
+The release contains focused Python/Chromium fixtures for:
 
-Миграция/приоритет источников; сохранение ручных CV; актуальный Technical Support / Integration Support опыт; разные проекты для WPF/PHP/backend; отсутствие названий прежних работодателей в cover letter; исключение hospitality из technical letters; профильное образование без названия учебного заведения; beginner French; отсутствие выдуманного Jira/стажа/зарплаты; последнее сообщение работодателя; несколько открытых вопросов; stale A→B; пустой чат; подтверждение неизвестного автора; full vacancy before HH-list letter; модель/локальный режим и содержимое model payload.
+- quick-list apply;
+- persistent vacancy/form memory;
+- full vacancy hidden-tab/API fallback;
+- questionnaire autofill and human fallback drafts.
 
-Отдельный HH fixture воспроизводит текущий двухэтапный flow со скриншота: `Откликнуться` → receipt «Ваш отклик отправлен работодателю» → `Приложить сопроводительное письмо` → modal textarea → `Отправить`. Проверяется, что письмо реально записано в textarea, dedicated Send нажат, modal закрыт и результат отмечен как confirmed.
+Examples:
 
-## Windows / реальный аккаунт
+```powershell
+python tests\browser_memory_399.py
+python tests\hh_read_fallback_3910.py
+python tests\browser_questionnaire_3912.py
+```
 
-Обновить старую установку, Reload расширения, refresh HH. Проверить профиль и дату источников. Сначала выполнить предпросмотр письма без отправки и chat draft. Затем проверить один явно выбранный реальный отклик. Автопилот сначала ограничить одной заявкой за сессию.
+These fixtures use synthetic/mocked HH boundaries and do not certify future production DOM changes.
 
-PowerShell-публикатор этой поставки проверен по структуре/ограничениям и Git-плану, но не исполнялся под Windows PowerShell. Windows backend EXE не запускался в Linux-среде; совпадение файлов не является runtime-тестом.
+## Source publication tests
 
-Локальные отчёты и screenshots относятся к `test-results/` и не коммитятся. Числа фактического финального прогона находятся в `TEST_REPORT.md` Windows-пакета и отдельном отчёте поставки.
+```powershell
+python tests\test_source_publication.py
+```
 
+Checks include:
 
-## 3.9.7 CI refresh
+- version/repository identity;
+- SHA-256 integrity;
+- allowed source targets;
+- forbidden binaries/secrets;
+- duplicate targets;
+- no force/reset/clean publication behavior;
+- normal Git push semantics.
 
-GitHub workflows now validate the current `browser-extension/` source rather than old exact popup text from pre-3.9 UI. `package-windows` packages the current root launcher, and CodeQL uses .NET 10 manual build for C# plus no-build JavaScript analysis.
+## Repository hygiene
 
-## 3.9.7 exact list-card regression
+```powershell
+python tools\check-repo-hygiene.py
+python tests\test_repository_hygiene.py
+```
 
-- Search page with heading `Найдено 19 718 вакансий` and multiple vacancy cards.
-- Each card must get its own `✦ Отклик + письмо`.
-- Clicking one card must persist that exact vacancy ID and full vacancy title.
-- The search-page heading must never appear in the cover letter.
-- Hidden detail-tab reading must confirm the same vacancy ID before accepting text.
-- Manual `✦ Fill` inside a list/modal must reuse the selected vacancy context.
-- Both HH cover-letter variants remain covered: required-before-submit and append-after-response.
+The hygiene check fails when tracked Git paths contain:
 
-## 3.9.7 inline call-analysis regression
+- nested `Violetta-Apply-Assistant-*` release folders;
+- root `backend/`, `extension/`, `github-source/`, `test-results/`;
+- build/runtime artifacts;
+- local databases/logs/secrets.
 
-The browser fixture verifies two HH search cards at once: a chat-only vacancy becomes `✓ Без звонков`, a vacancy with explicit inbound calls becomes `✕ Есть звонки`, the exact `/vacancies/<id>` API request is observed, and the original vacancy-specific `✦ Отклик + письмо` flow still completes afterward.
+## Backend
+
+```powershell
+dotnet restore src\JobSearchAssistant\JobSearchAssistant.csproj
+dotnet build src\JobSearchAssistant\JobSearchAssistant.csproj -c Release --no-restore
+dotnet test tests\JobSearchAssistant.Tests\JobSearchAssistant.Tests.csproj -c Release
+```
+
+## CI
+
+`.github/workflows/ci.yml` runs backend build/tests, extension syntax/tests, release metadata verification and repository hygiene on push/PR.
+
+Additional workflows cover CodeQL, candidate-memory regression, site-apply regression and Windows packaging.
+
+## Release verification
+
+Before publishing a release:
+
+1. run extension tests;
+2. run focused browser regressions;
+3. run source-publication tests;
+4. run hygiene check;
+5. verify manifest/backend release versions;
+6. verify ZIP hashes.
+
+Exact release counts belong in `TEST_REPORT.md`, not in README, so the project description does not become stale after every new test.

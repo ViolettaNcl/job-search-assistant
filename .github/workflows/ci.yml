@@ -21,6 +21,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Verify repository hygiene
+        run: python tools/check-repo-hygiene.py
+
       - name: Restore backend
         run: dotnet restore src/JobSearchAssistant/JobSearchAssistant.csproj
       - name: Build backend

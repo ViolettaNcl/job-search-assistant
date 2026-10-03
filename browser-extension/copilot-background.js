@@ -80,7 +80,7 @@ async function cpFetchHhVacancy(vInput,timeoutMs=4200){
   const v=cpCore.vacancy(vInput),apiUrl=cpHhList?.hhApiVacancyUrl?.(v.url,v.vacancyId);if(!apiUrl)throw new Error('Не удалось построить HH API-запрос для этой вакансии.');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.max(1200,Number(timeoutMs)||4200));
   try{
-    const response=await fetch(apiUrl,{method:'GET',headers:{'Accept':'application/json','HH-User-Agent':'ViolettaApplyAssistant/3.9.9 (github.com/ViolettaNcl/job-search-assistant)'},signal:controller.signal,credentials:'omit',cache:'no-store'});
+    const response=await fetch(apiUrl,{method:'GET',headers:{'Accept':'application/json','HH-User-Agent':'ViolettaApplyAssistant/3.9.13 (github.com/ViolettaNcl/job-search-assistant)'},signal:controller.signal,credentials:'omit',cache:'no-store'});
     if(!response?.ok)throw new Error(`HH API: ${response?.status||'error'}`);
     const data=await response.json(),id=String(data?.id||'');if(!id||id!==String(v.vacancyId))throw new Error('HH API вернул другую вакансию.');
     const title=cpCore.clip(data?.name||v.title,300);if(cpCore.suspiciousVacancyTitle?.(title))throw new Error('HH API не подтвердил название вакансии.');
@@ -88,35 +88,43 @@ async function cpFetchHhVacancy(vInput,timeoutMs=4200){
     return cpCore.vacancy({...v,title,company:cpCore.clip(data?.employer?.name||v.company,300),description,descriptionCoverage:'full-fetch',requirements:cpCore.clip((Array.isArray(data?.key_skills)?data.key_skills:[]).map(x=>x?.name||'').filter(Boolean).join(', '),5000),remote:Boolean(v.remote||/удален|remote/i.test([data?.schedule?.name,data?.work_format?.map?.(x=>x?.name).join(' ')].filter(Boolean).join(' ')))});
   }finally{clearTimeout(timer);}
 }
+async function cpAcquireHhVacancy(vInput,sender,{fast=false}={}){
+  const selected=cpCore.vacancy(vInput);
+  if(selected.provider!=='hh')return {vacancy:await cpReadVacancy(selected.url,sender,{fast}),source:'live-dom'};
+  const apiTimeout=fast?6500:8500;
+  const liveTask=cpReadVacancy(selected.url,sender,{fast}).then(vacancy=>({vacancy,source:'hh-live-dom'}));
+  const apiTask=cpFetchHhVacancy(selected,apiTimeout).then(vacancy=>({vacancy,source:'hh-api'}));
+  try{
+    const result=await Promise.any([apiTask,liveTask]);
+    if(!cpCore.sameVacancy(selected,result.vacancy))throw new Error('Получено описание другой вакансии.');
+    return result;
+  }catch(error){
+    const messages=Array.isArray(error?.errors)?error.errors.map(x=>x?.message||String(x)).filter(Boolean):[error?.message||String(error)];
+    throw new Error('Не удалось прочитать полную HH-вакансию: '+messages.join(' | '));
+  }
+}
 async function cpQuickListCallAnalysis(vInput,sender){
   cpAssertEmbeddedVacancy(sender,vInput);const selected=cpCore.vacancy(vInput),cacheKey='vjaCallAnalysis:'+selected.vacancyId;
   const cached=(await chrome.storage.local.get(cacheKey))[cacheKey];if(cached?.result&&cached?.url===selected.url&&Date.now()-Number(cached.at||0)<30*24*60*60*1000)return {...cached.result,cached:true};
-  let full=null,analysis=null,source='hh-live-dom',apiError='',liveError='';
+  let full=null,analysis=null,source='hh-live-dom',readError='';
 
-  // Analysis must inspect the exact vacancy, not infer from the search-card snippet.
-  // First open the selected vacancy in an inactive background tab, read its full DOM,
-  // verify the vacancy id, and close the tab automatically. HH API is a fallback only.
+  // Analyze the exact vacancy, never infer a green result from the short search-card snippet.
+  // Live DOM and the exact HH API vacancy are started together; whichever confirms the same
+  // vacancy first wins. The inactive DOM tab closes itself in cpReadVacancy's finally block.
   try{
-    full=await cpReadVacancy(selected.url,sender,{fast:true});
-    if(!cpCore.sameVacancy(selected,full))throw new Error('Фоновая проверка открыла другую вакансию.');
-    analysis=cpHhList?.analyzeCallRequirement?.(`${full.title||''}\n${full.description||''}\n${full.requirements||''}`,full.descriptionCoverage||'full-dom');
+    const acquired=await cpAcquireHhVacancy(selected,sender,{fast:true});
+    full=acquired.vacancy;source=acquired.source;
+    analysis=cpHhList?.analyzeCallRequirement?.(`${full.title||''}\n${full.description||''}\n${full.requirements||''}`,full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom'));
   }catch(error){
-    liveError=error?.message||String(error);
-    try{
-      source='hh-api';full=await cpFetchHhVacancy(selected,3600);
-      if(!cpCore.sameVacancy(selected,full))throw new Error('HH API вернул другую вакансию.');
-      analysis=cpHhList?.analyzeCallRequirement?.(`${full.title||''}\n${full.description||''}\n${full.requirements||''}`,full.descriptionCoverage||'full-fetch');
-    }catch(apiFailure){
-      apiError=apiFailure?.message||String(apiFailure);source='card-snippet';full=selected;
-      analysis=cpHhList?.analyzeCallRequirement?.(`${selected.title||''}\n${selected.description||''}\n${selected.requirements||''}`,'snippet');
-    }
+    readError=error?.message||String(error);source='card-snippet';full=selected;
+    analysis=cpHhList?.analyzeCallRequirement?.(`${selected.title||''}\n${selected.description||''}\n${selected.requirements||''}`,'snippet');
   }
   analysis=analysis||{status:'unknown',hasCalls:null,canApply:false,confidence:0,reason:'Не удалось выполнить анализ звонков.',evidence:''};
   const reason=source==='card-snippet'&&analysis.status==='unknown'
     ?'Не удалось прочитать полную страницу выбранной вакансии ни в фоне, ни через HH API. Повторите Analysis.'
     :analysis.reason;
   const coverage=source==='card-snippet'?'snippet':(full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom'));
-  const result={vacancyId:selected.vacancyId,title:full.title,status:analysis.status,hasCalls:analysis.hasCalls,canApply:analysis.canApply,confidence:analysis.confidence,reason,evidence:analysis.evidence||'',source,coverage,liveError:source==='card-snippet'?liveError:'',apiError:source==='card-snippet'?apiError:''};
+  const result={vacancyId:selected.vacancyId,title:full.title,status:analysis.status,hasCalls:analysis.hasCalls,canApply:analysis.canApply,confidence:analysis.confidence,reason,evidence:analysis.evidence||'',source,coverage,liveError:source==='card-snippet'?readError:'',apiError:''};
   if(source!=='card-snippet'||analysis.status!=='unknown')await chrome.storage.local.set({[cacheKey]:{url:selected.url,at:Date.now(),result}});return result;
 }
 const cpQuickListAnalysisTtl=30*24*60*60*1000;
@@ -313,18 +321,44 @@ async function cpRememberPrepared(message,sender){
   const exactLinked=Boolean(pending&&pending.id===message.id&&pending.target===cpCore.canonicalUrl(sender.url));
   const quickLinked=Boolean(quick&&quick.id===message.id&&quick.expires>=Date.now()&&cpIsQuickListContinuation(job,sender,message.pageText||''));
   if(!same&&!exactLinked&&!quickLinked)throw new Error('Изменился адрес формы.');
-  const reviewCount=Math.max(0,Number(message.reviewCount||0)),state=reviewCount?'Needs review':'Ready',now=Date.now();
-  const unresolved=Array.isArray(message.unresolved)?message.unresolved.slice(0,30).map(x=>({label:cpCore.clip(x?.label||'',180),reason:cpCore.clip(x?.reason||'',220)})).filter(x=>x.label||x.reason):[];
-  const formMemory={url:cpCore.canonicalUrl(sender.url),filled:Math.max(0,Number(message.filled||0)),reviewCount,unresolved,coverLetterFilled:Boolean(message.coverLetterFilled),cvUploaded:Boolean(message.cvUploaded),autoFilled:Boolean(message.autoFilled),updatedAt:now};
-  const previous=job.context?.formMemory||{},changed=previous.url!==formMemory.url||previous.reviewCount!==formMemory.reviewCount||previous.filled!==formMemory.filled;
+  const reviewCount=Math.max(0,Number(message.reviewCount||0)),now=Date.now();
+  const unresolved=Array.isArray(message.unresolved)?message.unresolved.slice(0,40).map(x=>({label:cpCore.clip(x?.label||'',180),reason:cpCore.clip(x?.reason||'',220),category:cpCore.clip(x?.category||'UNKNOWN',60),semanticKey:cpCore.clip(x?.semanticKey||'',240),required:Boolean(x?.required)})).filter(x=>x.label||x.reason):[];
+  const currentFilled=Array.isArray(message.filledFields)?message.filledFields.slice(0,40).map(x=>({label:cpCore.clip(x?.label||'',180),category:cpCore.clip(x?.category||'UNKNOWN',60),semanticKey:cpCore.clip(x?.semanticKey||'',240),source:cpCore.clip(x?.source||'',100),required:Boolean(x?.required),answer:cpCore.clip(x?.answer||'',1200),evidenceIds:Array.isArray(x?.evidenceIds)?x.evidenceIds.slice(0,20).map(v=>cpCore.clip(v,100)):[]})):[];
+  const previous=job.context?.formMemory||{};
+  const mergeFields=(oldItems,newItems)=>{const map=new Map();for(const x of [...(oldItems||[]),...(newItems||[])]){const k=x?.semanticKey||`${x?.category||''}:${x?.label||''}`;if(k)map.set(k,x);}return [...map.values()].slice(-40);};
+  const filledFields=mergeFields(previous.filledFields,currentFilled),confirmedFilledKeys=new Set(filledFields.filter(x=>!['human-fallback','existing-human-fallback'].includes(String(x?.source||''))).map(x=>x.semanticKey).filter(Boolean));
+  const mergedUnresolved=mergeFields(previous.unresolved,unresolved).filter(x=>!x.semanticKey||!confirmedFilledKeys.has(x.semanticKey));
+  const questionnaire={detected:Boolean(message.questionnaire?.detected||filledFields.length||mergedUnresolved.length),fieldCount:Math.max(0,Number(message.questionnaire?.fieldCount||filledFields.length+mergedUnresolved.length)),filledFields,unresolvedFields:mergedUnresolved,lastUpdated:now};
+  const effectiveReview=mergedUnresolved.length,state=effectiveReview?'Needs review':'Ready';
+  const formMemory={url:cpCore.canonicalUrl(sender.url),filled:Math.max(Number(previous.filled||0),Number(message.filled||0),filledFields.length),reviewCount:effectiveReview,unresolved:mergedUnresolved,filledFields,questionnaire,coverLetterFilled:Boolean(message.coverLetterFilled||previous.coverLetterFilled),cvUploaded:Boolean(message.cvUploaded||previous.cvUploaded),autoFilled:Boolean(message.autoFilled||previous.autoFilled),updatedAt:now};
+  const changed=previous.url!==formMemory.url||previous.reviewCount!==formMemory.reviewCount||previous.filled!==formMemory.filled;
   let context={...job.context,status:state,formMemory,updatedAt:now};
-  if(changed)context=cpWithTimeline(context,reviewCount?'needs-review':'ready',reviewCount?`${reviewCount} полей требуют проверки`:'Форма автоматически заполнена и готова к проверке',{reviewCount,filled:formMemory.filled,autoFilled:formMemory.autoFilled});
+  if(changed)context=cpWithTimeline(context,effectiveReview?'needs-review':'ready',effectiveReview?`${effectiveReview} полей требуют проверки`:'Форма автоматически заполнена и готова к проверке',{reviewCount:effectiveReview,filled:formMemory.filled,autoFilled:formMemory.autoFilled});
   await updateApplicationJob(message.id,{context,review:true,result:{id:job.plan.id,result:{submitted:false,status:'needs-review',reason:'user-submit-required',coverLetterFilled:Boolean(message.coverLetterFilled),formMemory}}});
   return {ok:true,status:state,formMemory};
 }
+async function cpWaitForVacancyReadable(tabId,expectedProvider,expectedId,timeoutMs=9000){
+  const started=Date.now();let lastTab=null,lastUrl='';
+  while(Date.now()-started<timeoutMs){
+    try{
+      lastTab=await chrome.tabs.get(tabId);lastUrl=cpCore.canonicalUrl(lastTab?.url||'');
+      const loadedId=cpCore.idFromUrl(lastUrl),loadedProvider=cpCore.provider(lastUrl);
+      if(loadedProvider===expectedProvider&&(!expectedId||loadedId===expectedId)){
+        try{
+          const probe=await chrome.scripting.executeScript({target:{tabId,frameIds:[0]},func:()=>({readyState:document.readyState,hasBody:Boolean(document.body),textLength:String(document.body?.innerText||'').trim().length})});
+          const state=probe?.[0]?.result||{};
+          if(state.hasBody&&['interactive','complete'].includes(state.readyState)&&Number(state.textLength||0)>=80)return lastTab;
+        }catch{/* The frame can be between navigations; retry without surfacing a false failure. */}
+        if(lastTab?.status==='complete')return lastTab;
+      }
+    }catch{/* Tab may be replacing its document during HH navigation. */}
+    await browserAutopilotWait(250);
+  }
+  throw new Error('HH vacancy page did not become readable in the background tab.');
+}
 async function cpReadVacancy(url,sender,options={}){
   const canonical=cpCore.canonicalUrl(url);if(!canonical)throw new Error('Некорректная ссылка на вакансию.');
-  const fast=Boolean(options?.fast),loadTimeoutMs=fast?7000:12000,readTimeoutMs=fast?4500:7000,readAttempts=fast?2:3,retryDelayMs=fast?250:450;
+  const fast=Boolean(options?.fast),loadTimeoutMs=fast?9000:14000,readTimeoutMs=fast?5000:7500,readAttempts=fast?4:5,retryDelayMs=fast?300:450;
   const expectedId=cpCore.idFromUrl(canonical), expectedProvider=cpCore.provider(canonical);
   const key='vjaVacancyCache:'+cpCore.hash(canonical);const cached=(await chrome.storage.local.get(key))[key];
   if(cached?.vacancy && ['full-dom','full-structured','full-fetch'].includes(cached.vacancy.descriptionCoverage) && cpCore.canonicalUrl(cached.vacancy.url)===canonical && (!expectedId||cached.vacancy.vacancyId===expectedId) && !cpCore.suspiciousVacancyTitle?.(cached.vacancy.title) && Date.now()-cached.at<15*60*1000)return cached.vacancy;
@@ -335,28 +369,31 @@ async function cpReadVacancy(url,sender,options={}){
   let tab;
   try{
     tab=await chrome.tabs.create({url:canonical,active:false});
-    let loaded=null;
+    let loaded=null,lastLoadError=null;
     for(let attempt=0;attempt<2;attempt++){
-      loaded=await browserAutopilotWaitForTab(tab.id,loadTimeoutMs);
+      try{loaded=await cpWaitForVacancyReadable(tab.id,expectedProvider,expectedId,loadTimeoutMs);}
+      catch(error){lastLoadError=error;if(attempt===0){await chrome.tabs.update(tab.id,{url:canonical}).catch(()=>{});await browserAutopilotWait(500);continue;}throw error;}
       const loadedUrl=cpCore.canonicalUrl(loaded?.url||'');
       const loadedId=cpCore.idFromUrl(loadedUrl),loadedProvider=cpCore.provider(loadedUrl);
       if(loadedProvider===expectedProvider&&(!expectedId||loadedId===expectedId))break;
-      if(attempt===0){await chrome.tabs.update(tab.id,{url:canonical});await browserAutopilotWait(450);continue;}
-      throw new Error('HeadHunter открыл не выбранную вакансию. Письмо не создано.');
+      if(attempt===0){await chrome.tabs.update(tab.id,{url:canonical});await browserAutopilotWait(500);continue;}
+      throw lastLoadError||new Error('HeadHunter открыл не выбранную вакансию. Письмо не создано.');
     }
-    await cpInject(tab.id);
-    let result=null;
+    let result=null,lastReadError=null;
     for(let attempt=0;attempt<readAttempts;attempt++){
-      result=await browserAutopilotWithTimeout(chrome.tabs.sendMessage(tab.id,{type:'vjaCopilotPage',action:'vacancy',expectedVacancyId:expectedId},{frameId:0}),readTimeoutMs,'Не удалось прочитать вакансию.');
-      const raw=result?.vacancy||{},v=cpCore.vacancy(raw);
-      if(v.description&&(!expectedId||v.vacancyId===expectedId)&&v.provider===expectedProvider&&!cpCore.suspiciousVacancyTitle?.(v.title)){
-        if(!v.descriptionCoverage)v.descriptionCoverage='full-dom';
-        await chrome.storage.local.set({[key]:{vacancy:v,at:Date.now()}});return v;
-      }
+      try{
+        await cpInject(tab.id);
+        result=await browserAutopilotWithTimeout(chrome.tabs.sendMessage(tab.id,{type:'vjaCopilotPage',action:'vacancy',expectedVacancyId:expectedId},{frameId:0}),readTimeoutMs,'Не удалось прочитать вакансию.');
+        const raw=result?.vacancy||{},v=cpCore.vacancy(raw);
+        if(v.description&&String(v.description).trim().length>=30&&(!expectedId||v.vacancyId===expectedId)&&v.provider===expectedProvider&&!cpCore.suspiciousVacancyTitle?.(v.title)){
+          if(!v.descriptionCoverage)v.descriptionCoverage='full-dom';
+          await chrome.storage.local.set({[key]:{vacancy:v,at:Date.now()}});return v;
+        }
+      }catch(error){lastReadError=error;}
       await browserAutopilotWait(retryDelayMs);
     }
     if(cpCore.suspiciousVacancyTitle?.(result?.vacancy?.title))throw new Error('Вместо выбранной вакансии HeadHunter вернул заголовок страницы поиска. Письмо не отправлено.');
-    throw new Error('Не удалось подтвердить полное описание именно выбранной вакансии.');
+    throw lastReadError||new Error('Не удалось подтвердить полное описание именно выбранной вакансии.');
   }finally{if(tab?.id)await chrome.tabs.remove(tab.id).catch(()=>{});}
 }
 async function cpResolve(snapshot,sender){

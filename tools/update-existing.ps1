@@ -1,11 +1,11 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 # Update in the SAME directory so an unpacked extension retains its path identity.
 [CmdletBinding()]
 param([string]$Destination)
 $ErrorActionPreference = 'Stop'
 $source = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 try {
-    Write-Host 'Violetta Apply Assistant 3.8.0 - in-place update' -ForegroundColor Cyan
+    Write-Host 'Violetta Apply Assistant 3.9.13 - in-place update' -ForegroundColor Cyan
     Write-Host 'Close the previous assistant backend window before continuing.'
     Write-Host 'Do NOT remove the existing extension from Chrome.'
     if ([string]::IsNullOrWhiteSpace($Destination)) {

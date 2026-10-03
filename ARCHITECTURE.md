@@ -1,63 +1,168 @@
-# Architecture · 3.9.9
+# Architecture · 3.9.13
 
+## Overview
 
-## 3.9.9: vacancy memory and form continuation
+Violetta Apply Assistant состоит из двух уровней:
 
-`hh-list-quick-apply.js` restores card UI from `quick-list-state` using the exact vacancy identity. The worker persists the quick-list application before navigation, keeps a short-lived tab/session binding for continuation, and stores durable application/form state in `chrome.storage.local`. `universal-content.js` resumes only an explicitly persisted or exact-ID-recovered application route, fills safe confirmed fields, records unresolved fields back into `formMemory`, and never treats a final Submit as an automatic continuation step.
+1. **Chrome extension** — основной пользовательский runtime. Он взаимодействует с HH DOM, хранит локальную память, готовит письма, анализирует вакансии и заполняет анкеты.
+2. **Optional .NET backend** — расширенный режим для dashboard, очередей, background automation и server-side analytics.
 
-The durable key is the application/vacancy identity, not the current DOM node. A repeated card therefore rehydrates Analysis and application state after Back/reload. Form recovery requires exact provider/vacancy identity when the URL exposes it; otherwise continuation is constrained to the same prepared tab plus title/context checks.
+Core workflow не должен зависеть от backend availability.
 
-## Единый путь текста в расширении
+## High-level flow
 
-```mermaid
-flowchart LR
- S[CV + подтверждения HH] --> T[Candidate Truth Memory]
- V[Полная вакансия] --> R[Role + Evidence Selection]
- T --> R
- C[Текущий чат + последний вопрос] --> R
- R --> G[Локальный текст или настроенная модель]
- G --> Q[Факты / длина / вопросы / язык]
- Q --> A[Apply + память отправленного письма]
- Q --> D[Черновик чата: ручной Send]
+```text
+HH page
+  │
+  ├─ content scripts
+  │   ├─ card detection
+  │   ├─ Analysis UI
+  │   ├─ quick apply
+  │   ├─ questionnaire content
+  │   └─ recruiter chat UI
+  │
+  ├─ extension service worker
+  │   ├─ full vacancy reader
+  │   ├─ HH API fallback
+  │   ├─ writing / evidence engine
+  │   ├─ persistent memory
+  │   └─ optional backend bridge
+  │
+  └─ chrome.storage
+      ├─ candidate profile
+      ├─ vacancy memory
+      ├─ cover-letter memory
+      └─ questionnaire answer memory
 ```
 
-`candidate-seed.js` содержит датированные источники и факты. `candidate-truth.js` мигрирует профиль, хранит происхождение/статус, согласует изменения и отделяет память диалога. `relevance-engine.js` читает требования, определяет семейство роли, выбирает до пяти основных фактов, двух проектов и одного дополнительного факта. Отрицательная релевантность исключает нерелевантную биографию.
+## Vacancy identity
 
-`context-reply.js` определяет последнее сообщение работодателя, ранее обсуждённые вопросы и пропуски. `chat-reader.js` ограничивает чтение активной панелью чата; боковой список переписок не является историей. Неизвестный автор не подменяется работодателем. Если разметка не даёт достаточно признаков, интерфейс показывает прочитанный текст и просит подтвердить его автора.
+`vacancyId` — главный ключ состояния HH-вакансии. UI карточки, Analysis, prepared application, cover letter и questionnaire state должны быть сопоставлены с одним и тем же ID.
 
-`writing-provider.js` — необязательный транспорт к явно настроенному Chat Completions API. `writing-background.js` связывает правила с существующими worker/storage. Старый canned `/triage` больше не выдаётся за анализ моделью.
+Это предотвращает:
 
-## Standalone extension-first runtime
+- смешивание соседних карточек;
+- использование search heading как vacancy title;
+- потерю состояния при Back/reload;
+- применение письма к другой вакансии.
 
-Core browsing features do not wait for `127.0.0.1:8080`.
+## Full Vacancy Reader
 
-- `universal-content.js` renders ✦ Apply from local page detection.
-- `recruiter-chat-content.js` renders ✎ AI from the active chat DOM.
-- `copilot-background.js` provides Candidate Truth/Profile/letter/chat logic inside the extension service worker.
-- `setup-readiness.js` treats the local backend as optional for core Apply/Chat functions.
-- `cpRepairSupportedTabs()` reconnects already-open HH tabs after install/startup when Chrome allows it.
-- lightweight SPA watchdogs re-run page/chat detection after route/content changes.
+Полная вакансия читается через единый reliable flow:
 
-The local .NET backend remains an advanced service for the autonomous queue/dashboard path.
+1. exact vacancy URL / vacancy ID;
+2. inactive background tab;
+3. DOM readiness (`interactive`/`complete` + readable content), без жёсткого ожидания `tab.status === complete`;
+4. проверка vacancy ID после navigation;
+5. retry при кратковременном SPA/message-channel transition;
+6. fallback на `https://api.hh.ru/vacancies/<id>`;
+7. отказ от generic writing, если полное описание не подтверждено.
 
-## Места интеграции
+Один и тот же reader используется Analysis и cover-letter preparation.
 
-- `cpPrepare` / `cpAutoApply`: полное описание → текущий профиль → новое письмо, а не устаревший application snapshot.
-- `cpEnrichExistingPlan`: тот же путь для старого dashboard и advanced popup.
-- `browserAutopilotApplyNext`: полная вакансия и новая память для письма. Серверная очередь/match score и существующие лимиты сохранены; backend ranking не переписан и автоматически не синхронизируется с произвольными изменениями профиля расширения.
-- HH list quick apply: карточка даёт identity; текст для письма читается отдельно в неактивной вкладке, не переключая текущую. При ошибке загрузки письмо не отправляется.
-- `cpResolve` / `cpAnswerCurrentChat`: актуальные личные факты плюс отдельный снимок CV/письма, использованный при отклике.
+## Analysis engine
 
-## Состояние и хранение
+`hh-list-quick-apply-core.js` содержит детерминированную классификацию phone duties.
 
-Профиль: Chrome local storage. Ключ модели: Chrome session storage, не content script и не экспорт Git. Память переписки: отдельная запись conversation. Черновик помечается `sent:false`; сохранение черновика не доказывает его отправку. Cover Letter Memory сохраняет фактический текст подтверждённого отклика и audit: vacancy hash, profile revision, fact IDs и источник генерации.
+Отдельно различаются:
 
-Кэш письма учитывает ID/полный текст вакансии, revision профиля и конфигурацию модели. Изменение фактов меняет ключ. Переключение чата/новое последнее сообщение отклоняет устаревший ответ. Подгрузка более ранней истории не считается новым последним сообщением.
+- фактические обязанности звонить;
+- chat/ticket work;
+- техническая настройка телефонии/SIP/VoIP.
 
-## Границы
+Analysis state сохраняется в vacancy memory с timestamp и источником evidence.
 
-Чтение истории ограничено безопасным количеством шагов и доступным DOM. «Достигнут верх» без явного маркера не означает, что сервер отдал всю историю. В интерфейсе сохраняется признак неполной истории.
+## Writing pipeline
 
-Проверка текста эвристическая: запрещённые неподтверждённые технологии, количества, известные противоречия, нерелевантный опыт, пустой/слишком длинный ответ. Произвольные семантические ошибки LLM полностью исключить этими проверками нельзя.
+```text
+full vacancy
+→ requirement extraction
+→ candidate truth / CV evidence
+→ relevance ranking
+→ draft generation
+→ validation
+→ cover-letter memory
+```
 
-В Windows ZIP: `extension/` + опубликованный `backend/`. В Git: `browser-extension/` + существующий `src/`. Изменения .NET-бинарников отсутствуют; профиль/транспорт модели этой версии реализованы в расширении.
+Письмо не должно заявлять неподтверждённые факты.
+
+Основные модули:
+
+- `candidate-truth.js`
+- `candidate-seed.js`
+- `relevance-engine.js`
+- `writing-provider.js`
+- `writing-background.js`
+- `copilot-core.js`
+- `copilot-background.js`
+
+## Smart Questionnaire Autofill
+
+Questionnaire logic разделена на небольшие модули:
+
+- `questionnaire-core.js` — normalization, classification, semantic keys;
+- `questionnaire-answer-engine.js` — evidence-first answers и human fallback drafts;
+- `questionnaire-memory.js` — reusable answer memory и vacancy-scoped form state;
+- `questionnaire-content.js` — DOM discovery, MutationObserver, verified writes и UI statuses.
+
+### Answer states
+
+- `confirmed` — ответ основан на подтверждённых данных;
+- `draft/review` — нейтральный human fallback, требует проверки;
+- `unknown/review` — безопасный ответ построить нельзя.
+
+### DOM verification
+
+Поле считается заполненным только после повторного чтения DOM и подтверждения значения. Простое присваивание `.value` недостаточно.
+
+### Dynamic forms
+
+MutationObserver + debounce позволяют обрабатывать поздние поля и новые steps без бесконечного повторного заполнения и duplicate UI.
+
+## Persistent memory
+
+Vacancy memory хранит, как минимум:
+
+```text
+vacancyId
+analysis
+application state
+cover letter
+questionnaire progress
+review fields
+```
+
+Questionnaire answer memory отделяет:
+
+- универсальные подтверждённые ответы;
+- vacancy/company-specific ответы;
+- reviewable drafts.
+
+Reviewable fallback draft не должен автоматически становиться подтверждённым фактом.
+
+## Recruiter Chat
+
+Chat assistant читает только активный доступный DOM-диалог, связывает его с известным vacancy context, создаёт draft и не отправляет сообщение автоматически.
+
+## Backend
+
+Backend source находится в `src/JobSearchAssistant/`.
+
+Он предоставляет advanced workflows и не должен дублировать core browser behavior. Release bundle содержит published runtime в `backend/`, но эта папка не публикуется в source Git repository.
+
+## Repository hygiene
+
+Source repository и FULL bundle намеренно имеют разную структуру:
+
+```text
+FULL bundle                 Git source
+-----------                 ----------
+extension/          ->       browser-extension/
+backend/            X        published runtime excluded
+github-source/...   ->       .github/...
+test-results/       X        excluded
+```
+
+`source-sync-manifest.json` определяет точное отображение release → source. Publisher проверяет каждый hash и whitelist target.
+
+`tools/check-repo-hygiene.py` дополнительно блокирует случайное отслеживание FULL/runtime paths.

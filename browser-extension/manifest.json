@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "3.9.9",
-  "description": "Violetta 3.9.9: постоянная память Analysis/откликов по vacancy ID и автоматическое заполнение форм после перехода из списка вакансий.",
+  "version": "3.9.13",
+  "description": "Violetta 3.9.13: vacancy analysis, vacancy-specific applications, persistent memory, smart questionnaire autofill, and repository/documentation hygiene.",
   "permissions": [
     "activeTab",
     "storage",
@@ -18,6 +18,7 @@
     "http://127.0.0.1/*",
     "https://hh.ru/*",
     "https://*.hh.ru/*",
+    "https://api.hh.ru/*",
     "https://headhunter.kg/*",
     "https://*.headhunter.kg/*"
   ],
@@ -49,6 +50,7 @@
       "matches": [
         "https://hh.ru/*",
         "https://*.hh.ru/*",
+        "https://api.hh.ru/*",
         "https://headhunter.kg/*",
         "https://*.headhunter.kg/*"
       ],
@@ -75,6 +77,10 @@
         "hh-list-quick-apply-core.js",
         "hh-list-quick-apply.js",
         "application-state-machine.js",
+        "questionnaire-core.js",
+        "questionnaire-memory.js",
+        "questionnaire-answer-engine.js",
+        "questionnaire-content.js",
         "universal-content.js",
         "recruiter-chat.js",
         "quick-replies.js",

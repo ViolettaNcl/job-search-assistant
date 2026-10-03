@@ -1,97 +1,51 @@
-VIOLETTA APPLY ASSISTANT 3.9.9
+VIOLETTA APPLY ASSISTANT 3.9.13 — START HERE
+=============================================
 
-3.9.9: Analysis и статусы карточек сохраняются по vacancy ID; формы HH после перехода заполняются автоматически.
+NORMAL USE (NO TERMINAL REQUIRED)
+---------------------------------
+1. Extract the ZIP.
+2. Open Chrome -> chrome://extensions
+3. Enable Developer mode.
+4. Click "Load unpacked".
+5. Select the "extension" folder from the FULL bundle.
+6. Grant HH.ru / HeadHunter access if Chrome asks.
+7. Reload already-open HH tabs once.
 
-3.9.8: если HH после попытки добавить письмо пишет «Отклик уже просмотрен работодателем»,
-расширение автоматически нажимает «Закрыть», помечает карточку «✓ Уже просмотрен»
-и возвращает вас к списку. Другие ошибки автоматически не скрываются.
+SEARCH PAGE
+-----------
+Analysis             -> reads the exact full vacancy and checks call duties.
+✦ Отклик + письмо    -> prepares an exact-vacancy application and cover letter.
 
-=============================
+QUESTIONNAIRE PAGE
+------------------
+The assistant reads employer questions and fills safe answers from candidate evidence.
 
-ANALYSIS НА КАРТОЧКЕ HH
------------------------
-Нажмите Analysis рядом с нужной вакансией: ✓ Без звонков = можно рассматривать для chat-only; ✕ Есть звонки = в полном описании найдены телефонные/голосовые обязанности; ? Неясно = полное описание не подтверждено. Analysis сам отклик не отправляет.
+✓ auto-filled        = confirmed evidence
+✎ draft/review       = neutral human fallback, check before sending
+? / review           = data cannot be safely inferred
 
-БЫСТРЫЙ ЗАПУСК БЕЗ ТЕРМИНАЛА
-1. Распакуйте ZIP.
-2. Chrome -> chrome://extensions
-3. Включите Режим разработчика.
-4. Нажмите "Загрузить распакованное".
-5. Выберите папку extension.
+The assistant does not invent legal/identity facts or numeric salary values.
 
-Готово. Базовые функции работают как Chrome extension:
-- ✦ Apply на поддерживаемой вакансии
-- ✎ AI в текущем recruiter chat
-- HH quick apply + vacancy-specific cover letter
-- Candidate Truth Memory
-- RU/EN CV
-- локальные ответы по подтвержденным фактам
+MEMORY
+------
+Analysis, application and questionnaire state are stored by vacancyId and restored after Back/reload/repeated cards.
 
-Если HH был открыт до установки/обновления расширения, 3.9.7 пытается
-подключиться к уже открытой вкладке. Если Chrome не разрешил переинжект,
-один раз обновите вкладку.
+ADVANCED MODE
+-------------
+Run start-assistant.cmd only if you need the local dashboard, queue, Autopilot or server analytics.
+Default backend: http://127.0.0.1:8080
 
-✦ APPLY
-На прямой HH-вакансии кнопка должна быть в правом нижнем углу.
-Она не зависит от готовности локального backend.
-При SPA-переходах 3.9.7 повторно проверяет тип страницы и восстанавливает UI.
+GITHUB SOURCE UPDATE
+--------------------
+Do NOT copy the whole FULL folder into the repository.
+Use Publish-Violetta-3.9.13.ps1.
 
-✎ AI
-В активной HH-переписке ручка должна появляться по умолчанию.
-Она работает по текущему открытому чату, а не по "последней вакансии".
-Send остается ручным.
+Before push you can run:
+  python tools\check-repo-hygiene.py
 
-ПИСЬМА И MEMORY
-Используются актуальные подтвержденные факты из CV/HH/current Technical Support/freelance memory.
-Для каждой вакансии отбираются только релевантные факты.
-В сопроводительном письме не называются прежние работодатели или учебное заведение: используются роль, релевантные обязанности, проекты и профильное образование в области информационных систем и программирования.
-GitHub добавляется только для технических ролей.
-
-ВНЕШНЯЯ AI-МОДЕЛЬ
-Не обязательна для базовых функций.
-Настройки -> AI и ответы -> Модель.
-Без модели работает локальный evidence-based режим.
-
-РАСШИРЕННЫЙ BACKEND (ОПЦИОНАЛЬНО)
-start-assistant.cmd нужен только для advanced-функций:
-- 🚀 Autopilot queue / background discovery
-- локальный dashboard
-- серверная очередь и часть аналитики
-
-Backend: http://127.0.0.1:8080
-
-ОБНОВЛЕНИЕ СТАРОЙ УСТАНОВКИ
-Можно загрузить новую папку extension отдельно.
-Если хотите сохранить старый bundle/backend, используйте UPDATE_EXISTING.cmd.
-Удалять локальную SQLite-базу не нужно.
-
-GITHUB
-SYNC_GITHUB.cmd
-или
-Publish-Violetta-3.9.9.ps1 -Push
-
-ПРОВЕРКА
-TEST_REPORT.md
-
-
-HH.RU — ПОСТОЯННЫЙ ✦ APPLY / ✎ AI
-----------------------------------
-На вакансиях и в переписке кнопки должны появляться автоматически.
-Если Chrome раньше был вручную переведён в режим «доступ только при нажатии», браузер не разрешает расширению отменить это без вашего действия. Разрешите доступ к HH.ru один раз. В 3.9.7 это разрешение запрашивается сразу для hh.ru и всех региональных *.hh.ru. После этого открывать popup для каждой вакансии не требуется.
-
-Нажатие ✦ Apply запускает полный поддерживаемый flow: анализ вакансии → CV → индивидуальное сопроводительное письмо → штатный «Откликнуться» → «Приложить сопроводительное письмо» → заполнение поля → «Отправить». Если сайт требует неоднозначного обязательного решения, flow останавливается на проверку.
-
-FAST CARD APPLY FROM THE VACANCY LIST
-------------------------------------
-On HH.ru / HeadHunter search result pages the extension adds:
-
-✦ Отклик + письмо
-
-next to supported vacancy cards. Press it to highlight that exact card and send the response with a vacancy-specific cover letter without manually opening the detail page.
-
-Supported HeadHunter variants:
-- cover letter is mandatory before the initial response;
-- response is sent first and HH then shows «Приложить письмо».
-
-Unsupported/ambiguous questionnaires stop for review.
-
+Documentation:
+  README.md
+  docs\USER_GUIDE.md
+  docs\REPOSITORY_LAYOUT.md
+  docs\RELEASE_PROCESS.md
+  docs\TROUBLESHOOTING.md

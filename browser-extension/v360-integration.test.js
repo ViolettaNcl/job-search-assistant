@@ -5,9 +5,9 @@ const path=require('node:path');
 const root=__dirname;
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 
-test('manifest and core expose 3.9.9',()=>{
-  assert.equal(JSON.parse(read('manifest.json')).version,'3.9.9');
-  assert.match(read('copilot-core.js'),/VERSION = '3\.9\.9'/);
+test('manifest and core expose 3.9.13',()=>{
+  assert.equal(JSON.parse(read('manifest.json')).version,'3.9.13');
+  assert.match(read('copilot-core.js'),/VERSION = '3\.9\.13'/);
 });
 
 test('main Apply routes job descriptions directly to auto-apply without opening popup auto page',()=>{
@@ -54,7 +54,7 @@ test('user-controlled HH autopilot is present and targets remote IT vacancies',(
   const popup=read('popup.html'),auto=read('browser-autopilot.js'),bg=read('background.js');
   assert.match(popup,/Запустить автопилот/);assert.match(popup,/Удалённо · IT по профилю/);
   assert.match(auto,/programmingOnly:true/);assert.match(auto,/remoteOnly:true/);assert.match(auto,/sessionLimit:5/);
-  assert.match(bg,/browserAutopilotSession/);assert.match(bg,/3\.9\.9-evidence/);
+  assert.match(bg,/browserAutopilotSession/);assert.match(bg,/3\.9\.13-evidence/);
 });
 
 test('backend dashboard no longer claims autopilot is disabled by Copilot 3.0',()=>{
@@ -108,6 +108,18 @@ test('chat AI exposes full-dialog analysis, current HH DOM fallback, and explici
   assert.match(bg,/cpAnswerCurrentChat/);assert.match(read('context-reply.js'),/LATEST|latest/i);
   assert.match(adapters,/fallbackMessageBlocks/);
   assert.match(adapters,/dom-fallback-/);
+});
+
+
+
+test('3.9.10 grants HH API access and keeps a full-vacancy fallback for Analysis and letters',()=>{
+  const manifest=JSON.parse(read('manifest.json')),bg=read('copilot-background.js'),writing=read('writing-background.js');
+  assert.ok(manifest.host_permissions.includes('https://api.hh.ru/*'));
+  assert.match(bg,/async function cpWaitForVacancyReadable/);
+  assert.match(bg,/cpAcquireHhVacancy\(selected,sender,\{fast:true\}\)/);
+  assert.match(bg,/Promise\.any\(\[apiTask,liveTask\]\)/);
+  assert.match(writing,/cpAcquireHhVacancy\(v,sender,\{fast:Boolean\(embedded\)\}\)/);
+  assert.match(bg,/Не удалось прочитать полную HH-вакансию/);
 });
 
 test('HH list quick apply starts preparation on trusted click and supports current generic modal portals',()=>{
@@ -166,7 +178,7 @@ test('3.7 autopilot targets junior-compatible development QA and technical suppo
 
 test('3.9 standalone mode keeps Apply and Chat AI available without backend readiness',()=>{
   const manifest=JSON.parse(read('manifest.json')),adapters=read('site-adapters.js'),universal=read('universal-content.js'),chat=read('recruiter-chat-content.js'),home=read('home.js');
-  assert.equal(manifest.version,'3.9.9');
+  assert.equal(manifest.version,'3.9.13');
   assert.ok(manifest.icons?.['128']);
   assert.ok(manifest.action?.default_icon?.['48']);
   assert.match(adapters,/direct HH vacancy URL/);
@@ -177,7 +189,7 @@ test('3.9 standalone mode keeps Apply and Chat AI available without backend read
   assert.match(home,/работают без терминала|работать автономно|продолжают работать автономно/);
 });
 
-test('3.9.9 treats HeadHunter.kg as a first-class HH surface without opening the popup',()=>{
+test('3.9.10 treats HeadHunter.kg as a first-class HH surface without opening the popup',()=>{
   const manifest=JSON.parse(read('manifest.json')),background=read('copilot-background.js'),site=read('site-apply.js'),home=read('home.js'),core=read('copilot-core.js');
   const scripts=manifest.content_scripts.find(x=>x.js?.includes('copilot-core.js'));
   assert.ok(manifest.host_permissions.includes('https://headhunter.kg/*'));
@@ -201,14 +213,14 @@ test('3.9 service worker repairs already-open HH tabs after extension load',()=>
 });
 
 
-test('3.9.9 HH vacancy detection does not mistake search forms for application forms',()=>{
+test('3.9.10 HH vacancy detection does not mistake search forms for application forms',()=>{
   const adapters=read('site-adapters.js');
   assert.match(adapters,/classify the form by its own semantics/);
   assert.doesNotMatch(adapters,/\+url\)\|\|Boolean\(el\.querySelector\('\[name="email"\]'/);
   assert.ok(adapters.includes("/\\/vacancy\\/\\d+/i.test(path)"));
 });
 
-test('3.9.9 repairs HH surfaces on activation, navigation, and permission grant',()=>{
+test('3.9.10 repairs HH surfaces on activation, navigation, and permission grant',()=>{
   const background=read('copilot-background.js');
   assert.match(background,/onActivated/);
   assert.match(background,/cpRepairHhTab/);
@@ -217,14 +229,14 @@ test('3.9.9 repairs HH surfaces on activation, navigation, and permission grant'
   assert.match(home,/https:\/\/\*\.hh\.ru\/\*/);
 });
 
-test('3.9.9 can continue an HH cover letter after resume submission',()=>{
+test('3.9.10 can continue an HH cover letter after resume submission',()=>{
   const background=read('copilot-background.js');
   assert.match(background,/function cpNeedsHhLetter/);
   assert.match(background,/letterContinuation/);
 });
 
 
-test('3.9.9 keeps HH Apply surfaces repaired across SPA history navigation',()=>{
+test('3.9.10 keeps HH Apply surfaces repaired across SPA history navigation',()=>{
   const manifest=JSON.parse(read('manifest.json')),background=read('copilot-background.js');
   assert.ok(manifest.permissions.includes('webNavigation'));
   assert.ok(manifest.permissions.includes('tabs'));
@@ -232,7 +244,7 @@ test('3.9.9 keeps HH Apply surfaces repaired across SPA history navigation',()=>
   assert.match(background,/hostSuffix:'hh\.ru'|hostSuffix:'hh.ru'/);
 });
 
-test('3.9.9 submits the dedicated HH cover-letter modal instead of generic final-action detection',()=>{
+test('3.9.10 submits the dedicated HH cover-letter modal instead of generic final-action detection',()=>{
   const content=read('site-apply-content.js'),core=read('site-apply.js');
   assert.match(content,/vjaHhCoverLetterSubmitAction/);
   assert.match(content,/hh-cover-letter-submit-not-found/);
@@ -241,7 +253,7 @@ test('3.9.9 submits the dedicated HH cover-letter modal instead of generic final
 });
 
 
-test('3.9.9 persists HH card memory and resumes exact application forms safely',()=>{
+test('3.9.10 persists HH card memory and resumes exact application forms safely',()=>{
   const list=read('hh-list-quick-apply.js'),bg=read('copilot-background.js'),universal=read('universal-content.js');
   assert.match(list,/quick-list-state/);assert.match(list,/restoreCardState/);assert.match(list,/Форма:.*проверить/);
   assert.match(bg,/vjaQuickListActive:/);assert.match(bg,/cpQuickListState/);assert.match(bg,/formMemory/);assert.match(bg,/30\*24\*60\*60\*1000/);assert.match(bg,/cpRepairPermittedApplicationTab/);
