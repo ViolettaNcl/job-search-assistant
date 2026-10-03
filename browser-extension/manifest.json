@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "3.9.13",
-  "description": "Violetta 3.9.13: vacancy analysis, vacancy-specific applications, persistent memory, smart questionnaire autofill, and repository/documentation hygiene.",
+  "version": "4.0.0",
+  "description": "Violetta 4.0: batch vacancy analysis, explainable Fit Score, user-controlled Apply Queue, persistent memory, smart questionnaires and vacancy-specific applications.",
   "permissions": [
     "activeTab",
     "storage",
@@ -76,6 +76,9 @@
         "site-apply-content.js",
         "hh-list-quick-apply-core.js",
         "hh-list-quick-apply.js",
+        "vacancy-fit.js",
+        "job-search-page-core.js",
+        "hh-list-intelligence.js",
         "application-state-machine.js",
         "questionnaire-core.js",
         "questionnaire-memory.js",

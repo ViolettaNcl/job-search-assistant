@@ -1,20 +1,20 @@
 # Release Process
 
-## Главное правило
+## Main rule
 
-**Никогда не копируйте FULL bundle целиком поверх Git repository.**
+Never copy a FULL bundle over the Git source repository.
 
-Неправильно:
+Wrong:
 
 ```powershell
 robocopy "...FULL" "...job-search-assistant" /E
 ```
 
-FULL bundle содержит packaged `extension/`, runtime `backend/`, test output и release helpers. Для GitHub нужен только source subset.
+A FULL bundle contains packaged `extension/`, runtime `backend/`, test output and release helpers. GitHub should receive only the source subset defined by `source-sync-manifest.json`.
 
-## Правильный процесс
+## Safe 4.0 publication
 
-1. Убедитесь, что локальный repository clean:
+1. Clone/open the existing repository and ensure it is clean.
 
 ```powershell
 cd C:\Users\1\Downloads\job-search-assistant
@@ -22,35 +22,26 @@ git status
 git pull --ff-only origin main
 ```
 
-2. Запустите hygiene check:
+2. Run repository hygiene.
 
 ```powershell
 python tools/check-repo-hygiene.py
 ```
 
-3. Используйте release publisher:
+3. Run the release publisher from the extracted FULL bundle.
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 
-& "<FULL_FOLDER>\Publish-Violetta-3.9.13.ps1" `
+& "<FULL_FOLDER>\Publish-Violetta-4.0.0.ps1" `
   -RepoPath "C:\Users\1\Downloads\job-search-assistant" `
   -PackagePath "<FULL_FOLDER>" `
   -Push
 ```
 
-Publisher:
+The publisher verifies origin, `main`, clean working tree, file SHA-256 values and the target whitelist. It keeps a backup outside the repository and does not use reset/clean/stash/force-push.
 
-- проверяет origin;
-- требует `main` и clean working tree;
-- проверяет source manifest и SHA-256;
-- допускает только whitelisted source paths;
-- сохраняет backup изменяемых файлов вне repository;
-- не делает reset/clean/stash;
-- не использует force-push;
-- проверяет remote HEAD после push.
-
-## После публикации
+## Verify after publication
 
 ```powershell
 (Get-Content .\browser-extension\manifest.json -Raw | ConvertFrom-Json).version
@@ -60,4 +51,4 @@ git status
 git log -3 --oneline
 ```
 
-Ожидается clean working tree и версия `3.9.13`.
+Expected release version: `4.0.0`.

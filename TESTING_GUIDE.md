@@ -1,108 +1,111 @@
-# Testing Guide · 3.9.13
+# Testing Guide · 4.0.0
 
-## Goals
+## Test layers
 
-Tests protect four areas:
-
-1. extension logic;
-2. browser/HH integration fixtures;
-3. source publication and repository hygiene;
-4. backend build/tests.
-
-## Extension unit/regression tests
-
-From the release/source root:
+### 1. Node unit/regression suite
 
 ```powershell
 node --test browser-extension/*.test.js
 ```
 
-In FULL bundle the extension source is under `extension/`:
+In a FULL bundle use `extension` instead of `browser-extension`.
+
+4.0 adds tests for:
+
+- preference normalization;
+- deterministic Fit Score;
+- hard calls/sales penalties;
+- skill matching;
+- Ready Queue selection;
+- duplicate vacancy IDs;
+- page filters/progress labels;
+- manifest/service-worker wiring;
+- user-controlled queue behaviour.
+
+### 2. Focused Chromium 4.0 fixture
 
 ```powershell
-node --test extension/*.test.js
+python tests/browser_batch_400.py
 ```
+
+This fixture uses the actual extension scripts with mocked Chrome/HH boundaries. It verifies:
+
+- one compact search-page toolbar;
+- Batch Analysis of multiple cards;
+- Fit badges;
+- calls penalty;
+- Ready Queue selection;
+- no-calls filter;
+- vacancy-ID Fit memory restoration.
+
+It does **not** log into a live HH account.
+
+### 3. Existing HH reader regression
+
+```powershell
+python tests/hh_read_fallback_3910.py
+```
+
+Checks interactive-but-loading hidden tabs and exact `api.hh.ru` fallback.
+
+### 4. Vacancy/form memory
+
+```powershell
+python tests/browser_memory_399.py
+```
+
+Checks Analysis restoration, quick-list continuation and return-to-list form memory.
+
+### 5. Smart Questionnaire regression
+
+```powershell
+python tests/browser_questionnaire_3912.py
+```
+
+Checks projects/English answers, salary fallback, dynamic fields and manual final submit.
+
+### 6. Source publication
+
+```powershell
+python tests/test_source_publication.py
+```
+
+Verifies the release manifest/publisher contract.
+
+### 7. Repository hygiene
+
+```powershell
+python tests/test_repository_hygiene.py
+python tools/check-repo-hygiene.py
+```
+
+Prevents FULL/runtime/build/test-output pollution in Git source.
 
 ## JavaScript syntax
 
 ```powershell
-Get-ChildItem .\extension -Filter *.js | ForEach-Object {
-  node --check $_.FullName
-}
+Get-ChildItem browser-extension -Filter *.js | ForEach-Object { node --check $_.FullName }
 ```
 
-## Focused browser fixtures
-
-The release contains focused Python/Chromium fixtures for:
-
-- quick-list apply;
-- persistent vacancy/form memory;
-- full vacancy hidden-tab/API fallback;
-- questionnaire autofill and human fallback drafts.
-
-Examples:
+## Python compile
 
 ```powershell
-python tests\browser_memory_399.py
-python tests\hh_read_fallback_3910.py
-python tests\browser_questionnaire_3912.py
+python -m py_compile tests/*.py tools/*.py
 ```
 
-These fixtures use synthetic/mocked HH boundaries and do not certify future production DOM changes.
+## Workflow YAML
 
-## Source publication tests
+Parse/check all `.github/workflows/*.yml` files before release.
 
-```powershell
-python tests\test_source_publication.py
-```
+## Real-site validation
 
-Checks include:
+Synthetic PASS and live-HH validation must be reported separately. A fixture verifies our logic against a controlled DOM/API boundary; it does not certify future HH production markup, CAPTCHA/MFA behaviour or rate limits.
 
-- version/repository identity;
-- SHA-256 integrity;
-- allowed source targets;
-- forbidden binaries/secrets;
-- duplicate targets;
-- no force/reset/clean publication behavior;
-- normal Git push semantics.
+Before publishing a major milestone such as 4.0, test at least:
 
-## Repository hygiene
-
-```powershell
-python tools\check-repo-hygiene.py
-python tests\test_repository_hygiene.py
-```
-
-The hygiene check fails when tracked Git paths contain:
-
-- nested `Violetta-Apply-Assistant-*` release folders;
-- root `backend/`, `extension/`, `github-source/`, `test-results/`;
-- build/runtime artifacts;
-- local databases/logs/secrets.
-
-## Backend
-
-```powershell
-dotnet restore src\JobSearchAssistant\JobSearchAssistant.csproj
-dotnet build src\JobSearchAssistant\JobSearchAssistant.csproj -c Release --no-restore
-dotnet test tests\JobSearchAssistant.Tests\JobSearchAssistant.Tests.csproj -c Release
-```
-
-## CI
-
-`.github/workflows/ci.yml` runs backend build/tests, extension syntax/tests, release metadata verification and repository hygiene on push/PR.
-
-Additional workflows cover CodeQL, candidate-memory regression, site-apply regression and Windows packaging.
-
-## Release verification
-
-Before publishing a release:
-
-1. run extension tests;
-2. run focused browser regressions;
-3. run source-publication tests;
-4. run hygiene check;
-5. verify manifest/backend release versions;
-6. verify ZIP hashes.
-
-Exact release counts belong in `TEST_REPORT.md`, not in README, so the project description does not become stale after every new test.
+1. a no-calls support vacancy;
+2. a confirmed calls vacancy;
+3. a repeated vacancy card;
+4. Batch Analysis on a normal result page;
+5. Ready Queue → explicit Apply;
+6. a questionnaire redirect and return to the list.

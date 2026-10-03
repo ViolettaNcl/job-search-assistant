@@ -6,12 +6,14 @@ on:
     paths:
       - 'browser-extension/**'
       - 'tests/browser_e2e.py'
+      - 'tests/browser_batch_400.py'
       - 'tests/fixtures/**'
       - '.github/workflows/site-apply-regression.yml'
   pull_request:
     paths:
       - 'browser-extension/**'
       - 'tests/browser_e2e.py'
+      - 'tests/browser_batch_400.py'
       - 'tests/fixtures/**'
       - '.github/workflows/site-apply-regression.yml'
 
@@ -31,7 +33,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for file in background.js site-apply.js site-apply-content.js copilot-background.js universal-content.js site-adapters.js hh-list-quick-apply.js recruiter-chat-content.js; do
+          for file in background.js site-apply.js site-apply-content.js copilot-background.js universal-content.js site-adapters.js hh-list-quick-apply.js vacancy-fit.js job-search-page-core.js hh-list-intelligence.js recruiter-chat-content.js; do
             node --check "browser-extension/$file"
           done
       - name: Run application-focused tests
@@ -40,6 +42,30 @@ jobs:
           node browser-extension/final-submit-control.test.js
           node browser-extension/browser-autopilot.test.js
           node browser-extension/v360-integration.test.js
+          node browser-extension/vacancy-fit.test.js
+          node browser-extension/job-search-page-core.test.js
+          node browser-extension/batch-analysis-400.test.js
+
+  batch-intelligence-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Playwright
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Verify Batch Analysis, Fit Score, queue and persistent vacancy score
+        run: python tests/browser_batch_400.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: batch-analysis-browser-results
+          path: test-results/
+          if-no-files-found: ignore
 
   floating-panel-browser:
     runs-on: ubuntu-latest

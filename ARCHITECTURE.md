@@ -1,168 +1,157 @@
-# Architecture · 3.9.13
+# Architecture · Violetta Apply Assistant 4.0
 
-## Overview
+## Design principles
 
-Violetta Apply Assistant состоит из двух уровней:
+- **Vacancy-first:** every search-card action is pinned to an exact vacancy identity.
+- **Extension-first:** core workflow does not require the local backend.
+- **Evidence-first:** candidate facts and vacancy data are verified before writing or autofill.
+- **Explainable ranking:** 4.0 Fit Score is deterministic `rules-v1` with visible reasons/risks.
+- **Persistent state:** HH SPA navigation must not erase analysis/application/form state.
+- **Fail-safe automation:** uncertain irreversible actions remain user-controlled.
+- **Data-first ML roadmap:** 4.0 records structured features/decisions; training is deferred until enough labels exist.
 
-1. **Chrome extension** — основной пользовательский runtime. Он взаимодействует с HH DOM, хранит локальную память, готовит письма, анализирует вакансии и заполняет анкеты.
-2. **Optional .NET backend** — расширенный режим для dashboard, очередей, background automation и server-side analytics.
+## Main components
 
-Core workflow не должен зависеть от backend availability.
+### Search-card layer
 
-## High-level flow
+`hh-list-quick-apply-core.js`
+: exact HH identifiers, phone-duty Analysis rules and safe action matching.
 
-```text
-HH page
-  │
-  ├─ content scripts
-  │   ├─ card detection
-  │   ├─ Analysis UI
-  │   ├─ quick apply
-  │   ├─ questionnaire content
-  │   └─ recruiter chat UI
-  │
-  ├─ extension service worker
-  │   ├─ full vacancy reader
-  │   ├─ HH API fallback
-  │   ├─ writing / evidence engine
-  │   ├─ persistent memory
-  │   └─ optional backend bridge
-  │
-  └─ chrome.storage
-      ├─ candidate profile
-      ├─ vacancy memory
-      ├─ cover-letter memory
-      └─ questionnaire answer memory
-```
+`hh-list-quick-apply.js`
+: per-card Analysis and `✦ Отклик + письмо` UI, status restoration and application flow.
 
-## Vacancy identity
+`vacancy-fit.js`
+: pure deterministic vacancy feature/fit scorer. It has no network/storage dependencies and exposes `rules-v1` score explanations.
 
-`vacancyId` — главный ключ состояния HH-вакансии. UI карточки, Analysis, prepared application, cover letter и questionnaire state должны быть сопоставлены с одним и тем же ID.
+`job-search-page-core.js`
+: pure helpers for page-level de-duplication, filters, progress and badge labels.
 
-Это предотвращает:
+`hh-list-intelligence.js`
+: Batch Analysis toolbar, bounded worker queue, Fit badges, current-page filters, Ready to Apply queue and explicit Save/Skip/Review actions.
 
-- смешивание соседних карточек;
-- использование search heading как vacancy title;
-- потерю состояния при Back/reload;
-- применение письма к другой вакансии.
+### Service worker intelligence
 
-## Full Vacancy Reader
+`copilot-background.js` coordinates:
 
-Полная вакансия читается через единый reliable flow:
+- exact full-vacancy acquisition;
+- HH hidden DOM + API race/fallback;
+- phone-duty Analysis;
+- `vjaRelevance.analyze` structured extraction;
+- candidate profile lookup;
+- Fit Score calculation;
+- vacancy intelligence persistence;
+- preference/decision memory;
+- application preparation.
 
-1. exact vacancy URL / vacancy ID;
-2. inactive background tab;
-3. DOM readiness (`interactive`/`complete` + readable content), без жёсткого ожидания `tab.status === complete`;
-4. проверка vacancy ID после navigation;
-5. retry при кратковременном SPA/message-channel transition;
-6. fallback на `https://api.hh.ru/vacancies/<id>`;
-7. отказ от generic writing, если полное описание не подтверждено.
+Multiple requests for the same vacancy are de-duplicated with an in-flight map.
 
-Один и тот же reader используется Analysis и cover-letter preparation.
+### Questionnaire layer
 
-## Analysis engine
+`questionnaire-core.js`
+: question/field recognition and semantic categories.
 
-`hh-list-quick-apply-core.js` содержит детерминированную классификацию phone duties.
+`questionnaire-answer-engine.js`
+: evidence-grounded answers plus reviewable human fallback drafts.
 
-Отдельно различаются:
+`questionnaire-memory.js`
+: reusable confirmed answers and per-vacancy form state.
 
-- фактические обязанности звонить;
-- chat/ticket work;
-- техническая настройка телефонии/SIP/VoIP.
+`questionnaire-content.js`
+: DOM fill/verification, MutationObserver and review UI.
 
-Analysis state сохраняется в vacancy memory с timestamp и источником evidence.
+### Candidate/evidence layer
 
-## Writing pipeline
+`candidate-truth.js`, `candidate-seed.js`, `relevance-engine.js`
+: confirmed facts, role routing, vacancy evidence selection and writing validation.
+
+## 4.0 Batch Analysis flow
 
 ```text
-full vacancy
-→ requirement extraction
-→ candidate truth / CV evidence
-→ relevance ranking
-→ draft generation
-→ validation
-→ cover-letter memory
+HH search page
+  ↓
+hh-list-intelligence.js collects unique visible vacancyIds
+  ↓
+3 workers by default (configurable 1–4)
+  ↓
+quick-list-full-analysis
+  ↓
+cpAcquireHhVacancy
+  ├─ hidden DOM reader
+  └─ api.hh.ru fallback/race
+  ↓
+phone-duty Analysis
+  ↓
+vjaRelevance.analyze(full vacancy)
+  ↓
+vacancy-fit.js + Candidate Truth + Job Preference Profile
+  ↓
+Fit Score + reasons + risks + feature snapshot
+  ↓
+vjaVacancyIntel:<vacancyId>
+  ↓
+Fit badge / filters / Ready Queue
 ```
 
-Письмо не должно заявлять неподтверждённые факты.
+No step in this flow submits an application.
 
-Основные модули:
+## 4.0 storage model
 
-- `candidate-truth.js`
-- `candidate-seed.js`
-- `relevance-engine.js`
-- `writing-provider.js`
-- `writing-background.js`
-- `copilot-core.js`
-- `copilot-background.js`
+### `vjaJobPreferencesV1`
 
-## Smart Questionnaire Autofill
-
-Questionnaire logic разделена на небольшие модули:
-
-- `questionnaire-core.js` — normalization, classification, semantic keys;
-- `questionnaire-answer-engine.js` — evidence-first answers и human fallback drafts;
-- `questionnaire-memory.js` — reusable answer memory и vacancy-scoped form state;
-- `questionnaire-content.js` — DOM discovery, MutationObserver, verified writes и UI statuses.
-
-### Answer states
-
-- `confirmed` — ответ основан на подтверждённых данных;
-- `draft/review` — нейтральный human fallback, требует проверки;
-- `unknown/review` — безопасный ответ построить нельзя.
-
-### DOM verification
-
-Поле считается заполненным только после повторного чтения DOM и подтверждения значения. Простое присваивание `.value` недостаточно.
-
-### Dynamic forms
-
-MutationObserver + debounce позволяют обрабатывать поздние поля и новые steps без бесконечного повторного заполнения и duplicate UI.
-
-## Persistent memory
-
-Vacancy memory хранит, как минимум:
-
-```text
-vacancyId
-analysis
-application state
-cover letter
-questionnaire progress
-review fields
+```json
+{
+  "preferredRoles": ["technical_support", "developer"],
+  "dislikedRoles": ["sales"],
+  "avoidCalls": true,
+  "avoidSales": true,
+  "remotePreferred": true,
+  "officeAllowed": true,
+  "minimumFitScore": 80,
+  "batchConcurrency": 3,
+  "maxBatchPerPage": 80
+}
 ```
 
-Questionnaire answer memory отделяет:
+### `vjaVacancyIntel:<vacancyId>`
 
-- универсальные подтверждённые ответы;
-- vacancy/company-specific ответы;
-- reviewable drafts.
+Stores only the structured snapshot needed for ranking/memory:
 
-Reviewable fallback draft не должен автоматически становиться подтверждённым фактом.
-
-## Recruiter Chat
-
-Chat assistant читает только активный доступный DOM-диалог, связывает его с известным vacancy context, создаёт draft и не отправляет сообщение автоматически.
-
-## Backend
-
-Backend source находится в `src/JobSearchAssistant/`.
-
-Он предоставляет advanced workflows и не должен дублировать core browser behavior. Release bundle содержит published runtime в `backend/`, но эта папка не публикуется в source Git repository.
-
-## Repository hygiene
-
-Source repository и FULL bundle намеренно имеют разную структуру:
-
-```text
-FULL bundle                 Git source
------------                 ----------
-extension/          ->       browser-extension/
-backend/            X        published runtime excluded
-github-source/...   ->       .github/...
-test-results/       X        excluded
+```json
+{
+  "schemaVersion": 1,
+  "vacancy": {"vacancyId": "...", "title": "...", "company": "...", "url": "..."},
+  "analysis": {"status": "no-calls", "confidence": 0.98, "source": "hh-api"},
+  "fit": {"score": 91, "decision": "STRONG_MATCH", "reasons": [], "risks": [], "algorithm": "rules-v1"},
+  "features": {"role": "technical_support", "technologies": [], "remote": true},
+  "preferenceKey": "...",
+  "at": 0
+}
 ```
 
-`source-sync-manifest.json` определяет точное отображение release → source. Publisher проверяет каждый hash и whitelist target.
+A changed preference profile invalidates the cached Fit Score while allowing the vacancy to be re-evaluated.
 
-`tools/check-repo-hygiene.py` дополнительно блокирует случайное отслеживание FULL/runtime paths.
+### `vjaVacancyDecision:<vacancyId>`
+
+Explicit 4.0 user queue state: `SAVED`, `SKIPPED` or `REVIEWED`.
+
+These decisions are not yet ML training events. 4.1 will migrate/emit them into a dedicated Learning Event model.
+
+## Fit Score rules-v1
+
+The baseline starts at a neutral score and applies bounded adjustments for role preference, calls, sales, remote/office format, skill overlap, seniority, explicit experience years and English requirement.
+
+Important hard constraints:
+
+- when `avoidCalls=true`, a confirmed calls vacancy is capped at a low score and cannot enter Ready Queue;
+- when `avoidSales=true`, sales-focused vacancies are capped and not ready;
+- the score contains the algorithm ID and explanation arrays.
+
+This is deliberately not described as ML.
+
+## Optional backend
+
+The .NET backend remains the advanced runtime for dashboard/server automation/analytics. 4.0 extension ranking does not depend on it. Source release metadata can be updated during publication without replacing the backend runtime in a source-only commit.
+
+## Future learning boundary
+
+4.1 will add a versioned Learning Event Store. 5.0 may train models only from labelled user/outcome data and must keep evaluation/test data separate from training data. See `docs/LEARNING_SYSTEM.md` and `docs/ML_ARCHITECTURE.md`.

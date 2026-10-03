@@ -1,54 +1,59 @@
 # Roadmap
 
-The current priority is reliability before adding more automatic actions.
+The project follows a data-first sequence. Each milestone should create reliable inputs for the next rather than adding "AI" labels without evidence.
 
-## Next candidates
+## 4.0 — Batch Analysis + Explainable Ranking · Current
 
-### 1. Batch Analysis Queue
+- Batch Analysis of current HH search results.
+- Structured vacancy feature extraction.
+- Explainable Fit Score (`rules-v1`).
+- Job Preference Profile.
+- Ready to Apply queue.
+- Search-page filters.
+- Save / Skip / Review decision memory.
 
-Analyze visible HH cards sequentially with bounded concurrency and cache results by vacancy ID. Goal: reduce repetitive clicks without opening many active tabs.
+Exit criterion: the 4.0 workflow is stable on real HH usage and produces trustworthy structured vacancy/decision data.
 
-### 2. Questionnaire Review Center
+## 4.1 — Personal Learning Engine
 
-One compact screen showing:
+- `LearningEvent` store for accepted, skipped, edited and corrected decisions.
+- Explicit feedback: Good / Edit / Wrong where useful.
+- Implicit feedback signals from Apply / Skip / Save.
+- Separation of Fact, Preference, Answer, Writing, Vacancy and Outcome memory.
+- Retrieval of similar user-confirmed questionnaire/writing corrections.
+- No trained model required yet: retrieval + structured statistics first.
 
-- confirmed answers;
-- fallback drafts;
-- unresolved required fields;
-- reusable answers waiting for user confirmation.
+## 4.2 — Outcome Learning + Analytics
 
-This would make answer-memory approval explicit instead of implicit.
+- Full application lifecycle: Applied → Viewed → Reply → Interview → Test → Offer / Rejection / No response.
+- Application timeline linked to CV, cover letter and questionnaire answers.
+- Conversion metrics with sample-size reporting.
+- Separate targets for user preference and employer engagement.
+- Outcome-aware ranking signals, without claiming causality from small samples.
 
-### 3. Duplicate / Repost Detection
+## 4.3 — Recruiter Intelligence + Interview Copilot
 
-Detect semantically identical vacancies that appear with a new vacancy ID or are reposted by the same employer. This should be advisory, not silently merge application history.
+- Recruiter message intent classification.
+- Vacancy/CV/letter-aware reply suggestions.
+- Short / Normal / Detailed drafts.
+- Interview preparation and mock interview mode.
+- Structured feedback on clarity, factual accuracy and relevance.
 
-### 4. Application Timeline
+## 4.4 — Multi-site Job Agent
 
-Per-vacancy history:
+- `JobSiteAdapter` abstraction.
+- Additional supported job sites behind separate adapters.
+- Cross-site canonical vacancy fingerprint.
+- Duplicate/repost detection, optionally using embeddings.
 
-```text
-seen → analyzed → prepared → questionnaire → submitted → viewed → reply/rejection
-```
+## 5.0 — Real Machine Learning
 
-Useful for analytics and follow-up without relying only on current HH card state.
+Only after enough real labelled data exists:
 
-### 5. Memory Export / Import
+- Personal Vacancy Preference Classifier: `P(user_would_apply | vacancy)`.
+- Employer Engagement ranking signal: `P(reply | application)`.
+- Optional call-duty and questionnaire classifiers from corrected labels.
+- Active learning based on confidence thresholds.
+- Model registry, dataset versions, offline evaluation and promotion gates.
 
-Encrypted or user-controlled backup of candidate profile, vacancy memory and questionnaire answer memory, separate from GitHub source code.
-
-### 6. Public-safe Profile Vault
-
-Move personal CV/candidate seed out of tracked source into a local importable vault. This would make the repository safer to keep public without exposing candidate data.
-
-### 7. Additional ATS adapters
-
-Add site-specific adapters only after the generic questionnaire engine is stable. Each adapter should have explicit permissions and dedicated fixtures.
-
-### 8. Pre-submit Review Diff
-
-Before final submission, show exactly what the assistant changed in the form and which fields were user-edited afterward.
-
-## Not planned as blind automation
-
-The project should not auto-invent legal/identity facts, bypass CAPTCHA/MFA or silently submit reviewable questionnaire drafts.
+Initial baselines should be interpretable (for example Logistic Regression) before evaluating more complex models. Neural networks are not a project goal by themselves.

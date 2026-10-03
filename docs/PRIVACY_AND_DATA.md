@@ -1,29 +1,55 @@
 # Privacy and Local Data
 
-Violetta Apply Assistant хранит часть кандидатского контекста локально в расширении и использует его для писем, анкет и recruiter-chat drafts.
+Violetta Apply Assistant keeps candidate context and job-search memory locally in the extension so it can prepare letters, questionnaires, recruiter-chat drafts, and restore vacancy state.
 
-## Что может находиться в проекте
+## 4.0 local intelligence data
 
-В FULL bundle могут присутствовать:
+Version 4.0 adds local structured job-search intelligence. Typical keys include:
+
+- `vjaJobPreferencesV1` — editable job-search preferences;
+- `vjaVacancyIntel:<vacancyId>` — exact-vacancy Analysis, extracted features and Fit Score;
+- `vjaVacancyDecision:<vacancyId>` — Saved / Skipped / Reviewed decisions.
+
+The 4.0 Fit Score is deterministic `rules-v1`. **These records are not evidence that a machine-learning model has been trained.** They are the clean structured signals needed for the later 4.1 Personal Learning Engine.
+
+## Candidate data
+
+A FULL bundle may contain:
 
 - CV assets;
 - Candidate Truth / candidate seed;
-- локальные настройки и memory.
+- local profile defaults;
+- application and questionnaire memory.
+
+The current packaged extension remains personalized. Treat its contents as private candidate data.
 
 ## GitHub visibility
 
-Если repository временно становится public, учитывайте, что любые уже tracked CV/candidate files становятся публично доступными. Переключение repository обратно в private не отменяет факт предыдущей публикации и не удаляет копии, которые могли быть скачаны.
+If the repository is temporarily public, any tracked CV/candidate files become publicly accessible. Switching the repository back to private does not undo earlier exposure or remove copies that may already have been downloaded.
 
-Для полностью public-safe open-source варианта рекомендуется в будущем вынести личный профиль и CV из source tree в локальный импортируемый vault.
+The planned privacy architecture moves candidate documents, personal facts, learning events and future model datasets into a local private vault, for example under `%LOCALAPPDATA%\ViolettaApplyAssistant\`, while GitHub keeps only code, schemas, tests and non-personal templates.
 
-## Секреты
+## Secrets
 
-Не коммитьте:
+Do not commit:
 
 - API keys;
-- `.env`;
+- `.env` files;
 - `user-settings.cmd`;
 - `candidate.private.json`;
-- `appsettings.local.json`.
+- `appsettings.local.json`;
+- browser session cookies or authentication tokens.
 
-Эти пути блокируются publisher/hygiene rules.
+Publisher and repository-hygiene rules block the known private/runtime paths, but repository visibility and commit contents should still be reviewed before publishing.
+
+## Future learning controls
+
+Before 4.1/5.0 model learning becomes active, the product should expose explicit controls for:
+
+- export local learning data;
+- reset learning;
+- delete local learning data;
+- import/export a backup;
+- inspect which events are used as training labels.
+
+Production models must never be retrained silently from every click. New labels should be accumulated, evaluated offline, and promoted only after the candidate model beats the current baseline.

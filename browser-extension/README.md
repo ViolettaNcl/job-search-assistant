@@ -1,34 +1,30 @@
-# Violetta Apply Assistant — Chrome Extension 3.9.13
+# Violetta Apply Assistant — Chrome Extension 4.0.0
 
-`extension/` is the packaged Chrome runtime used by the FULL bundle. In the GitHub source repository the same extension source is published under `browser-extension/`.
+`extension/` is the packaged Chrome runtime inside the FULL bundle. In the Git source repository the same source is published as `browser-extension/`.
 
-## Main capabilities
+## 4.0 search-page workflow
 
-- HH search-card `Analysis` using exact vacancy ID and full-vacancy reading.
-- `✦ Отклик + письмо` with vacancy-specific evidence-based cover letters.
-- Persistent vacancy/application/questionnaire memory.
-- Smart Questionnaire Autofill with confirmed answers and reviewable Human Fallback Drafts.
-- Known `Отклик уже просмотрен работодателем` modal handling.
-- Recruiter-chat `✎ AI` drafts without automatic Send.
-- Optional local/backend advanced mode.
+- `⚡ Analyze page` — bounded batch analysis of unique visible HH vacancy IDs.
+- Explainable `rules-v1` Fit Score with reasons and risks.
+- Local Job Preference Profile.
+- Filters: all / no calls / fit threshold / ready / saved.
+- User-controlled Ready to Apply queue with Apply / Show / Save / Skip.
 
-## Questionnaire behavior
+## Existing protected capabilities
 
-Confirmed candidate facts are preferred. Reviewable free-text drafts may be generated when evidence is insufficient, but the extension does not invent legal/identity facts, numeric salary values, years of experience or other verifiable personal data.
+- exact full-vacancy `Analysis`;
+- HH API fallback;
+- `✦ Отклик + письмо`;
+- persistent vacancy/application/questionnaire memory;
+- Smart Questionnaire Autofill and reviewable human drafts;
+- employer-already-viewed handling;
+- recruiter-chat `✎ AI` drafts;
+- optional local/backend advanced mode.
+
+## Important
+
+Fit Score 4.0 is deterministic and explainable. It is not a trained machine-learning model. The structured 4.0 data will feed the planned 4.1 Learning Engine.
 
 ## Installation
 
-Chrome → `chrome://extensions` → Developer mode → **Load unpacked** → select this `extension` directory.
-
-For source/development installation from GitHub select `browser-extension/` instead.
-
-## Documentation
-
-See the repository root:
-
-- `README.md`
-- `docs/USER_GUIDE.md`
-- `docs/FEATURES.md`
-- `ARCHITECTURE.md`
-- `TESTING_GUIDE.md`
-- `docs/TROUBLESHOOTING.md`
+Chrome → `chrome://extensions` → Developer mode → Load unpacked → choose this `extension` directory.

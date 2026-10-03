@@ -19,7 +19,7 @@ def safe(root, relative):
     return result
 
 def validate(data):
-    if data.get('version') != '3.9.13' or data.get('repository') != 'ViolettaNcl/job-search-assistant':
+    if data.get('version') != '4.0.0' or data.get('repository') != 'ViolettaNcl/job-search-assistant':
         raise ValueError('wrong release')
     seen = set()
     for row in data['files']:
@@ -54,6 +54,12 @@ class PublicationPlanTests(unittest.TestCase):
         self.assertIn('scripts/start-assistant-windows.cmd', targets)
         self.assertIn('tools/check-repo-hygiene.py', targets)
         self.assertIn('tests/test_repository_hygiene.py', targets)
+        self.assertIn('browser-extension/vacancy-fit.js', targets)
+        self.assertIn('browser-extension/job-search-page-core.js', targets)
+        self.assertIn('browser-extension/hh-list-intelligence.js', targets)
+        self.assertIn('tests/browser_batch_400.py', targets)
+        self.assertIn('docs/ml_architecture.md', targets)
+        self.assertIn('docs/learning_system.md', targets)
         self.assertIn('docs/user_guide.md', targets)
         self.assertIn('docs/release_process.md', targets)
         self.assertFalse(any(t.startswith(('backend/', 'extension/', 'src/')) for t in targets))
@@ -80,7 +86,7 @@ class PublicationPlanTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'duplicate'): validate(self.data)
 
     def test_publisher_checks_exit_codes_and_never_force_resets(self):
-        script = (ROOT/'Publish-Violetta-3.9.13.ps1').read_text(encoding='utf-8-sig')
+        script = (ROOT/'Publish-Violetta-4.0.0.ps1').read_text(encoding='utf-8-sig')
         self.assertIn('$LASTEXITCODE', script)
         self.assertIn("@('diff','--cached','--quiet') -Accepted @(0,1)", script)
         self.assertIn("@('push','origin','HEAD:main')", script)

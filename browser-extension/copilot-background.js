@@ -5,9 +5,12 @@ const cpFollow=globalThis.vjaFollowUpIntelligence;
 const cpAnalytics=globalThis.vjaApplicationAnalytics;
 const cpState=globalThis.vjaApplicationState;
 const cpHhList=globalThis.vjaHhListQuickApply;
+const cpFit=globalThis.vjaVacancyFit;
 const cpKey='vjaCandidateTruthProfile';
 let cpInit=null;
 const cpAiRequests=new Map();
+const cpVacancyIntelInFlight=new Map();
+const cpPreferencesKey='vjaJobPreferencesV1';
 async function cpInitialize(){
   if(cpInit)return cpInit;
   cpInit=(async()=>{
@@ -80,7 +83,7 @@ async function cpFetchHhVacancy(vInput,timeoutMs=4200){
   const v=cpCore.vacancy(vInput),apiUrl=cpHhList?.hhApiVacancyUrl?.(v.url,v.vacancyId);if(!apiUrl)throw new Error('Не удалось построить HH API-запрос для этой вакансии.');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.max(1200,Number(timeoutMs)||4200));
   try{
-    const response=await fetch(apiUrl,{method:'GET',headers:{'Accept':'application/json','HH-User-Agent':'ViolettaApplyAssistant/3.9.13 (github.com/ViolettaNcl/job-search-assistant)'},signal:controller.signal,credentials:'omit',cache:'no-store'});
+    const response=await fetch(apiUrl,{method:'GET',headers:{'Accept':'application/json','HH-User-Agent':'ViolettaApplyAssistant/4.0.0 (github.com/ViolettaNcl/job-search-assistant)'},signal:controller.signal,credentials:'omit',cache:'no-store'});
     if(!response?.ok)throw new Error(`HH API: ${response?.status||'error'}`);
     const data=await response.json(),id=String(data?.id||'');if(!id||id!==String(v.vacancyId))throw new Error('HH API вернул другую вакансию.');
     const title=cpCore.clip(data?.name||v.title,300);if(cpCore.suspiciousVacancyTitle?.(title))throw new Error('HH API не подтвердил название вакансии.');
@@ -103,29 +106,61 @@ async function cpAcquireHhVacancy(vInput,sender,{fast=false}={}){
     throw new Error('Не удалось прочитать полную HH-вакансию: '+messages.join(' | '));
   }
 }
+function cpAssertHhListSender(sender){
+  if(!sender.tab?.id||!/^https?:\/\//i.test(sender.url||''))throw new Error('Откройте список вакансий HeadHunter.');
+  let u;try{u=new URL(sender.url);}catch{throw new Error('Не удалось определить страницу вакансий.');}
+  if(!/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(u.hostname))throw new Error('Batch Analysis доступен на HeadHunter.');
+}
+async function cpJobPreferences(){
+  const stored=(await chrome.storage.local.get(cpPreferencesKey))[cpPreferencesKey]||{};
+  const normalized=cpFit?.normalizePreferences?.(stored)||stored;
+  if(JSON.stringify(stored)!==JSON.stringify(normalized))await chrome.storage.local.set({[cpPreferencesKey]:normalized});
+  return normalized;
+}
+async function cpSaveJobPreferences(value,sender){
+  cpAssertHhListSender(sender);const normalized=cpFit?.normalizePreferences?.(value||{})||value||{};
+  await chrome.storage.local.set({[cpPreferencesKey]:normalized});return normalized;
+}
+function cpVacancyIntelKey(id){return 'vjaVacancyIntel:'+String(id||'');}
+function cpVacancyDecisionKey(id){return 'vjaVacancyDecision:'+String(id||'');}
+async function cpQuickListApplicationState(v){
+  const jobs=await applicationJobs();const job=jobs.filter(j=>cpCore.sameVacancy(cpCore.application(j).vacancy,v)).sort((a,b)=>Number(b.context?.updatedAt||b.plan?.createdAt||0)-Number(a.context?.updatedAt||a.plan?.createdAt||0))[0]||null;
+  if(!job)return null;const app=cpCore.application(job),site=job.result?.result||{},memory=job.context?.coverLetterMemory||{},formMemory=job.context?.formMemory||null;
+  return {id:app.id,status:app.status,updatedAt:app.updatedAt||0,completed:Boolean(job.completed||site.submitted),coverLetterSubmitted:Boolean(memory.submittedAt||site.coverLetterFilled),employerAlreadyViewed:Boolean(site.employerAlreadyViewed),formMemory};
+}
+async function cpQuickListFullAnalysis(vInput,sender,{force=false}={}){
+  cpAssertEmbeddedVacancy(sender,vInput);const selected=cpCore.vacancy(vInput),id=String(selected.vacancyId||'');if(!id)throw new Error('Не удалось определить vacancy ID.');
+  const preferences=await cpJobPreferences(),intelKey=cpVacancyIntelKey(id),decisionKey=cpVacancyDecisionKey(id),stored=await chrome.storage.local.get([intelKey,decisionKey]);
+  const cached=stored[intelKey],decision=stored[decisionKey]?.decision||'',preferenceKey=cpCore.hash(JSON.stringify(preferences));
+  const fresh=cached?.vacancy?.vacancyId===id&&cached?.preferenceKey===preferenceKey&&Date.now()-Number(cached.at||0)<30*24*60*60*1000;
+  if(fresh&&!force)return {...cached,application:await cpQuickListApplicationState(selected),decision,preferences,cached:true};
+  if(cpVacancyIntelInFlight.has(id)&&!force)return cpVacancyIntelInFlight.get(id);
+  const task=(async()=>{
+    const acquired=await cpAcquireHhVacancy(selected,sender,{fast:true}),full=acquired.vacancy,source=acquired.source;
+    if(!cpCore.sameVacancy(selected,full))throw new Error('Получено описание другой вакансии.');
+    const analysis=cpHhList?.analyzeCallRequirement?.(`${full.title||''}\n${full.description||''}\n${full.requirements||''}`,full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom'))||{status:'unknown',hasCalls:null,canApply:false,confidence:0,reason:'Analysis недоступен.',evidence:''};
+    const relevance=globalThis.vjaRelevance?.analyze?.(full)||{};
+    const profile=(await cpData()).profile;
+    const fit=cpFit?.scoreVacancy?.(full,profile,preferences,analysis,relevance)||{score:0,decision:'REVIEW',ready:false,reasons:[],risks:['Fit Score недоступен'],features:{},algorithm:'unavailable'};
+    const vacancy={provider:full.provider,url:full.url,vacancyId:full.vacancyId,title:full.title,company:full.company||'',location:full.location||'',remote:Boolean(full.remote)};
+    const record={schemaVersion:1,vacancy,analysis:{...analysis,source,coverage:full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom')},fit,features:{...(fit.features||{}),descriptionHash:relevance.descriptionHash||'',descriptionCoverage:relevance.descriptionCoverage||full.descriptionCoverage||''},preferenceKey,source,at:Date.now()};
+    await chrome.storage.local.set({[intelKey]:record,[`vjaCallAnalysis:${id}`]:{vacancyId:id,url:selected.url,at:record.at,result:{vacancyId:id,title:full.title,status:analysis.status,hasCalls:analysis.hasCalls,canApply:analysis.canApply,confidence:analysis.confidence,reason:analysis.reason,evidence:analysis.evidence||'',source,coverage:record.analysis.coverage}}});
+    return {...record,application:await cpQuickListApplicationState(selected),decision,preferences,cached:false};
+  })();
+  cpVacancyIntelInFlight.set(id,task);try{return await task;}finally{if(cpVacancyIntelInFlight.get(id)===task)cpVacancyIntelInFlight.delete(id);}
+}
+async function cpQuickListDecision(vInput,sender,decision){
+  cpAssertEmbeddedVacancy(sender,vInput);const v=cpCore.vacancy(vInput),id=String(v.vacancyId||'');const allowed=new Set(['SAVED','SKIPPED','REVIEWED','']);
+  decision=String(decision||'').toUpperCase();if(decision==='CLEAR')decision='';if(!allowed.has(decision))throw new Error('Неизвестное решение по вакансии.');
+  const key=cpVacancyDecisionKey(id);if(!decision)await chrome.storage.local.remove(key);else await chrome.storage.local.set({[key]:{vacancyId:id,url:v.url,title:v.title,decision,at:Date.now()}});
+  return {vacancyId:id,decision};
+}
 async function cpQuickListCallAnalysis(vInput,sender){
-  cpAssertEmbeddedVacancy(sender,vInput);const selected=cpCore.vacancy(vInput),cacheKey='vjaCallAnalysis:'+selected.vacancyId;
-  const cached=(await chrome.storage.local.get(cacheKey))[cacheKey];if(cached?.result&&cached?.url===selected.url&&Date.now()-Number(cached.at||0)<30*24*60*60*1000)return {...cached.result,cached:true};
-  let full=null,analysis=null,source='hh-live-dom',readError='';
-
-  // Analyze the exact vacancy, never infer a green result from the short search-card snippet.
-  // Live DOM and the exact HH API vacancy are started together; whichever confirms the same
-  // vacancy first wins. The inactive DOM tab closes itself in cpReadVacancy's finally block.
-  try{
-    const acquired=await cpAcquireHhVacancy(selected,sender,{fast:true});
-    full=acquired.vacancy;source=acquired.source;
-    analysis=cpHhList?.analyzeCallRequirement?.(`${full.title||''}\n${full.description||''}\n${full.requirements||''}`,full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom'));
-  }catch(error){
-    readError=error?.message||String(error);source='card-snippet';full=selected;
-    analysis=cpHhList?.analyzeCallRequirement?.(`${selected.title||''}\n${selected.description||''}\n${selected.requirements||''}`,'snippet');
+  try{const intel=await cpQuickListFullAnalysis(vInput,sender);return {...intel.analysis,fit:intel.fit,features:intel.features,cached:Boolean(intel.cached)};}
+  catch(error){
+    cpAssertEmbeddedVacancy(sender,vInput);const selected=cpCore.vacancy(vInput),analysis=cpHhList?.analyzeCallRequirement?.(`${selected.title||''}\n${selected.description||''}\n${selected.requirements||''}`,'snippet')||{status:'unknown',hasCalls:null,canApply:false,confidence:0,evidence:''};
+    return {vacancyId:selected.vacancyId,title:selected.title,status:'unknown',hasCalls:null,canApply:false,confidence:analysis.confidence||0,reason:'Не удалось прочитать полную страницу выбранной вакансии ни в фоне, ни через HH API. Повторите Analysis.',evidence:analysis.evidence||'',source:'card-snippet',coverage:'snippet',liveError:error?.message||String(error)};
   }
-  analysis=analysis||{status:'unknown',hasCalls:null,canApply:false,confidence:0,reason:'Не удалось выполнить анализ звонков.',evidence:''};
-  const reason=source==='card-snippet'&&analysis.status==='unknown'
-    ?'Не удалось прочитать полную страницу выбранной вакансии ни в фоне, ни через HH API. Повторите Analysis.'
-    :analysis.reason;
-  const coverage=source==='card-snippet'?'snippet':(full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom'));
-  const result={vacancyId:selected.vacancyId,title:full.title,status:analysis.status,hasCalls:analysis.hasCalls,canApply:analysis.canApply,confidence:analysis.confidence,reason,evidence:analysis.evidence||'',source,coverage,liveError:source==='card-snippet'?readError:'',apiError:''};
-  if(source!=='card-snippet'||analysis.status!=='unknown')await chrome.storage.local.set({[cacheKey]:{url:selected.url,at:Date.now(),result}});return result;
 }
 const cpQuickListAnalysisTtl=30*24*60*60*1000;
 function cpQuickListActiveKey(sender){return `vjaQuickListActive:${sender.tab.id}:${sender.frameId||0}`;}
@@ -158,12 +193,11 @@ async function cpPendingPayload(job,extra={}){
   return {application:cpCore.application(job),context:job.context,profile:job.context?.profileSnapshot,coverLetter:job.context?.coverLetter,role:job.context?.role,cvFile:cvVersion===job.context?.cvVersion&&cpCore.cvValid(file)?file:null,...extra};
 }
 async function cpQuickListState(vInput,sender){
-  cpAssertEmbeddedVacancy(sender,vInput);const v=cpCore.vacancy(vInput),cacheKey='vjaCallAnalysis:'+v.vacancyId,stored=(await chrome.storage.local.get(cacheKey))[cacheKey];
-  const analysis=stored?.result&&Date.now()-Number(stored.at||0)<cpQuickListAnalysisTtl&&stored.url===v.url?{...stored.result,cached:true,at:Number(stored.at||0)}:null;
-  const jobs=await applicationJobs();const job=jobs.filter(j=>cpCore.sameVacancy(cpCore.application(j).vacancy,v)).sort((a,b)=>Number(b.context?.updatedAt||b.plan?.createdAt||0)-Number(a.context?.updatedAt||a.plan?.createdAt||0))[0]||null;
-  if(!job)return {vacancyId:v.vacancyId,analysis,application:null};
-  const app=cpCore.application(job),site=job.result?.result||{},memory=job.context?.coverLetterMemory||{},formMemory=job.context?.formMemory||null;
-  return {vacancyId:v.vacancyId,analysis,application:{id:app.id,status:app.status,updatedAt:app.updatedAt||0,completed:Boolean(job.completed||site.submitted),coverLetterSubmitted:Boolean(memory.submittedAt||site.coverLetterFilled),employerAlreadyViewed:Boolean(site.employerAlreadyViewed),formMemory}};
+  cpAssertEmbeddedVacancy(sender,vInput);const v=cpCore.vacancy(vInput),id=String(v.vacancyId||''),cacheKey='vjaCallAnalysis:'+id,intelKey=cpVacancyIntelKey(id),decisionKey=cpVacancyDecisionKey(id);
+  const stored=await chrome.storage.local.get([cacheKey,intelKey,decisionKey]),call=stored[cacheKey],intel=stored[intelKey],decision=stored[decisionKey]?.decision||'';
+  const analysis=call?.result&&Date.now()-Number(call.at||0)<cpQuickListAnalysisTtl&&String(call.result.vacancyId||id)===id?{...call.result,cached:true,at:Number(call.at||0)}:(intel?.analysis&&Date.now()-Number(intel.at||0)<cpQuickListAnalysisTtl?{...intel.analysis,cached:true,at:Number(intel.at||0)}:null);
+  const application=await cpQuickListApplicationState(v),preferences=await cpJobPreferences();
+  return {vacancyId:id,analysis,fit:intel?.fit||null,features:intel?.features||null,intelAt:Number(intel?.at||0),decision,application,preferences};
 }
 function cpTimelineEvent(type,label,meta={}){return {id:`evt-${Date.now()}-${Math.random().toString(16).slice(2)}`,at:Date.now(),type:cpCore.clip(type,60),label:cpCore.clip(label,220),meta};}
 function cpWithTimeline(context,type,label,meta={}){const timeline=[...(context?.timeline||[]),cpTimelineEvent(type,label,meta)].slice(-40);return {...context,timeline,updatedAt:Date.now()};}
@@ -553,7 +587,8 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
       if(op==='open-options'){await chrome.runtime.openOptionsPage();return {ok:true};}
     }
     const chatOps=new Set(['quick-context','observe-chat','resolve','analyze','remember-template','remember-ai-draft','map']);
-    if(op==='quick-list-prepare'||op==='quick-list-call-analysis'||op==='quick-list-state')cpAssertEmbeddedVacancy(sender,message.vacancy||{});
+    if(op==='quick-list-prepare'||op==='quick-list-call-analysis'||op==='quick-list-state'||op==='quick-list-full-analysis'||op==='quick-list-decision')cpAssertEmbeddedVacancy(sender,message.vacancy||{});
+    else if(op==='job-preferences-get'||op==='job-preferences-save')cpAssertHhListSender(sender);
     else if(chatOps.has(op)&&message.snapshot)cpAssertChatPage(sender,message.snapshot);
     else cpAssertPage(sender,message.snapshot?.url||message.vacancy?.url||message.url);
     if(op==='bootstrap')return {ok:true,...await cpData()};
@@ -576,6 +611,10 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(op==='quick-list-prepare')return {ok:true,...await cpQuickListPrepare(message.vacancy,sender)};
     if(op==='quick-list-call-analysis')return {ok:true,...await cpQuickListCallAnalysis(message.vacancy,sender)};
     if(op==='quick-list-state')return {ok:true,...await cpQuickListState(message.vacancy,sender)};
+    if(op==='quick-list-full-analysis')return {ok:true,...await cpQuickListFullAnalysis(message.vacancy,sender,{force:message.force===true})};
+    if(op==='quick-list-decision')return {ok:true,...await cpQuickListDecision(message.vacancy,sender,message.decision)};
+    if(op==='job-preferences-get')return {ok:true,preferences:await cpJobPreferences()};
+    if(op==='job-preferences-save')return {ok:true,preferences:await cpSaveJobPreferences(message.preferences,sender)};
     if(op==='quick-list-complete')return cpQuickListComplete(message,sender);
     if(op==='vacancy-status')return cpVacancyStatus(message.vacancy,sender);
     if(op==='prepared')return cpRememberPrepared(message,sender);

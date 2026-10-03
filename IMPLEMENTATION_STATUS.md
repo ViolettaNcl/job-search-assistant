@@ -1,62 +1,54 @@
-# Implementation Status · 3.9.13
+# Implementation Status · 4.0.0
 
-## Current release
+## Current milestone
 
-3.9.13 сохраняет пользовательское поведение 3.9.12 и обновляет документацию/repository hygiene. Основной runtime — Chrome extension; backend остаётся optional advanced mode.
+4.0.0 introduces the first structured ranking layer on top of the stable 3.9.x HH workflow. The primary additions are Batch Analysis, explainable Fit Score, search-page filters, a user-controlled Ready to Apply queue and persistent Job Preference/decision memory.
+
+4.0.0 intentionally uses deterministic rules (`rules-v1`). It does not claim trained ML. Its structured outputs are the data foundation for 4.1 learning.
 
 ## Feature matrix
 
 | Capability | Status | Notes |
 |---|---|---|
-| HH search-card detection | Ready | Exact-card / vacancy-ID isolation |
-| `Analysis` | Ready | Full DOM + HH API fallback |
-| Phone-duty detection | Ready | Distinguishes call duties from telephony configuration |
+| Exact HH search-card detection | Ready | vacancy-ID isolation |
+| Single-card `Analysis` | Ready | Full DOM + HH API fallback |
+| Phone-duty detection | Ready | Distinguishes duties from telephony configuration |
+| **Batch Analysis** | Ready | Current rendered page, bounded concurrency |
+| **Structured vacancy features** | Ready | Role, technologies, remote, calls, sales, seniority, years requirement |
+| **Explainable Fit Score** | Ready | `rules-v1`, reasons + risks |
+| **Job Preference Profile** | Ready | Threshold, calls, remote, office, sales, batch concurrency |
+| **Search-page filters** | Ready | All / no calls / fit / ready / saved |
+| **Ready to Apply queue** | Ready | Apply / Show / Save / Skip; user-controlled |
+| Vacancy decision memory | Ready | Saved / skipped / reviewed |
 | `✦ Отклик + письмо` | Ready | Vacancy-specific writing |
-| Employer already viewed guard | Ready | Known terminal modal only |
-| Persistent vacancy memory | Ready | Back/reload/repeated-card restoration |
+| Employer-already-viewed guard | Ready | Known terminal modal only |
+| Persistent vacancy/application memory | Ready | Back/reload/repeated-card restoration |
 | Smart Questionnaire Autofill | Ready | Semantic field classification |
-| Human fallback drafts | Ready | Reviewable free-text drafts only |
+| Human fallback drafts | Ready | Reviewable subjective free-text only |
 | Questionnaire answer memory | Ready | Confirmed reusable answers |
-| DOM write verification | Ready | Re-read after input/change/blur |
-| Dynamic/multi-step questionnaire handling | Ready | MutationObserver + debounce |
-| Recruiter chat draft | Ready | No automatic Send |
-| Local CV selection | Ready | Bundled candidate CVs |
-| External AI provider | Optional | Configured from extension settings |
-| Dashboard | Advanced | Requires local backend |
-| Browser Autopilot queue | Advanced | Requires local backend |
-| Server analytics/follow-up | Advanced | Requires local backend |
+| Recruiter-chat draft | Ready | No automatic Send |
+| Optional dashboard/backend | Advanced | Local backend |
+| 4.1 Learning Event Store | Planned | Not active in 4.0 |
+| Trained preference model | Planned 5.0 | Requires labelled data first |
 
-## Safety / intentional stops
+## 4.0 storage additions
 
-The assistant intentionally stops or requests review when:
+- `vjaJobPreferencesV1`
+- `vjaVacancyIntel:<vacancyId>`
+- `vjaVacancyDecision:<vacancyId>`
 
-- the full vacancy cannot be verified;
-- the selected card/vacancy ID becomes ambiguous;
-- an HH modal/action is not uniquely identified;
-- a required questionnaire answer depends on an unknown verifiable fact;
-- a legal/work-authorization/consent answer is not confirmed;
-- DOM write verification fails.
+Existing 3.9.x application/questionnaire/call-analysis memory is preserved.
 
-## Repository state expected after publication
+## Intentional safety boundaries
 
-Expected tracked source directories:
+Batch Analysis never mass-submits applications. The queue only exposes explicit user actions. Fit Score is advisory and explainable; a low/high score does not alter the underlying HH vacancy.
 
-```text
-.github/
-browser-extension/
-docs/
-scripts/
-src/
-tests/
-tools/
-```
-
-The repository should not track FULL bundle folders, runtime binaries, local databases or test output.
+The assistant still stops when the full vacancy cannot be verified, the vacancy identity becomes ambiguous, a required questionnaire answer needs an unknown factual/legal value, or DOM write verification fails.
 
 ## Known limitations
 
-- Production HH DOM can change independently of this project.
-- CAPTCHA/MFA may require manual interaction.
-- Some cross-origin employer forms may not be writable without explicit Chrome permission.
-- Human fallback drafts require review and are not verified candidate facts.
-- Automated writing does not guarantee employer response or ATS success.
+- HH production DOM can change independently of this project.
+- Batch Analysis can be throttled or delayed by HH/API behaviour; concurrency is intentionally bounded.
+- `rules-v1` is a deterministic baseline, not a trained personalization model.
+- Current-page filters apply to rendered cards, not unseen pages of HH results.
+- CAPTCHA/MFA and some cross-origin forms can still require manual action.

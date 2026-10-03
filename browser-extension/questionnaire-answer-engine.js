@@ -1,4 +1,4 @@
-/* Evidence-based questionnaire answer engine (3.9.13). */
+/* Evidence-based questionnaire answer engine (4.0.0). */
 (function(root,factory){
   const api=factory(root.vjaQuestionnaireCore||((typeof require==='function')?require('./questionnaire-core.js'):null));
   if(typeof module==='object'&&module.exports)module.exports=api;

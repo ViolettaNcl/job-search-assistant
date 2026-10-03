@@ -1,110 +1,99 @@
-# User Guide
+# User Guide · 4.0
 
-## 1. Установка
+## Installation
 
-### Standalone Extension
+### Standalone extension
 
-1. Распакуйте standalone ZIP.
-2. Откройте `chrome://extensions`.
-3. Включите **Режим разработчика**.
-4. Нажмите **Загрузить распакованное**.
-5. Выберите распакованную папку.
+1. Extract the standalone ZIP.
+2. Open `chrome://extensions`.
+3. Enable **Developer mode**.
+4. Click **Load unpacked**.
+5. Select the extracted extension folder.
 
 ### FULL bundle
 
-1. Распакуйте FULL ZIP.
-2. В Chrome загрузите папку `extension`.
-3. `start-assistant.cmd` запускайте только если нужен backend/dashboard/Autopilot.
+Load `extension/` in Chrome. Run `start-assistant.cmd` only when you need the optional local dashboard/backend workflows.
 
-## 2. Работа со списком вакансий
+After an upgrade reload already-open HH tabs once.
 
-На поддерживаемой карточке HH доступны два действия.
+## Search-page workflow
 
-### Analysis
+### Analyze one vacancy
 
-1. Нажмите `Analysis`.
-2. Расширение фиксирует точный `vacancyId`.
-3. Получает полное описание через hidden tab или HH API.
-4. Показывает один из статусов:
-   - `✓ Без звонков`;
-   - `✕ Есть звонки`;
-   - `↻ Повторить`.
+Use `Analysis` on a card when you want an immediate phone-duty check for that vacancy only.
 
-Результат сохраняется в vacancy memory и восстанавливается при повторном появлении карточки.
+### Analyze the page
 
-### ✦ Отклик + письмо
+Use the compact toolbar:
 
-1. Нажмите кнопку на нужной карточке.
-2. Расширение привязывает отклик к этой vacancy ID.
-3. Читает полную вакансию.
-4. Выбирает релевантный CV и строит короткое evidence-based письмо.
-5. Продолжает стандартный HH flow.
+`⚡ Analyze page`
 
-Если HH переводит на отдельную анкету, включается Questionnaire Autofill.
+The assistant analyzes unique rendered vacancy IDs with limited parallelism. You can press the same button while it is running to stop scheduling additional vacancies.
 
-## 3. Smart Questionnaire Autofill
+Each completed vacancy gets a badge such as:
 
-Расширение читает каждый вопрос формы и определяет его смысловую категорию.
+`91% Match`
 
-### Подтверждённые ответы
+Hover the badge to see the main positive reasons, risks and the algorithm ID.
 
-Факт из Candidate Truth / CV / подтверждённой памяти может быть заполнен автоматически и получает статус:
+## Fit Score settings
 
-`✓ Заполнено автоматически`
+Open `⚙` in the search toolbar.
 
-### Human fallback draft
+You can change:
 
-Если вопрос допускает свободный текст, но подтверждённого факта недостаточно, расширение может создать нейтральный черновик:
+- minimum Fit Score;
+- avoid calls;
+- remote preference;
+- whether office vacancies are allowed;
+- avoid sales;
+- Batch Analysis concurrency (1–4).
 
-`✎ Черновик — проверьте`
+Changing settings causes vacancies to be re-evaluated under the new preference profile when analyzed/restored.
 
-Черновик не считается фактом и не попадает в подтверждённую долговременную память сам по себе.
+Fit Score 4.0 is an explainable rules baseline, not a trained model.
 
-### Поля, которые нельзя угадывать
+## Filters
 
-Без подтверждённых данных расширение не должно придумывать:
+The toolbar can show:
 
-- конкретную зарплату цифрой;
-- количество лет опыта;
-- гражданство;
-- визу/work authorization;
-- юридические согласия;
-- дату выхода;
-- лицензии и сертификаты;
-- иные проверяемые биографические факты.
+- **All**;
+- **✓ Без звонков**;
+- **Fit ≥ threshold**;
+- **Готовы к отклику**;
+- **Сохранённые**.
 
-Такие поля остаются на review.
+This only changes the visible cards on the current page.
 
-## 4. Память вакансии
+## Ready to Apply
 
-По `vacancyId` сохраняются:
+Open `Очередь N`.
 
-- Analysis;
-- статус отклика;
-- выбранный CV;
-- cover letter;
-- прогресс анкеты;
-- unresolved/review fields.
+Available actions:
 
-Поэтому Back, reload или повторный поиск не должны обнулять уже выполненную работу.
+- **Отклик** — locate the exact card and start the existing `✦ Отклик + письмо` flow;
+- **Показать** — scroll to the card for manual review;
+- **Сохранить** — keep it in Saved;
+- **Пропустить** — persist a skip decision.
 
-## 5. Переписка с работодателем
+The queue never mass-submits applications by itself.
 
-В активном recruiter chat используйте `✎ AI`.
+## Application and questionnaire
 
-Ассистент анализирует доступный диалог и готовит черновик. Сообщение не отправляется автоматически.
+The existing 3.9.x behaviour remains:
 
-## 6. Когда нужен backend
+- exact vacancy-specific cover letter;
+- application state persisted across navigation;
+- Smart Questionnaire Autofill;
+- confirmed evidence first;
+- reviewable human fallback drafts for subjective free text;
+- legal/factual unknowns remain for review;
+- complex final submission remains user-controlled when unresolved fields exist.
 
-Без backend работают core-функции расширения: Analysis, quick apply, cover letter, questionnaire autofill, memory и recruiter-chat draft.
+## Memory
 
-Backend нужен для расширенного режима:
+Per-vacancy memory now includes Analysis, Fit Score/features, queue decision, application state and questionnaire state. Repeated cards should restore this data automatically.
 
-- dashboard;
-- background queue;
-- Autopilot;
-- серверной аналитики/follow-ups.
+## Optional backend
 
-## 7. Перед отправкой анкеты
-
-Проверьте все поля с `✎` или `!`. Финальная отправка сложной формы намеренно остаётся под контролем пользователя, если остаются reviewable ответы.
+Core 4.0 Batch Analysis and queue do not need the backend. The backend is still used by the advanced dashboard/server Autopilot/analytics mode.

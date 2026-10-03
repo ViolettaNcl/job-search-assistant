@@ -2,205 +2,236 @@
 
 # Violetta Apply Assistant
 
-**Текущая версия: 3.9.13**
+**Current release: 4.0.0**
 
-Violetta Apply Assistant — браузерный помощник для поиска работы на HeadHunter. Он работает прямо в интерфейсе вакансий: анализирует полное описание выбранной вакансии, помогает подготовить персонализированный отклик, запоминает состояние карточек и заполняет безопасные части анкет работодателя.
+Violetta Apply Assistant is a vacancy-first job-search copilot for HeadHunter. It runs primarily as a Chrome extension and keeps each decision bound to the exact `vacancyId`: full-vacancy analysis, phone-duty detection, explainable fit ranking, application preparation, questionnaire assistance and recruiter-chat drafts.
 
-Проект построен по принципу **extension-first**: основные функции работают в Chrome-расширении. Локальный .NET backend нужен только для расширенного режима — очереди, фонового автопилота, dashboard и серверной аналитики.
+Version 4.0 moves the project from one-card-at-a-time assistance toward a structured job-search workflow: **Batch Analysis → Explainable Fit Score → filters → user-controlled Apply Queue**. It deliberately does **not** claim machine learning yet. The 4.0 scoring model is deterministic and explainable so that 4.1 can later collect reliable feedback/training signals.
 
-## Основной сценарий
+## Core workflow
 
 ```text
-Поиск вакансий HH
-→ Analysis
-→ ✓ Без звонков / ✕ Есть звонки
+HH search results
+→ ⚡ Analyze page
+→ full vacancy read for each exact vacancyId
+→ Analysis: calls / no calls
+→ Fit Score with reasons + risks
+→ filter the page
+→ Ready to Apply queue
+→ user chooses Apply / Review / Save / Skip
 → ✦ Отклик + письмо
-→ при необходимости анкета работодателя
-→ Smart Questionnaire Autofill
-→ проверка спорных полей
-→ отправка пользователем
-→ состояние сохраняется по vacancyId
+→ questionnaire autofill if required
+→ final review
+→ persistent vacancy/application memory
 ```
 
-## Что умеет проект
+## 4.0 search-page intelligence
+
+### Batch Analysis
+
+`⚡ Analyze page` collects the unique vacancies currently rendered on the HH search page and analyzes them with bounded concurrency. It does not open dozens of visible tabs and does not mass-submit applications.
+
+For every vacancy it:
+
+1. fixes the exact `vacancyId`;
+2. obtains the full description through the reliable HH reader / API fallback;
+3. runs phone-duty Analysis;
+4. extracts structured vacancy features;
+5. calculates an explainable Fit Score;
+6. stores the result by vacancy ID;
+7. updates all repeated cards for that vacancy.
+
+Default batch concurrency is 3 and is configurable from the compact search-page toolbar.
+
+### Explainable Fit Score
+
+Fit Score is currently **rules-v1**, not an ML model. The score uses structured evidence such as:
+
+- role family;
+- confirmed candidate skills vs vacancy technologies;
+- remote/office format;
+- phone-call duties;
+- sales focus;
+- seniority and explicit years-of-experience requirements;
+- English requirement when detectable;
+- user search preferences.
+
+A score is always accompanied by reasons and risks. Examples:
+
+```text
+91% Match
+✓ Remote
+✓ No required calls
+✓ C#, SQL Server and REST API match
+! Linux is requested but not confirmed
+```
+
+Phone-call vacancies are strongly penalized when `avoidCalls` is enabled. Sales-focused roles are similarly penalized when `avoidSales` is enabled.
+
+### Search filters
+
+The 4.0 toolbar can filter the current HH result page by:
+
+- all vacancies;
+- confirmed no-calls vacancies;
+- Fit Score above the selected threshold;
+- vacancies ready for the queue;
+- saved-for-later vacancies.
+
+Filters affect only the local page presentation; they do not modify HH search settings or submit anything.
+
+### Ready to Apply queue
+
+The queue is derived from analyzed vacancies and remains user-controlled. A queue item can be:
+
+- **Apply** — invokes the existing exact-card `✦ Отклик + письмо` flow;
+- **Show** — scrolls back to the card for manual review;
+- **Save** — persists a saved-for-later decision;
+- **Skip** — persists a skip decision.
+
+These decisions are stored as structured data so the later 4.1 Learning Engine can use explicit feedback. In 4.0 they are **not yet used to train or adapt a model**.
+
+## Existing protected workflows
 
 ### Vacancy Analysis
 
-На карточке вакансии появляется `Analysis`. Расширение привязывает анализ к точному `vacancyId`, получает полное описание вакансии через скрытую вкладку или HH API и определяет, есть ли в обязанностях телефонные звонки.
+The single-card `Analysis` button remains available. It reads the exact full vacancy through a hidden/background HH page and `api.hh.ru` fallback, checks that the returned vacancy ID matches the selected card, and returns:
 
-- `✓ Без звонков` — подтверждённое полное описание не содержит обязанности звонить или явно указывает чат/переписку.
-- `✕ Есть звонки` — найдены входящие/исходящие звонки, обзвон, call center, phone/voice support или аналогичная обязанность.
-- `↻ Повторить` — полное описание не удалось надёжно получить.
+- `✓ Без звонков`;
+- `✕ Есть звонки`;
+- `↻ Повторить` only when the full vacancy cannot be verified.
 
-Технические упоминания `SIP`, `VoIP`, «настройка телефонии» и обычные «входящие обращения» сами по себе звонками не считаются.
+Telephony configuration, SIP/VoIP setup, generic incoming requests, tickets and chats are not treated as phone-call duties by themselves.
 
-### Персонализированный отклик
+### Vacancy-specific application
 
-Кнопка `✦ Отклик + письмо` работает с конкретной карточкой вакансии, а не со всей страницей поиска. Письмо строится только из подтверждённых данных кандидата и контекста выбранной вакансии.
+`✦ Отклик + письмо` keeps the application pinned to the selected card. It rejects search-page headings as vacancy titles, does not borrow another card's description, and prepares the letter only from verified candidate evidence.
 
-Защиты:
+If HH reports `Отклик уже просмотрен работодателем`, only that known terminal modal is closed automatically and the vacancy is marked as already viewed.
 
-- заголовки вроде `Найдено 28 000 вакансий` не могут стать названием вакансии;
-- соседние карточки не смешиваются;
-- короткий snippet не используется как замена полного описания, если полное описание не подтверждено;
-- если HH сообщает `Отклик уже просмотрен работодателем`, модальное окно закрывается автоматически и карточка получает терминальный статус.
+### Persistent vacancy memory
 
-### Persistent Vacancy Memory
+Memory is keyed by exact vacancy ID and survives HH SPA rerenders, reloads, Back/Forward, repeated search results and questionnaire navigation.
 
-Состояние хранится по `vacancyId` и восстанавливается после:
+4.0 additionally persists:
 
-- перехода на анкету;
-- Back / Forward;
-- reload;
-- повторного поиска;
-- повторного появления той же вакансии;
-- SPA-переходов и dynamic rerender HH.
-
-Сохраняются Analysis, статус отклика, cover letter, прогресс анкеты и review-state.
+- structured vacancy features;
+- Fit Score and explanations;
+- batch-analysis timestamp/source;
+- Save / Skip / Reviewed decisions;
+- job-search preference profile.
 
 ### Smart Questionnaire Autofill
 
-На странице `Отклик на вакансию` расширение анализирует вопросы работодателя и заполняет поля там, где ответ можно построить из подтверждённого профиля кандидата.
+Questionnaire support from 3.9.x remains intact. Confirmed facts are preferred. Reviewable neutral drafts can be generated for subjective free-text questions, but the assistant does not fabricate verifiable candidate facts such as citizenship, work authorization, certificates, exact years of experience or a numeric salary value.
 
-Поддерживаются, в частности:
+Final submission of complex forms remains under user control when review fields are present.
 
-- проекты и опыт;
-- English level и другие языки;
-- technical stack;
-- API / CRM / databases;
-- support / troubleshooting;
-- образование;
-- мотивационные вопросы;
-- контакты;
-- зарплатные вопросы.
+## Architecture
 
-Если подтверждённых данных нет, для обычного свободного текстового вопроса может быть создан **нейтральный human fallback draft**. Он помечается `✎ Черновик — проверьте` и не превращается в подтверждённый факт.
+The product is extension-first:
 
-Расширение не выдумывает проверяемые сведения: стаж в годах, гражданство, work authorization, визы, сертификаты, юридические согласия, даты, конкретную зарплату цифрой и другие факты, которых нет в профиле.
+```text
+browser-extension/
+  HH page integration
+  Batch Analysis UI
+  rules-v1 Fit Score
+  vacancy/application memory
+  questionnaire copilot
+  recruiter chat copilot
 
-Финальная отправка сложной анкеты по умолчанию остаётся под контролем пользователя.
+src/
+  optional .NET backend source
+  dashboard / advanced automation / analytics
+```
 
-### Recruiter Chat Assistant
+The local backend remains optional for core search-page intelligence. Batch Analysis, Fit Score, queue, quick apply, questionnaire memory and recruiter-chat drafts are extension features.
 
-`✎ AI` работает в активной переписке работодателя. Он читает доступный диалог, учитывает профиль кандидата и контекст вакансии и готовит черновик ответа. Отправка сообщения остаётся ручной.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the detailed flow and storage model.
 
-### Advanced mode
+## Installation
 
-Опциональный локальный backend предоставляет:
+1. Extract the FULL ZIP or standalone extension ZIP.
+2. Open `chrome://extensions`.
+3. Enable **Developer mode**.
+4. Choose **Load unpacked**.
+5. For the FULL bundle select `extension/`.
+6. For source/development installation select `browser-extension/` in the Git repository.
+7. Grant HH/HeadHunter access when Chrome requests it.
+8. Reload already-open HH pages once after an extension upgrade.
 
-- dashboard;
-- очередь откликов;
-- расширенный Autopilot;
-- аналитику и follow-up workflows.
+Detailed instructions: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
-Backend запускается через `start-assistant.cmd` и по умолчанию доступен на `http://127.0.0.1:8080`.
+## Documentation
 
-## Установка расширения
-
-1. Распакуйте FULL ZIP или STANDALONE EXTENSION.
-2. Откройте `chrome://extensions`.
-3. Включите **Режим разработчика**.
-4. Нажмите **Загрузить распакованное**.
-5. Для FULL-сборки выберите папку `extension`.
-6. Для standalone-сборки выберите распакованную папку расширения.
-7. Разрешите доступ к HH.ru / HeadHunter.kg, если Chrome его запросит.
-
-После обновления расширения уже открытые страницы HH лучше один раз перезагрузить.
-
-Подробно: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
-
-## Документация
-
-| Документ | Для чего |
+| Document | Purpose |
 |---|---|
-| [USER_GUIDE.md](docs/USER_GUIDE.md) | Установка и повседневная работа |
-| [FEATURES.md](docs/FEATURES.md) | Полный список возможностей и ограничений |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Архитектура extension/backend и потоки данных |
-| [REPOSITORY_LAYOUT.md](docs/REPOSITORY_LAYOUT.md) | Что должно находиться в GitHub и что нельзя коммитить |
-| [RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md) | Безопасное обновление GitHub без дублирующих FULL-папок |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Типовые проблемы HH/Chrome и диагностика |
-| [SECURITY.md](SECURITY.md) | Локальные данные, разрешения и приватность |
-| [TESTING_GUIDE.md](TESTING_GUIDE.md) | Как запускать тесты |
-| [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) | Текущий статус функций |
-| [ROADMAP.md](ROADMAP.md) | Следующие направления развития |
-| [WHAT_CHANGED.md](WHAT_CHANGED.md) | Изменения текущего релиза |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Installation and daily use |
+| [docs/FEATURES.md](docs/FEATURES.md) | Feature reference |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Runtime/storage architecture |
+| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Structured vacancy/application/learning data |
+| [docs/LEARNING_SYSTEM.md](docs/LEARNING_SYSTEM.md) | 4.1 learning design and feedback signals |
+| [docs/ML_ARCHITECTURE.md](docs/ML_ARCHITECTURE.md) | Planned 5.0 ML architecture |
+| [docs/MODEL_EVALUATION.md](docs/MODEL_EVALUATION.md) | Model evaluation requirements |
+| [docs/REPOSITORY_LAYOUT.md](docs/REPOSITORY_LAYOUT.md) | Clean source repository layout |
+| [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md) | Safe publishing without FULL/runtime duplication |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | HH/Chrome troubleshooting |
+| [docs/PRIVACY_AND_DATA.md](docs/PRIVACY_AND_DATA.md) | Candidate data and future local vault |
+| [TESTING_GUIDE.md](TESTING_GUIDE.md) | Test suites and commands |
+| [ROADMAP.md](ROADMAP.md) | 4.1 → 5.0 development sequence |
+| [WHAT_CHANGED.md](WHAT_CHANGED.md) | Current release changes |
 
-## Структура репозитория
+## Repository hygiene
 
-В GitHub должны находиться **исходники**, а не готовая FULL-сборка:
+The Git repository is a source repository. Do not copy a FULL bundle into it.
 
-```text
-job-search-assistant/
-├── .github/workflows/
-├── browser-extension/
-├── docs/
-├── scripts/
-├── src/
-├── tests/
-├── tools/
-├── README.md
-└── ...
-```
-
-Не должны попадать в source repository:
+Tracked source is expected under:
 
 ```text
-Violetta-Apply-Assistant-*/
-backend/          # published runtime
-extension/        # packaged copy; source lives in browser-extension/
-test-results/
-github-source/
-dist/
-artifacts/
-node_modules/
-*.dll *.exe *.pdb *.zip *.db *.log
+.github/
+browser-extension/
+docs/
+scripts/
+src/
+tests/
+tools/
 ```
 
-Перед публикацией можно выполнить:
+Runtime/release folders such as `backend/`, packaged `extension/`, `test-results/`, `dist/`, `artifacts/` and `Violetta-Apply-Assistant-*` must not be tracked in Git.
+
+Before publishing:
 
 ```powershell
 python tools/check-repo-hygiene.py
 ```
 
-CI выполняет ту же проверку автоматически.
+## Development
 
-## Разработка и тесты
-
-Основные команды:
+Core checks:
 
 ```powershell
 node --test browser-extension/*.test.js
+python tests/browser_batch_400.py
+python tests/browser_memory_399.py
+python tests/browser_questionnaire_3912.py
+python tests/hh_read_fallback_3910.py
 python tests/test_source_publication.py
 python tests/test_repository_hygiene.py
 ```
 
-Дополнительные Chromium fixtures описаны в [TESTING_GUIDE.md](TESTING_GUIDE.md).
+Synthetic fixtures verify extension logic and DOM flows; they are not a permanent guarantee against future HH production changes.
 
-## Публикация в GitHub
+## Publishing
 
-Не копируйте FULL-папку в репозиторий через `robocopy /E`.
+Use `Publish-Violetta-4.0.0.ps1`. It verifies the source manifest and copies only whitelisted source/documentation files into the existing Git repository. It never performs force-push, reset, clean or stash.
 
-Используйте `Publish-Violetta-3.9.13.ps1`: он читает `source-sync-manifest.json`, проверяет SHA-256 каждого разрешённого файла и переносит только source/documentation paths.
+## Roadmap principle
 
-Пример:
+- **4.0** creates structured vacancy data and user decisions.
+- **4.1** introduces the Personal Learning Engine and feedback event store.
+- **4.2** learns from application outcomes and adds stronger analytics.
+- **4.3** expands recruiter and interview intelligence.
+- **4.4** introduces multi-site adapters.
+- **5.0** may train real ranking/classification models only after enough labelled real-user data exists.
 
-```powershell
-& ".\Publish-Violetta-3.9.13.ps1" `
-  -RepoPath "C:\Users\1\Downloads\job-search-assistant" `
-  -PackagePath "C:\Users\1\Downloads\Violetta-Apply-Assistant-3.9.13-FULL\Violetta-Apply-Assistant-3.9.13" `
-  -Push
-```
-
-Скрипт не выполняет `git reset`, `git clean`, `git stash` или force-push.
-
-## Ограничения
-
-- DOM и workflow HH могут меняться без предупреждения.
-- CAPTCHA, MFA и некоторые cross-origin формы могут потребовать ручного действия.
-- Автоматическая генерация текста не гарантирует приглашение, прохождение ATS или ответ работодателя.
-- Human fallback drafts являются черновиками и требуют проверки.
-- Synthetic/browser fixtures не являются бессрочной гарантией production DOM.
-
-## Версия 3.9.13
-
-3.9.13 не меняет основной пользовательский workflow 3.9.12. Релиз приводит документацию и source-publication процесс к состоянию, пригодному для дальнейшей разработки, и добавляет автоматическую защиту репозитория от случайного коммита FULL/runtime-мусора.
+The project intentionally distinguishes deterministic rules, LLM-assisted writing, retrieval, embeddings and actual trained ML models. No component should be labelled "machine learning" until a model is genuinely trained and evaluated.

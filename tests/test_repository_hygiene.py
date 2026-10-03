@@ -11,7 +11,7 @@ spec.loader.exec_module(mod)
 
 class RepositoryHygieneTests(unittest.TestCase):
     def test_rejects_nested_release_folder(self):
-        self.assertIsNotNone(mod.reason('Violetta-Apply-Assistant-3.9.13/extension/background.js'))
+        self.assertIsNotNone(mod.reason('Violetta-Apply-Assistant-4.0.0/extension/background.js'))
 
     def test_rejects_runtime_roots(self):
         for path in [

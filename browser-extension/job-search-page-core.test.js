@@ -1,0 +1,5 @@
+const test=require('node:test');const assert=require('node:assert/strict');const P=require('./job-search-page-core.js');
+test('4.0 batch plan de-duplicates repeated vacancy IDs',()=>{assert.deepEqual(P.uniqueVacancies([{vacancyId:'1'},{vacancyId:'1'},{vacancyId:'2'}]).map(x=>x.vacancyId),['1','2']);});
+test('4.0 filters distinguish no-calls, fit and ready records',()=>{const r={analysis:{status:'no-calls'},fit:{score:91,ready:true},application:null};assert.equal(P.filterMatches(r,'no-calls',{minimumFitScore:80}),true);assert.equal(P.filterMatches(r,'fit',{minimumFitScore:80}),true);assert.equal(P.filterMatches(r,'ready',{minimumFitScore:80}),true);assert.equal(P.filterMatches({...r,application:{status:'Applied',completed:true}},'ready',{minimumFitScore:80}),false);});
+test('4.0 saved filter uses explicit user decision memory',()=>{assert.equal(P.filterMatches({decision:'SAVED'},'saved',{}),true);assert.equal(P.filterMatches({decision:'SKIPPED'},'saved',{}),false);});
+test('4.0 progress and badge labels are deterministic',()=>{assert.equal(P.progress(3,10,1),'3/10 · ошибок 1');assert.equal(P.badgeLabel({score:91.4}),'91% Match');});

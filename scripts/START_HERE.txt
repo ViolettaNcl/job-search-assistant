@@ -1,51 +1,48 @@
-VIOLETTA APPLY ASSISTANT 3.9.13 — START HERE
-=============================================
+VIOLETTA APPLY ASSISTANT 4.0.0 — START HERE
+============================================
 
-NORMAL USE (NO TERMINAL REQUIRED)
----------------------------------
+NORMAL USE
+----------
 1. Extract the ZIP.
 2. Open Chrome -> chrome://extensions
 3. Enable Developer mode.
-4. Click "Load unpacked".
-5. Select the "extension" folder from the FULL bundle.
+4. Click Load unpacked.
+5. Select the extension folder from this FULL bundle.
 6. Grant HH.ru / HeadHunter access if Chrome asks.
 7. Reload already-open HH tabs once.
 
-SEARCH PAGE
------------
-Analysis             -> reads the exact full vacancy and checks call duties.
-✦ Отклик + письмо    -> prepares an exact-vacancy application and cover letter.
+HH SEARCH PAGE — NEW IN 4.0
+---------------------------
+⚡ Analyze page        -> analyzes unique rendered vacancies with bounded concurrency.
+Fit badge              -> explainable rules-v1 score with reasons/risks.
+Filters                -> All / No calls / Fit / Ready / Saved.
+Очередь                -> user-controlled Apply / Show / Save / Skip actions.
+⚙                     -> Job Preference Profile and Fit threshold.
 
-QUESTIONNAIRE PAGE
-------------------
-The assistant reads employer questions and fills safe answers from candidate evidence.
+EXISTING CARD ACTIONS
+---------------------
+Analysis               -> exact full vacancy + call-duty check.
+✦ Отклик + письмо      -> vacancy-specific application and cover letter.
 
-✓ auto-filled        = confirmed evidence
-✎ draft/review       = neutral human fallback, check before sending
-? / review           = data cannot be safely inferred
-
-The assistant does not invent legal/identity facts or numeric salary values.
+QUESTIONNAIRE
+-------------
+Confirmed answers are auto-filled when safe.
+Reviewable human drafts are marked for checking.
+Unknown factual/legal values are not fabricated.
 
 MEMORY
 ------
-Analysis, application and questionnaire state are stored by vacancyId and restored after Back/reload/repeated cards.
+Analysis, Fit Score/features, queue decisions, application and questionnaire state are stored by vacancyId and restored after Back/reload/repeated cards.
+
+IMPORTANT
+---------
+Fit Score 4.0 is deterministic rules-v1, not a trained ML model. 4.1 will add learning events after real usage creates reliable labels.
 
 ADVANCED MODE
 -------------
-Run start-assistant.cmd only if you need the local dashboard, queue, Autopilot or server analytics.
-Default backend: http://127.0.0.1:8080
+Run start-assistant.cmd only for the optional local dashboard/server Autopilot/analytics workflows.
 
-GITHUB SOURCE UPDATE
---------------------
+GITHUB UPDATE
+-------------
 Do NOT copy the whole FULL folder into the repository.
-Use Publish-Violetta-3.9.13.ps1.
-
-Before push you can run:
-  python tools\check-repo-hygiene.py
-
-Documentation:
-  README.md
-  docs\USER_GUIDE.md
-  docs\REPOSITORY_LAYOUT.md
-  docs\RELEASE_PROCESS.md
-  docs\TROUBLESHOOTING.md
+Use Publish-Violetta-4.0.0.ps1.
