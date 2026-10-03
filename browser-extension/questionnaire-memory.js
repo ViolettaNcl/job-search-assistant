@@ -1,4 +1,4 @@
-/* Questionnaire answer memory (4.0.0). */
+/* Questionnaire answer memory (5.0.0). */
 (function(root,factory){
   const api=factory(root);
   if(typeof module==='object'&&module.exports)module.exports=api;

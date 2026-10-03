@@ -135,7 +135,7 @@
     const text=[parts.slice(0,github?-1:parts.length).join(' '),github?parts.at(-1):''].filter(Boolean).join('\n\n');
     const validation=verify(text,p,{vacancy:v,kind:'cover',factIds:selected.map(f=>f.id),allowedFacts:selected});
     if(l==='en'&&selected.some(f=>!f.textEn&&/[а-яё]/i.test(f.text))){validation.errors.push('translation-required');validation.ok=false;}
-    return {ok:validation.ok,text,source:'local-evidence',factIds:selected.map(f=>f.id),selection:s,validation,version:'4.0.0-evidence'};
+    return {ok:validation.ok,text,source:'local-evidence',factIds:selected.map(f=>f.id),selection:s,validation,version:'5.0.0-evidence'};
   }
   function vacancySpecificity(text,vacancy={}){
     const draft=trim(text,20000).toLowerCase(),title=trim(vacancy.title,500).toLowerCase(),desc=trim(vacancy.description,16000).toLowerCase();

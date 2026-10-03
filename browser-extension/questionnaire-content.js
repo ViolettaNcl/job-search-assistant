@@ -1,4 +1,4 @@
-/* Minimal questionnaire UI + dynamic-form watcher (4.0.0). */
+/* Minimal questionnaire UI + dynamic-form watcher (5.0.0). */
 (function(root){
   'use strict';
   if(root.vjaQuestionnaireContent)return;

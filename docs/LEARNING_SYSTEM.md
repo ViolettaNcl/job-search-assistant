@@ -1,44 +1,69 @@
-# Personal Learning System · planned 4.1
+# Personal Learning System · 5.0
 
 ## Goal
 
-The learning layer should adapt to the user's confirmed decisions and corrections without silently rewriting Candidate Truth or claiming that a rules engine is a trained model.
+Learn from the user's real decisions without silently rewriting factual candidate data.
 
-## Training signals
+## Event store
 
-Strong signals:
+The extension stores bounded `LearningEvent` records in `chrome.storage.local` under `vjaLearningEventsV1`.
 
-- user clicks Apply after reviewing a vacancy;
-- user explicitly Skips;
-- user edits an AI questionnaire answer;
-- user edits a cover letter/recruiter reply;
-- user confirms a preference such as salary strategy;
-- user overrides a Fit recommendation.
+Each event may contain:
 
-Weak/implicit signals should be stored separately from explicit corrections.
+- event ID and timestamp;
+- vacancy identity;
+- structured vacancy features;
+- model/rule decision at the time;
+- user action;
+- original/corrected text when relevant;
+- confidence/source metadata.
 
-## Memory separation
+## Signals
 
-- **Fact Memory** — confirmed biographical/professional facts.
-- **Preference Memory** — job-search preferences.
-- **Answer Memory** — confirmed reusable questionnaire answers.
-- **Writing Memory** — AI draft → user-edited pairs.
-- **Vacancy Memory** — analysis/features/ranking history.
-- **Outcome Memory** — application results.
+Current production personalization is **not an ML model**. It derives bounded weights from real events:
 
-A preference or writing correction must never automatically become a Candidate Fact.
+- role weights;
+- technology weights;
+- remote preference signal;
+- calls/sales history;
+- weak company-specific signal.
 
-## 4.1 implementation sequence
+The adjustment is capped so learning cannot turn a hard mismatch into an extreme score simply because of a few clicks.
 
-1. Introduce a versioned `LearningEvent` schema.
-2. Emit events from existing Apply/Save/Skip/Edit flows.
-3. Add export/reset controls.
-4. Build retrieval of similar confirmed corrections.
-5. Use retrieved examples for future drafts/ranking explanations.
-6. Add summary statistics only after enough events exist.
+## Labels
 
-No fine-tuning is required for 4.1.
+Positive preference labels:
 
-## Active learning preparation
+- Apply
+- Save
+- Fit accepted
 
-Every future classifier should expose a confidence value. High-confidence predictions can be automated only where safe; medium confidence should be reviewable; low confidence should request user input.
+Negative preference labels:
+
+- Skip
+- Fit rejected
+
+Outcome events are stored separately and must not be mixed with preference labels.
+
+## Active learning
+
+Confidence policy:
+
+- >= 0.90: safe auto-classification when the feature itself is allowed to be automatic;
+- 0.65–0.90: suggestion / review;
+- < 0.65: ask or leave for user review.
+
+This policy does not override legal, salary, work-authorization or other high-risk review gates.
+
+## Learning Center
+
+The local Learning Center can export:
+
+- a full learning backup (`.json`);
+- preference training rows (`.jsonl`).
+
+Import deduplicates by `eventId`. Reset deletes learning events and local model registry only; applications and CVs are not deleted.
+
+## Future
+
+When enough real labels exist, the exported dataset can train the 5.0 logistic baseline. Promotion remains an explicit offline step.

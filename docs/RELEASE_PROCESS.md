@@ -12,7 +12,7 @@ robocopy "...FULL" "...job-search-assistant" /E
 
 A FULL bundle contains packaged `extension/`, runtime `backend/`, test output and release helpers. GitHub should receive only the source subset defined by `source-sync-manifest.json`.
 
-## Safe 4.0 publication
+## Safe 5.0 publication
 
 1. Clone/open the existing repository and ensure it is clean.
 
@@ -33,7 +33,7 @@ python tools/check-repo-hygiene.py
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 
-& "<FULL_FOLDER>\Publish-Violetta-4.0.0.ps1" `
+& "<FULL_FOLDER>\Publish-Violetta-5.0.0.ps1" `
   -RepoPath "C:\Users\1\Downloads\job-search-assistant" `
   -PackagePath "<FULL_FOLDER>" `
   -Push
@@ -51,4 +51,4 @@ git status
 git log -3 --oneline
 ```
 
-Expected release version: `4.0.0`.
+Expected release version: `5.0.0`.

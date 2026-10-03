@@ -6,11 +6,19 @@ const cpAnalytics=globalThis.vjaApplicationAnalytics;
 const cpState=globalThis.vjaApplicationState;
 const cpHhList=globalThis.vjaHhListQuickApply;
 const cpFit=globalThis.vjaVacancyFit;
+const cpLearning=globalThis.vjaLearningCore;
+const cpDuplicate=globalThis.vjaDuplicateDetector;
+const cpRecruiterIntel=globalThis.vjaRecruiterIntelligence;
+const cpOutcome2=globalThis.vjaOutcomeAnalyticsV2;
 const cpKey='vjaCandidateTruthProfile';
 let cpInit=null;
 const cpAiRequests=new Map();
 const cpVacancyIntelInFlight=new Map();
 const cpPreferencesKey='vjaJobPreferencesV1';
+const cpLearningEventsKey='vjaLearningEventsV1';
+const cpLearningSettingsKey='vjaLearningSettingsV1';
+const cpModelRegistryKey='vjaModelRegistryV1';
+const cpFeatureFlagsKey='vjaFeatureFlagsV1';
 async function cpInitialize(){
   if(cpInit)return cpInit;
   cpInit=(async()=>{
@@ -34,6 +42,13 @@ async function cpInitialize(){
       await chrome.storage.local.set({vjaPersonalReplies:[defaultReply,...withoutSystemDefault].slice(0,30)});
     }
     if(!stored.vjaCopilotSettings)await chrome.storage.local.set({vjaCopilotSettings:{aiConsent:false,debug:false,historyLimit:24,discoveryEnabled:false,floatingApplyMode:'auto',alwaysCoverLetter:true,compactApplyStatus:true,quickListCoverLetter:true}});
+    const foundation=await chrome.storage.local.get([cpLearningEventsKey,cpLearningSettingsKey,cpModelRegistryKey,cpFeatureFlagsKey]);
+    const initPatch={};
+    if(!Array.isArray(foundation[cpLearningEventsKey]))initPatch[cpLearningEventsKey]=[];
+    if(!foundation[cpLearningSettingsKey])initPatch[cpLearningSettingsKey]={enabled:true,explicitFeedback:true,implicitFeedback:true,maxEvents:5000,activeLearning:true};
+    if(!foundation[cpModelRegistryKey])initPatch[cpModelRegistryKey]={schemaVersion:1,activeModel:null,models:[],updatedAt:Date.now()};
+    if(!foundation[cpFeatureFlagsKey])initPatch[cpFeatureFlagsKey]={batchAnalysis:true,personalRanking:true,learningEngine:true,outcomeLearning:true,recruiterCopilot:true,multiSite:true,mlRanking:false};
+    if(Object.keys(initPatch).length)await chrome.storage.local.set(initPatch);
     else {const next={...stored.vjaCopilotSettings,historyLimit:Number(stored.vjaCopilotSettings.historyLimit)===8?24:(stored.vjaCopilotSettings.historyLimit||24),floatingApplyMode:'auto',alwaysCoverLetter:true,compactApplyStatus:true,quickListCoverLetter:stored.vjaCopilotSettings.quickListCoverLetter!==false};if(JSON.stringify(next)!==JSON.stringify(stored.vjaCopilotSettings))await chrome.storage.local.set({vjaCopilotSettings:next});}
   })().catch(e=>{cpInit=null;throw e;});return cpInit;
 }
@@ -83,7 +98,7 @@ async function cpFetchHhVacancy(vInput,timeoutMs=4200){
   const v=cpCore.vacancy(vInput),apiUrl=cpHhList?.hhApiVacancyUrl?.(v.url,v.vacancyId);if(!apiUrl)throw new Error('Не удалось построить HH API-запрос для этой вакансии.');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.max(1200,Number(timeoutMs)||4200));
   try{
-    const response=await fetch(apiUrl,{method:'GET',headers:{'Accept':'application/json','HH-User-Agent':'ViolettaApplyAssistant/4.0.0 (github.com/ViolettaNcl/job-search-assistant)'},signal:controller.signal,credentials:'omit',cache:'no-store'});
+    const response=await fetch(apiUrl,{method:'GET',headers:{'Accept':'application/json','HH-User-Agent':'ViolettaApplyAssistant/5.0.0 (github.com/ViolettaNcl/job-search-assistant)'},signal:controller.signal,credentials:'omit',cache:'no-store'});
     if(!response?.ok)throw new Error(`HH API: ${response?.status||'error'}`);
     const data=await response.json(),id=String(data?.id||'');if(!id||id!==String(v.vacancyId))throw new Error('HH API вернул другую вакансию.');
     const title=cpCore.clip(data?.name||v.title,300);if(cpCore.suspiciousVacancyTitle?.(title))throw new Error('HH API не подтвердил название вакансии.');
@@ -110,6 +125,27 @@ function cpAssertHhListSender(sender){
   if(!sender.tab?.id||!/^https?:\/\//i.test(sender.url||''))throw new Error('Откройте список вакансий HeadHunter.');
   let u;try{u=new URL(sender.url);}catch{throw new Error('Не удалось определить страницу вакансий.');}
   if(!/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(u.hostname))throw new Error('Batch Analysis доступен на HeadHunter.');
+}
+
+async function cpLearningEvents(){
+  const x=(await chrome.storage.local.get(cpLearningEventsKey))[cpLearningEventsKey];return Array.isArray(x)?x:[];
+}
+async function cpLearningSettings(){
+  const x=(await chrome.storage.local.get(cpLearningSettingsKey))[cpLearningSettingsKey]||{};return {enabled:x.enabled!==false,explicitFeedback:x.explicitFeedback!==false,implicitFeedback:x.implicitFeedback!==false,maxEvents:Math.max(200,Math.min(10000,Number(x.maxEvents)||5000)),activeLearning:x.activeLearning!==false};
+}
+async function cpRecordLearningEvent(input){
+  if(!cpLearning?.event)return null;const settings=await cpLearningSettings();if(!settings.enabled)return null;
+  let e;try{e=cpLearning.event(input);}catch{return null;}const events=await cpLearningEvents();events.push(e);if(events.length>settings.maxEvents)events.splice(0,events.length-settings.maxEvents);await chrome.storage.local.set({[cpLearningEventsKey]:events});return e;
+}
+async function cpLearningSignals(){return cpLearning?.deriveSignals?.(await cpLearningEvents())||{total:0};}
+async function cpLearningSummary(){const events=await cpLearningEvents(),signals=cpLearning?.summary?.(events)||{total:events.length};const rows=cpLearning?.datasetRows?.(events)||[],registry=(await chrome.storage.local.get(cpModelRegistryKey))[cpModelRegistryKey]||{activeModel:null,models:[]};return {schemaVersion:1,events:events.length,labels:rows.length,signals,registry,trainingReady:rows.length>=20,minimumRecommendedLabels:100};}
+async function cpLearningExport(){const events=await cpLearningEvents();return {schemaVersion:1,exportedAt:new Date().toISOString(),events,dataset:cpLearning?.datasetRows?.(events)||[],summary:cpLearning?.summary?.(events)||{},preferences:await cpJobPreferences(),registry:(await chrome.storage.local.get(cpModelRegistryKey))[cpModelRegistryKey]||null};}
+async function cpLearningImport(payload){
+  if(!payload||Number(payload.schemaVersion)!==1||!Array.isArray(payload.events))throw new Error('Некорректный learning backup.');const settings=await cpLearningSettings(),events=[];for(const raw of payload.events){try{events.push(cpLearning.event(raw));}catch{}}if(!events.length&&payload.events.length)throw new Error('Learning backup не содержит допустимых событий.');const merged=[...(await cpLearningEvents()),...events];const map=new Map();for(const e of merged)map.set(e.eventId,e);const out=[...map.values()].sort((a,b)=>Number(a.timestamp)-Number(b.timestamp)).slice(-settings.maxEvents);await chrome.storage.local.set({[cpLearningEventsKey]:out});return cpLearningSummary();
+}
+async function cpLearningReset(){await chrome.storage.local.set({[cpLearningEventsKey]:[],[cpModelRegistryKey]:{schemaVersion:1,activeModel:null,models:[],updatedAt:Date.now()}});return cpLearningSummary();}
+async function cpFindDuplicate(vacancy){
+  if(!cpDuplicate?.bestMatch)return null;const keys=await chrome.storage.local.get(null),records=[];for(const [k,v] of Object.entries(keys))if(k.startsWith('vjaVacancyIntel:')&&v?.vacancy&&String(v.vacancy.vacancyId)!==String(vacancy.vacancyId))records.push(v);const best=cpDuplicate.bestMatch(vacancy,records);return best?.similarity?.repost?{vacancyId:best.vacancy.vacancyId,title:best.vacancy.title,company:best.vacancy.company,similarity:best.similarity}:null;
 }
 async function cpJobPreferences(){
   const stored=(await chrome.storage.local.get(cpPreferencesKey))[cpPreferencesKey]||{};
@@ -141,9 +177,11 @@ async function cpQuickListFullAnalysis(vInput,sender,{force=false}={}){
     const analysis=cpHhList?.analyzeCallRequirement?.(`${full.title||''}\n${full.description||''}\n${full.requirements||''}`,full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom'))||{status:'unknown',hasCalls:null,canApply:false,confidence:0,reason:'Analysis недоступен.',evidence:''};
     const relevance=globalThis.vjaRelevance?.analyze?.(full)||{};
     const profile=(await cpData()).profile;
-    const fit=cpFit?.scoreVacancy?.(full,profile,preferences,analysis,relevance)||{score:0,decision:'REVIEW',ready:false,reasons:[],risks:['Fit Score недоступен'],features:{},algorithm:'unavailable'};
+    const baseFit=cpFit?.scoreVacancy?.(full,profile,preferences,analysis,relevance)||{score:0,decision:'REVIEW',ready:false,reasons:[],risks:['Fit Score недоступен'],features:{},algorithm:'unavailable'};
+    const signals=await cpLearningSignals();const fit=cpLearning?.adjustFit?.({...baseFit,preferences},signals,full)||baseFit;fit.baseScore=baseFit.score;fit.ready=(analysis.status==='no-calls'||!preferences.avoidCalls)&&!fit.features?.sales&&fit.score>=preferences.minimumFitScore;
     const vacancy={provider:full.provider,url:full.url,vacancyId:full.vacancyId,title:full.title,company:full.company||'',location:full.location||'',remote:Boolean(full.remote)};
-    const record={schemaVersion:1,vacancy,analysis:{...analysis,source,coverage:full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom')},fit,features:{...(fit.features||{}),descriptionHash:relevance.descriptionHash||'',descriptionCoverage:relevance.descriptionCoverage||full.descriptionCoverage||''},preferenceKey,source,at:Date.now()};
+    const duplicate=await cpFindDuplicate({...vacancy,description:full.description,requirements:full.requirements});
+    const record={schemaVersion:2,vacancy,analysis:{...analysis,source,coverage:full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom')},fit,features:{...(fit.features||{}),descriptionHash:relevance.descriptionHash||'',descriptionCoverage:relevance.descriptionCoverage||full.descriptionCoverage||''},duplicate,preferenceKey,source,at:Date.now()};
     await chrome.storage.local.set({[intelKey]:record,[`vjaCallAnalysis:${id}`]:{vacancyId:id,url:selected.url,at:record.at,result:{vacancyId:id,title:full.title,status:analysis.status,hasCalls:analysis.hasCalls,canApply:analysis.canApply,confidence:analysis.confidence,reason:analysis.reason,evidence:analysis.evidence||'',source,coverage:record.analysis.coverage}}});
     return {...record,application:await cpQuickListApplicationState(selected),decision,preferences,cached:false};
   })();
@@ -153,6 +191,7 @@ async function cpQuickListDecision(vInput,sender,decision){
   cpAssertEmbeddedVacancy(sender,vInput);const v=cpCore.vacancy(vInput),id=String(v.vacancyId||'');const allowed=new Set(['SAVED','SKIPPED','REVIEWED','']);
   decision=String(decision||'').toUpperCase();if(decision==='CLEAR')decision='';if(!allowed.has(decision))throw new Error('Неизвестное решение по вакансии.');
   const key=cpVacancyDecisionKey(id);if(!decision)await chrome.storage.local.remove(key);else await chrome.storage.local.set({[key]:{vacancyId:id,url:v.url,title:v.title,decision,at:Date.now()}});
+  if(decision){const intel=(await chrome.storage.local.get(cpVacancyIntelKey(id)))[cpVacancyIntelKey(id)];const type=decision==='SAVED'?'VACANCY_SAVED':decision==='SKIPPED'?'VACANCY_SKIPPED':'VACANCY_REVIEWED';await cpRecordLearningEvent({type,vacancy:v,userAction:decision,source:'quick-list',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{}},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score}});}
   return {vacancyId:id,decision};
 }
 async function cpQuickListCallAnalysis(vInput,sender){
@@ -197,7 +236,7 @@ async function cpQuickListState(vInput,sender){
   const stored=await chrome.storage.local.get([cacheKey,intelKey,decisionKey]),call=stored[cacheKey],intel=stored[intelKey],decision=stored[decisionKey]?.decision||'';
   const analysis=call?.result&&Date.now()-Number(call.at||0)<cpQuickListAnalysisTtl&&String(call.result.vacancyId||id)===id?{...call.result,cached:true,at:Number(call.at||0)}:(intel?.analysis&&Date.now()-Number(intel.at||0)<cpQuickListAnalysisTtl?{...intel.analysis,cached:true,at:Number(intel.at||0)}:null);
   const application=await cpQuickListApplicationState(v),preferences=await cpJobPreferences();
-  return {vacancyId:id,analysis,fit:intel?.fit||null,features:intel?.features||null,intelAt:Number(intel?.at||0),decision,application,preferences};
+  return {vacancyId:id,analysis,fit:intel?.fit||null,features:intel?.features||null,duplicate:intel?.duplicate||null,intelAt:Number(intel?.at||0),decision,application,preferences};
 }
 function cpTimelineEvent(type,label,meta={}){return {id:`evt-${Date.now()}-${Math.random().toString(16).slice(2)}`,at:Date.now(),type:cpCore.clip(type,60),label:cpCore.clip(label,220),meta};}
 function cpWithTimeline(context,type,label,meta={}){const timeline=[...(context?.timeline||[]),cpTimelineEvent(type,label,meta)].slice(-40);return {...context,timeline,updatedAt:Date.now()};}
@@ -336,6 +375,7 @@ async function cpQuickListComplete(message,sender){
   const reason=employerAlreadyViewed||letterSent?null:'Сопроводительное письмо не подтверждено сайтом.';
   const next=await updateApplicationJob(message.id,{context,completed:true,review:false,reason,pending:null,result:{id:message.id,trackedId:job.plan?.trackedId||job.plan?.vacancyId||'',sourceUrl:job.plan?.sourceUrl||'',coverLetter:job.context?.coverLetter||'',createdAt:now,result}});
   await chrome.storage.session.remove(cpQuickListActiveKey(sender)).catch(()=>{});
+  const intel=(await chrome.storage.local.get(cpVacancyIntelKey(job.plan?.vacancyId||'')))[cpVacancyIntelKey(job.plan?.vacancyId||'')];await cpRecordLearningEvent({type:'VACANCY_APPLIED',vacancy:job.context?.vacancy||{},userAction:'APPLY',accepted:true,source:'quick-list',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{}},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score}});
   return {ok:true,application:cpPublicApplication(cpCore.application(next||job)),result};
 }
 async function cpVacancyStatus(vInput,sender){
@@ -574,20 +614,27 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
 
       if(op==='register-origin')return cpRegisterOrigin(message.origin);
       if(op==='inject'){await cpInject(message.tabId);return {ok:true};}
-      if(op==='applications'){const apps=(await applicationJobs()).map(cpCore.application);return {ok:true,applications:apps.map(cpPublicApplication),analytics:cpAnalytics?.summarize(apps)||null,dueCount:cpFollow?.dueItems(apps.map(cpPublicApplication),Date.now()).length||0};}
+      if(op==='applications'){const apps=(await applicationJobs()).map(cpCore.application);return {ok:true,applications:apps.map(cpPublicApplication),analytics:cpAnalytics?.summarize(apps)||null,outcomeAnalytics:cpOutcome2?.summarize?.(apps)||null,dueCount:cpFollow?.dueItems(apps.map(cpPublicApplication),Date.now()).length||0};}
       if(op==='mark-status'){
         if(!['Applied','Viewed','Recruiter Replied','HR Interview','Technical Interview','Test Assignment','Offer','Rejected','Closed'].includes(message.status))throw new Error('Неизвестный статус.');
         const j=await applicationJob(message.id);if(!j)throw new Error('Отклик не найден.');
         let nextAction=j.context?.nextAction;if(['Offer','Rejected','Closed'].includes(message.status)&&nextAction&&!nextAction.doneAt)nextAction={...nextAction,doneAt:Date.now()};
         const context=cpWithTimeline({...j.context,status:message.status,statusSource:'user-confirmed',nextAction},'status',`Статус: ${message.status}`,{status:message.status});
-        await updateApplicationJob(message.id,{context,completed:message.status==='Applied'||j.completed});await cpUpdateReminderBadge().catch(()=>{});return {ok:true};
+        await updateApplicationJob(message.id,{context,completed:message.status==='Applied'||j.completed});await cpRecordLearningEvent({type:'OUTCOME_CHANGED',vacancy:j.context?.vacancy||{},userAction:message.status,source:'user-status',meta:{status:message.status}});await cpUpdateReminderBadge().catch(()=>{});return {ok:true};
       }
       if(op==='next-action')return {ok:true,application:await cpChangeNextAction(message.id,message.mode,Number(message.days)||1)};
       if(op==='set-followup')return {ok:true,application:await cpChangeNextAction(message.id,'manual',Number(message.days)||3)};
       if(op==='open-options'){await chrome.runtime.openOptionsPage();return {ok:true};}
+      if(op==='learning-summary')return {ok:true,...await cpLearningSummary()};
+      if(op==='learning-export')return {ok:true,data:await cpLearningExport()};
+      if(op==='learning-import')return {ok:true,...await cpLearningImport(message.data)};
+      if(op==='learning-reset')return {ok:true,...await cpLearningReset()};
+      if(op==='learning-settings'){if(message.value)await chrome.storage.local.set({[cpLearningSettingsKey]:{...(await cpLearningSettings()),...message.value}});return {ok:true,settings:await cpLearningSettings()};}
+      if(op==='feature-flags'){const old=(await chrome.storage.local.get(cpFeatureFlagsKey))[cpFeatureFlagsKey]||{};if(message.value)await chrome.storage.local.set({[cpFeatureFlagsKey]:{...old,...message.value}});return {ok:true,flags:(await chrome.storage.local.get(cpFeatureFlagsKey))[cpFeatureFlagsKey]||old};}
+      if(op==='interview-plan'){const j=await applicationJob(message.id);if(!j)throw new Error('Отклик не найден.');const data=await cpData();return {ok:true,plan:cpRecruiterIntel?.interviewPlan?.(j.context?.vacancy||cpCore.application(j).vacancy,data.profile)||null};}
     }
     const chatOps=new Set(['quick-context','observe-chat','resolve','analyze','remember-template','remember-ai-draft','map']);
-    if(op==='quick-list-prepare'||op==='quick-list-call-analysis'||op==='quick-list-state'||op==='quick-list-full-analysis'||op==='quick-list-decision')cpAssertEmbeddedVacancy(sender,message.vacancy||{});
+    if(op==='quick-list-prepare'||op==='quick-list-call-analysis'||op==='quick-list-state'||op==='quick-list-full-analysis'||op==='quick-list-decision'||op==='learning-feedback')cpAssertEmbeddedVacancy(sender,message.vacancy||{});
     else if(op==='job-preferences-get'||op==='job-preferences-save')cpAssertHhListSender(sender);
     else if(chatOps.has(op)&&message.snapshot)cpAssertChatPage(sender,message.snapshot);
     else cpAssertPage(sender,message.snapshot?.url||message.vacancy?.url||message.url);
@@ -602,7 +649,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(op==='list-context-applications')return {ok:true,reason:'needs-selection',candidates:(await applicationJobs()).map(cpCore.application).filter(a=>a.vacancy.provider===message.snapshot.provider).map(cpPublicApplication)};
     if(op==='update-letter'){
       const job=await applicationJob(message.id);if(!job||job.tabId!==sender.tab.id||Number(job.frameId||0)!==Number(sender.frameId||0))throw new Error('Отклик принадлежит другой вкладке.');
-      const letter=cpCore.clip(message.text,8000),now=Date.now();const memory={...(job.context?.coverLetterMemory||{}),text:letter,source:'user-edited',updatedAt:now};await updateApplicationJob(message.id,{context:{...job.context,coverLetter:letter,coverLetterMemory:memory,coverLetterSource:'user-edited',updatedAt:now}});return {ok:true};
+      const letter=cpCore.clip(message.text,8000),now=Date.now(),before=job.context?.coverLetter||'';const memory={...(job.context?.coverLetterMemory||{}),text:letter,source:'user-edited',updatedAt:now};await updateApplicationJob(message.id,{context:{...job.context,coverLetter:letter,coverLetterMemory:memory,coverLetterSource:'user-edited',updatedAt:now}});await cpRecordLearningEvent({type:'COVER_LETTER_EDITED',vacancy:job.context?.vacancy||{},originalValue:before,correctedValue:letter,edited:true,userAction:'EDIT',source:'cover-letter'});return {ok:true};
     }
     if(op==='focus'){await chrome.storage.session.set({[`vjaCopilotFocus:${sender.tab.id}`]:{frameId:sender.frameId||0,at:Date.now()}});return {ok:true};}
     if(op==='invalidate'){cpAiRequests.delete(`${sender.tab.id}:${sender.frameId||0}`);return {ok:true};}
@@ -613,6 +660,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(op==='quick-list-state')return {ok:true,...await cpQuickListState(message.vacancy,sender)};
     if(op==='quick-list-full-analysis')return {ok:true,...await cpQuickListFullAnalysis(message.vacancy,sender,{force:message.force===true})};
     if(op==='quick-list-decision')return {ok:true,...await cpQuickListDecision(message.vacancy,sender,message.decision)};
+    if(op==='learning-feedback'){const v=cpCore.vacancy(message.vacancy||{}),accepted=String(message.sentiment||'').toLowerCase()==='accepted',rejected=String(message.sentiment||'').toLowerCase()==='rejected';if(!accepted&&!rejected)throw new Error('Неизвестная обратная связь.');const intel=(await chrome.storage.local.get(cpVacancyIntelKey(v.vacancyId)))[cpVacancyIntelKey(v.vacancyId)];const e=await cpRecordLearningEvent({type:accepted?'FIT_ACCEPTED':'FIT_REJECTED',vacancy:v,accepted,rejected,userAction:accepted?'ACCEPT':'REJECT',source:'fit-feedback',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{}},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score}});return {ok:true,event:e,summary:await cpLearningSummary()};}
     if(op==='job-preferences-get')return {ok:true,preferences:await cpJobPreferences()};
     if(op==='job-preferences-save')return {ok:true,preferences:await cpSaveJobPreferences(message.preferences,sender)};
     if(op==='quick-list-complete')return cpQuickListComplete(message,sender);

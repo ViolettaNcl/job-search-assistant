@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "4.0.0",
-  "description": "Violetta 4.0: batch vacancy analysis, explainable Fit Score, user-controlled Apply Queue, persistent memory, smart questionnaires and vacancy-specific applications.",
+  "version": "5.0.0",
+  "description": "Violetta 5.0 Foundation: batch analysis, explicit Calls status, personal learning signals, outcomes, recruiter/interview intelligence, multi-site architecture and ML-ready pipeline.",
   "permissions": [
     "activeTab",
     "storage",
@@ -85,6 +85,7 @@
         "questionnaire-answer-engine.js",
         "questionnaire-content.js",
         "universal-content.js",
+        "recruiter-intelligence.js",
         "recruiter-chat.js",
         "quick-replies.js",
         "recruiter-chat-content.js"

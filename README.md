@@ -2,190 +2,157 @@
 
 # Violetta Apply Assistant
 
-**Current release: 4.0.0**
+**Current release: 5.0.0 Foundation**
 
-Violetta Apply Assistant is a vacancy-first job-search copilot for HeadHunter. It runs primarily as a Chrome extension and keeps each decision bound to the exact `vacancyId`: full-vacancy analysis, phone-duty detection, explainable fit ranking, application preparation, questionnaire assistance and recruiter-chat drafts.
+Violetta Apply Assistant is a vacancy-first job-search copilot centered on HeadHunter. It combines exact-vacancy analysis, no-calls detection, explainable fit ranking, persistent application memory, questionnaire autofill, recruiter assistance, outcome analytics and a privacy-conscious personal learning layer.
 
-Version 4.0 moves the project from one-card-at-a-time assistance toward a structured job-search workflow: **Batch Analysis → Explainable Fit Score → filters → user-controlled Apply Queue**. It deliberately does **not** claim machine learning yet. The 4.0 scoring model is deterministic and explainable so that 4.1 can later collect reliable feedback/training signals.
+5.0 is intentionally called **Foundation**: the product now contains the data/learning/model pipeline required for real ML, while production decisions still remain explainable and safe when no validated trained model exists. The extension never labels heuristics as machine learning.
 
-## Core workflow
+## Main workflow
 
 ```text
 HH search results
 → ⚡ Analyze page
-→ full vacancy read for each exact vacancyId
-→ Analysis: calls / no calls
-→ Fit Score with reasons + risks
-→ filter the page
-→ Ready to Apply queue
-→ user chooses Apply / Review / Save / Skip
-→ ✦ Отклик + письмо
-→ questionnaire autofill if required
-→ final review
-→ persistent vacancy/application memory
+→ exact vacancyId + full vacancy read
+→ Calls status: ✓ no calls / ✕ calls / ? unknown
+→ explainable Fit Score
+→ personal learning adjustment from your real Apply / Save / Skip / ✓ / ✕ history
+→ filters + Ready Queue
+→ vacancy-specific ✦ Отклик + письмо
+→ questionnaire autofill + review gate
+→ recruiter / interview workflow
+→ outcomes + timeline
+→ Learning Center
+→ export labelled dataset
+→ offline model training + evaluation + promotion gate
 ```
 
-## 4.0 search-page intelligence
+## What 5.0 adds
 
-### Batch Analysis
+### Personal Learning Engine
 
-`⚡ Analyze page` collects the unique vacancies currently rendered on the HH search page and analyzes them with bounded concurrency. It does not open dozens of visible tabs and does not mass-submit applications.
+The extension records structured `LearningEvent` objects from real user actions. Examples:
 
-For every vacancy it:
+- `VACANCY_APPLIED`
+- `VACANCY_SAVED`
+- `VACANCY_SKIPPED`
+- `FIT_ACCEPTED`
+- `FIT_REJECTED`
+- `COVER_LETTER_EDITED`
+- `OUTCOME_CHANGED`
 
-1. fixes the exact `vacancyId`;
-2. obtains the full description through the reliable HH reader / API fallback;
-3. runs phone-duty Analysis;
-4. extracts structured vacancy features;
-5. calculates an explainable Fit Score;
-6. stores the result by vacancy ID;
-7. updates all repeated cards for that vacancy.
+These are stored locally and used to derive explainable personal signals. A positive history around a role or technology can adjust the deterministic Fit Score; repeated skips can reduce it. The adjustment is bounded, visible in the Fit tooltip and never overrides hard safety constraints such as required phone calls when calls are disabled.
 
-Default batch concurrency is 3 and is configurable from the compact search-page toolbar.
+### Clear Fit vs Calls UI
 
-### Explainable Fit Score
-
-Fit Score is currently **rules-v1**, not an ML model. The score uses structured evidence such as:
-
-- role family;
-- confirmed candidate skills vs vacancy technologies;
-- remote/office format;
-- phone-call duties;
-- sales focus;
-- seniority and explicit years-of-experience requirements;
-- English requirement when detectable;
-- user search preferences.
-
-A score is always accompanied by reasons and risks. Examples:
+`Fit` and `Calls` are separate indicators.
 
 ```text
-91% Match
-✓ Remote
-✓ No required calls
-✓ C#, SQL Server and REST API match
-! Linux is requested but not confirmed
+86% Match     ✓ Без звонков
+70% Match     ✕ Есть звонки
 ```
 
-Phone-call vacancies are strongly penalized when `avoidCalls` is enabled. Sales-focused roles are similarly penalized when `avoidSales` is enabled.
+Fit color means job-fit strength. Calls color means whether phone/voice duties were detected. They are not the same signal.
 
-### Search filters
+### Explicit and implicit feedback
 
-The 4.0 toolbar can filter the current HH result page by:
+The search page records:
 
-- all vacancies;
-- confirmed no-calls vacancies;
-- Fit Score above the selected threshold;
-- vacancies ready for the queue;
-- saved-for-later vacancies.
+- Apply → strong positive signal;
+- Save → positive signal;
+- Skip → negative signal;
+- ✓ next to Fit → score was useful;
+- ✕ next to Fit → score was wrong.
 
-Filters affect only the local page presentation; they do not modify HH search settings or submit anything.
+The system does not silently change confirmed candidate facts from these signals.
 
-### Ready to Apply queue
+### Learning Center
 
-The queue is derived from analyzed vacancies and remains user-controlled. A queue item can be:
+Open **Learning Center** from the extension popup to see:
 
-- **Apply** — invokes the existing exact-card `✦ Отклик + письмо` flow;
-- **Show** — scrolls back to the card for manual review;
-- **Save** — persists a saved-for-later decision;
-- **Skip** — persists a skip decision.
+- number of learning events;
+- number of labelled vacancy decisions;
+- strongest role/technology preference signals;
+- application outcome funnel;
+- ML training readiness;
+- current model-registry state;
+- export/import/reset controls.
 
-These decisions are stored as structured data so the later 4.1 Learning Engine can use explicit feedback. In 4.0 they are **not yet used to train or adapt a model**.
+Exports are local JSON / JSONL files. Resetting learning data does not delete CVs or application history.
+
+### Outcome learning foundation
+
+Application outcomes remain separate from preference labels. `Would I apply?` and `Did the employer respond?` are different targets. Outcome analytics include sample-size warnings so a tiny sample is not presented as strong evidence.
+
+### Recruiter and interview intelligence
+
+5.0 adds deterministic recruiter-intent classification and an evidence-safe interview-preparation plan. It can recognize salary questions, interview invitations, test assignments, technical questions, rejection and follow-up messages. Interview preparation uses the exact vacancy and confirmed profile evidence; it does not manufacture experience.
+
+### Multi-site adapter contract
+
+`site-adapter-core.js` defines a formal `JobSiteAdapter` contract for future providers. HH remains the primary live-tested adapter. Other selectors already exist in the legacy adapter layer, but 5.0 does **not** claim full live support for every listed site.
+
+### Repost / duplicate detection
+
+A cross-ID detector compares company, normalized title and description similarity. It can flag a likely repost even when the source vacancy ID changes. This is advisory, not a destructive deduplication action.
+
+## Real ML pipeline
+
+The repository now contains a real offline baseline pipeline under `tools/ml/`:
+
+```text
+tools/ml/train_preference.py
+tools/ml/evaluate_model.py
+tools/ml/model_registry.py
+tools/ml/promote_model.py
+```
+
+The first model is a logistic-regression preference baseline trained from exported real labels. It uses deterministic hashed features and produces a versioned model JSON.
+
+Important safeguards:
+
+1. production training requires a minimum labelled dataset;
+2. both positive and negative labels are required;
+3. training and evaluation are separate steps;
+4. model promotion refuses synthetic/test-only models;
+5. validation sample size and F1 thresholds are enforced;
+6. a candidate cannot replace an active model if the configured promotion metric regresses;
+7. no online retraining happens after every click.
+
+Synthetic data is used only in automated tests to prove the pipeline works. It is never represented as a real personal model.
 
 ## Existing protected workflows
 
-### Vacancy Analysis
+5.0 preserves the established 3.9/4.0 flows:
 
-The single-card `Analysis` button remains available. It reads the exact full vacancy through a hidden/background HH page and `api.hh.ru` fallback, checks that the returned vacancy ID matches the selected card, and returns:
-
-- `✓ Без звонков`;
-- `✕ Есть звонки`;
-- `↻ Повторить` only when the full vacancy cannot be verified.
-
-Telephony configuration, SIP/VoIP setup, generic incoming requests, tickets and chats are not treated as phone-call duties by themselves.
-
-### Vacancy-specific application
-
-`✦ Отклик + письмо` keeps the application pinned to the selected card. It rejects search-page headings as vacancy titles, does not borrow another card's description, and prepares the letter only from verified candidate evidence.
-
-If HH reports `Отклик уже просмотрен работодателем`, only that known terminal modal is closed automatically and the vacancy is marked as already viewed.
-
-### Persistent vacancy memory
-
-Memory is keyed by exact vacancy ID and survives HH SPA rerenders, reloads, Back/Forward, repeated search results and questionnaire navigation.
-
-4.0 additionally persists:
-
-- structured vacancy features;
-- Fit Score and explanations;
-- batch-analysis timestamp/source;
-- Save / Skip / Reviewed decisions;
-- job-search preference profile.
-
-### Smart Questionnaire Autofill
-
-Questionnaire support from 3.9.x remains intact. Confirmed facts are preferred. Reviewable neutral drafts can be generated for subjective free-text questions, but the assistant does not fabricate verifiable candidate facts such as citizenship, work authorization, certificates, exact years of experience or a numeric salary value.
-
-Final submission of complex forms remains under user control when review fields are present.
-
-## Architecture
-
-The product is extension-first:
-
-```text
-browser-extension/
-  HH page integration
-  Batch Analysis UI
-  rules-v1 Fit Score
-  vacancy/application memory
-  questionnaire copilot
-  recruiter chat copilot
-
-src/
-  optional .NET backend source
-  dashboard / advanced automation / analytics
-```
-
-The local backend remains optional for core search-page intelligence. Batch Analysis, Fit Score, queue, quick apply, questionnaire memory and recruiter-chat drafts are extension features.
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the detailed flow and storage model.
+- full exact-vacancy reader with hidden-tab + `api.hh.ru` fallback;
+- `Analysis` for calls/no-calls;
+- `⚡ Analyze page` batch processing with bounded concurrency;
+- user-controlled Ready Queue;
+- persistent vacancy memory by exact ID;
+- individual cover letters;
+- employer-already-viewed auto-close;
+- smart questionnaire autofill and human fallback drafts;
+- final review gate;
+- recruiter-chat copilot;
+- application timeline and reminders.
 
 ## Installation
 
-1. Extract the FULL ZIP or standalone extension ZIP.
+1. Extract the FULL or standalone extension ZIP.
 2. Open `chrome://extensions`.
 3. Enable **Developer mode**.
 4. Choose **Load unpacked**.
-5. For the FULL bundle select `extension/`.
-6. For source/development installation select `browser-extension/` in the Git repository.
-7. Grant HH/HeadHunter access when Chrome requests it.
-8. Reload already-open HH pages once after an extension upgrade.
+5. FULL build: select `extension/`.
+6. Git source: select `browser-extension/`.
+7. Grant HH access if Chrome asks.
+8. Reload already-open HH tabs once after upgrading.
 
-Detailed instructions: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
+See [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
-## Documentation
+## Repository layout
 
-| Document | Purpose |
-|---|---|
-| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Installation and daily use |
-| [docs/FEATURES.md](docs/FEATURES.md) | Feature reference |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Runtime/storage architecture |
-| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Structured vacancy/application/learning data |
-| [docs/LEARNING_SYSTEM.md](docs/LEARNING_SYSTEM.md) | 4.1 learning design and feedback signals |
-| [docs/ML_ARCHITECTURE.md](docs/ML_ARCHITECTURE.md) | Planned 5.0 ML architecture |
-| [docs/MODEL_EVALUATION.md](docs/MODEL_EVALUATION.md) | Model evaluation requirements |
-| [docs/REPOSITORY_LAYOUT.md](docs/REPOSITORY_LAYOUT.md) | Clean source repository layout |
-| [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md) | Safe publishing without FULL/runtime duplication |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | HH/Chrome troubleshooting |
-| [docs/PRIVACY_AND_DATA.md](docs/PRIVACY_AND_DATA.md) | Candidate data and future local vault |
-| [TESTING_GUIDE.md](TESTING_GUIDE.md) | Test suites and commands |
-| [ROADMAP.md](ROADMAP.md) | 4.1 → 5.0 development sequence |
-| [WHAT_CHANGED.md](WHAT_CHANGED.md) | Current release changes |
-
-## Repository hygiene
-
-The Git repository is a source repository. Do not copy a FULL bundle into it.
-
-Tracked source is expected under:
+The Git repository contains source, tests and docs only:
 
 ```text
 .github/
@@ -197,41 +164,44 @@ tests/
 tools/
 ```
 
-Runtime/release folders such as `backend/`, packaged `extension/`, `test-results/`, `dist/`, `artifacts/` and `Violetta-Apply-Assistant-*` must not be tracked in Git.
-
-Before publishing:
+Do not commit FULL releases, runtime `backend/`, packaged `extension/`, ZIPs, test-results, databases, logs or build output. Run:
 
 ```powershell
 python tools/check-repo-hygiene.py
 ```
 
-## Development
+before publishing.
 
-Core checks:
+## ML quick start
+
+After enough real decisions have been collected:
 
 ```powershell
-node --test browser-extension/*.test.js
-python tests/browser_batch_400.py
-python tests/browser_memory_399.py
-python tests/browser_questionnaire_3912.py
-python tests/hh_read_fallback_3910.py
-python tests/test_source_publication.py
-python tests/test_repository_hygiene.py
+# Export dataset from Learning Center first.
+python tools/ml/train_preference.py violetta-preference-dataset.jsonl --out candidate-model.json
+python tools/ml/evaluate_model.py candidate-model.json violetta-preference-dataset.jsonl --out candidate-metrics.json
+python tools/ml/model_registry.py model-registry.json candidate-model.json --metrics candidate-metrics.json
+python tools/ml/promote_model.py model-registry.json <modelVersion>
 ```
 
-Synthetic fixtures verify extension logic and DOM flows; they are not a permanent guarantee against future HH production changes.
+Default production training expects at least 100 labelled decisions. For meaningful personalization, several hundred real labels are preferred.
 
-## Publishing
+## Documentation
 
-Use `Publish-Violetta-4.0.0.ps1`. It verifies the source manifest and copies only whitelisted source/documentation files into the existing Git repository. It never performs force-push, reset, clean or stash.
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+- [docs/FEATURES.md](docs/FEATURES.md)
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md)
+- [docs/LEARNING_SYSTEM.md](docs/LEARNING_SYSTEM.md)
+- [docs/ML_ARCHITECTURE.md](docs/ML_ARCHITECTURE.md)
+- [docs/MODEL_EVALUATION.md](docs/MODEL_EVALUATION.md)
+- [docs/PRIVACY_AND_DATA.md](docs/PRIVACY_AND_DATA.md)
+- [docs/REPOSITORY_LAYOUT.md](docs/REPOSITORY_LAYOUT.md)
+- [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md)
+- [TESTING_GUIDE.md](TESTING_GUIDE.md)
+- [ROADMAP.md](ROADMAP.md)
+- [WHAT_CHANGED.md](WHAT_CHANGED.md)
 
-## Roadmap principle
+## Product principle
 
-- **4.0** creates structured vacancy data and user decisions.
-- **4.1** introduces the Personal Learning Engine and feedback event store.
-- **4.2** learns from application outcomes and adds stronger analytics.
-- **4.3** expands recruiter and interview intelligence.
-- **4.4** introduces multi-site adapters.
-- **5.0** may train real ranking/classification models only after enough labelled real-user data exists.
-
-The project intentionally distinguishes deterministic rules, LLM-assisted writing, retrieval, embeddings and actual trained ML models. No component should be labelled "machine learning" until a model is genuinely trained and evaluated.
+The assistant should become more personal as real evidence accumulates, but automation must remain reversible, explainable and grounded in verified candidate facts. Rules, LLM assistance, retrieval, embeddings and trained ML models are documented as separate mechanisms.

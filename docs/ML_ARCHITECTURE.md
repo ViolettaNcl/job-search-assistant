@@ -1,49 +1,64 @@
-# ML Architecture · planned 5.0
+# ML Architecture · 5.0 Foundation
 
-4.0 does not contain a trained ML ranking model. It creates structured vacancy/decision data so a future model can be trained honestly.
+## Separation of mechanisms
 
-## Prerequisites
+The project distinguishes:
 
-Before training a personal preference model, collect a meaningful set of real labelled decisions. A few dozen examples are not sufficient for a reliable personalized ranking claim. Target at least several hundred labelled vacancies before evaluating a first baseline.
+1. deterministic rules;
+2. user-derived personal signals;
+3. LLM-assisted text generation;
+4. retrieval/memory;
+5. embeddings/similarity;
+6. trained ML models.
 
-## First model
+Only item 6 is called machine learning.
 
-**Personal Vacancy Preference Classifier**
+## First real model
 
-Target:
+Target: `P(user_would_apply | vacancy)`.
 
-`P(user_would_apply | vacancy)`
+Baseline: logistic regression over structured + hashed sparse features.
 
-Start with an interpretable baseline such as Logistic Regression over structured features. Compare against `rules-v1` before considering Random Forest / Gradient Boosting. More complex models are justified only by measured improvement.
+Features currently exported:
 
-## Separate engagement model
+- role;
+- remote;
+- calls status;
+- sales;
+- senior/junior flags;
+- required years;
+- technologies;
+- hashed title/company tokens.
 
-A later Employer Engagement model may rank applications by observed reply/interview outcomes. This target must stay separate from user preference; "I like this vacancy" and "this employer will reply" are different labels.
+The baseline is deliberately simple so it is debuggable and easy to compare with deterministic rules.
 
-## Text representation
+## Training lifecycle
 
-Embeddings can later support:
+```text
+Learning Events
+→ labelled JSONL export
+→ dataset validation
+→ stratified train/validation split
+→ candidate model
+→ offline evaluation
+→ registry
+→ promotion gate
+→ active model
+```
 
-- duplicate/repost vacancies;
-- similar questionnaire questions;
-- retrieval of previous corrections;
-- text features for preference ranking.
+No model is promoted merely because training finished.
 
-Embedding similarity is not itself a supervised ML outcome model.
+## Online behavior
 
-## Model registry
+5.0 does not retrain after every click. The extension continues to work with rules + personal signals when no validated model is active.
 
-Every promoted model should record:
+## Later models
 
-- `modelVersion`;
-- `trainingDatasetVersion`;
-- training timestamp;
-- feature schema version;
-- train/test split strategy;
-- metrics;
-- decision thresholds;
-- artifact SHA-256.
+Potential independent models:
 
-## Promotion rule
+- calls classifier;
+- questionnaire category classifier;
+- employer engagement model;
+- duplicate/repost semantic model.
 
-Train candidate model → evaluate offline → compare with current baseline/model → promote only if metrics and product safety checks improve. Do not update the production model after every click.
+These targets must remain separate because the labels and risks differ.

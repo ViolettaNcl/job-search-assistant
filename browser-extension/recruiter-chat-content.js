@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   if(root.vjaLiveChat)return;
-  const C=root.vjaCopilotCore,A=root.vjaSiteAdapters,U=root.vjaCopilotUI,Q=root.vjaQuickReplies;
+  const C=root.vjaCopilotCore,A=root.vjaSiteAdapters,U=root.vjaCopilotUI,Q=root.vjaQuickReplies,RI=root.vjaRecruiterIntelligence;
   const documentId=root.vjaUniversal?.documentId||C.newId();
   let bar=null,panel=null,draft=null,replyIdentity=null,epoch=0,timer=null,active='',latestFingerprint='',loading=false;
   let renderSignature='';
@@ -94,7 +94,8 @@
   function openAiMenu(){
     const s=snapshot();if(!s.detected)return;
     close();const p=U.panel('✎ AI · текущий диалог',adapter().getReplyInput());panel=p;
-    const status=p.status('AI работает только с открытым сейчас чатом. Выберите действие.');
+    const detectedIntent=RI?.intent?.(s.latestInbound||'')||'OTHER';
+    const status=p.status(`AI работает только с открытым сейчас чатом. Intent: ${detectedIntent}. Выберите действие.`);
     const actions=document.createElement('div');actions.className='actions';
     const userAction=(style,seed='')=>event=>{if(event?.isTrusted===false)return;void analyze(style,typeof seed==='function'?seed():seed,true);};
     actions.append(U.button('🧠 Проанализировать весь диалог и ответить',userAction('dialog'),'primary'));
@@ -128,7 +129,7 @@
       if(localEpoch!==epoch||!currentMatches(s))return {ok:false,code:'stale'};
       if(resolved.ok===false)throw new Error(resolved.error);
       lastResolved=resolved;
-      const summary=document.createElement('div');summary.className='summary';summary.textContent=`${resolved.application.vacancy.title}${resolved.application.vacancy.company?' — '+resolved.application.vacancy.company:''}\n${full.messages.length} сообщений прочитано${full.historyPartial?' · история может быть неполной':''}${resolved.cvUnknown?'\nРезюме исходного отклика неизвестно; используется текущий профиль.':''}`;p.body.prepend(summary);
+      const summary=document.createElement('div');summary.className='summary';summary.textContent=`${resolved.application.vacancy.title}${resolved.application.vacancy.company?' — '+resolved.application.vacancy.company:''}\n${full.messages.length} сообщений прочитано · intent: ${RI?.intent?.(full.latestInbound||'')||'OTHER'}${full.historyPartial?' · история может быть неполной':''}${resolved.cvUnknown?'\nРезюме исходного отклика неизвестно; используется текущий профиль.':''}`;p.body.prepend(summary);
       if(!resolved.settings?.aiConsent&&!explicitUserRequest){status.textContent='AI выключен в настройках. Нажмите основную кнопку анализа в этом чате, чтобы разрешить разовую обработку текущего диалога.';p.place();return {ok:false,code:'consent-required'};}
       if(!full.latestInbound||full.messages?.at(-1)?.speaker==='unknown'){
         const unknown=full.messages?.at(-1);status.textContent=full.messages?.length?'Текст прочитан, но сайт не обозначил автора последнего сообщения. Проверьте его перед анализом.':'Сообщения не найдены в активном диалоге.';

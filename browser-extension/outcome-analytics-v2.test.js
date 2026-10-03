@@ -1,0 +1,2 @@
+const test=require('node:test');const assert=require('node:assert/strict');const A=require('./outcome-analytics-v2.js');
+test('outcome funnel computes rates and low sample warning',()=>{const s=A.summarize([{status:'Applied'},{status:'Recruiter Replied'},{status:'Offer'},{status:'Rejected'}]);assert.equal(s.applied,4);assert.equal(s.reply,2);assert.equal(s.offer,1);assert.equal(s.lowSample,true);});

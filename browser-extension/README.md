@@ -1,8 +1,8 @@
-# Violetta Apply Assistant — Chrome Extension 4.0.0
+# Violetta Apply Assistant — Chrome Extension 5.0.0 Foundation
 
 `extension/` is the packaged Chrome runtime inside the FULL bundle. In the Git source repository the same source is published as `browser-extension/`.
 
-## 4.0 search-page workflow
+## Search-page workflow
 
 - `⚡ Analyze page` — bounded batch analysis of unique visible HH vacancy IDs.
 - Explainable `rules-v1` Fit Score with reasons and risks.
@@ -23,7 +23,7 @@
 
 ## Important
 
-Fit Score 4.0 is deterministic and explainable. It is not a trained machine-learning model. The structured 4.0 data will feed the planned 4.1 Learning Engine.
+Fit Score 5.0 combines deterministic explainable rules with bounded personal-learning signals. A trained ML model is not claimed unless a validated promoted model exists.
 
 ## Installation
 

@@ -1,4 +1,4 @@
-/* Smart questionnaire understanding helpers (4.0.0). */
+/* Smart questionnaire understanding helpers (5.0.0). */
 (function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;

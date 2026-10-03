@@ -1,59 +1,32 @@
 # Roadmap
 
-The project follows a data-first sequence. Each milestone should create reliable inputs for the next rather than adding "AI" labels without evidence.
+## 5.0 Foundation — current
 
-## 4.0 — Batch Analysis + Explainable Ranking · Current
+- Batch Analysis and explicit Fit vs Calls UI.
+- Personal Learning Event Store.
+- Implicit Apply/Save/Skip learning signals.
+- Explicit ✓ / ✕ Fit feedback.
+- Learning Center with export/import/reset.
+- Outcome funnel with sample-size warning.
+- Repost/duplicate advisory.
+- Recruiter intent + interview-prep foundation.
+- Formal multi-site adapter contract.
+- Offline logistic preference baseline.
+- Model registry and promotion gate.
 
-- Batch Analysis of current HH search results.
-- Structured vacancy feature extraction.
-- Explainable Fit Score (`rules-v1`).
-- Job Preference Profile.
-- Ready to Apply queue.
-- Search-page filters.
-- Save / Skip / Review decision memory.
+## 5.1
 
-Exit criterion: the 4.0 workflow is stable on real HH usage and produces trustworthy structured vacancy/decision data.
+- Production import/inference for promoted preference models.
+- Calibration and threshold tuning from a larger real dataset.
+- Pre-submit diff center.
+- Richer questionnaire correction capture.
 
-## 4.1 — Personal Learning Engine
+## 5.2
 
-- `LearningEvent` store for accepted, skipped, edited and corrected decisions.
-- Explicit feedback: Good / Edit / Wrong where useful.
-- Implicit feedback signals from Apply / Skip / Save.
-- Separation of Fact, Preference, Answer, Writing, Vacancy and Outcome memory.
-- Retrieval of similar user-confirmed questionnaire/writing corrections.
-- No trained model required yet: retrieval + structured statistics first.
+- Engagement model trained independently from preference model.
+- Embedding index for semantic duplicates/question memory.
+- Stronger recruiter/interview UI.
 
-## 4.2 — Outcome Learning + Analytics
+## 6.0 candidate milestone
 
-- Full application lifecycle: Applied → Viewed → Reply → Interview → Test → Offer / Rejection / No response.
-- Application timeline linked to CV, cover letter and questionnaire answers.
-- Conversion metrics with sample-size reporting.
-- Separate targets for user preference and employer engagement.
-- Outcome-aware ranking signals, without claiming causality from small samples.
-
-## 4.3 — Recruiter Intelligence + Interview Copilot
-
-- Recruiter message intent classification.
-- Vacancy/CV/letter-aware reply suggestions.
-- Short / Normal / Detailed drafts.
-- Interview preparation and mock interview mode.
-- Structured feedback on clarity, factual accuracy and relevance.
-
-## 4.4 — Multi-site Job Agent
-
-- `JobSiteAdapter` abstraction.
-- Additional supported job sites behind separate adapters.
-- Cross-site canonical vacancy fingerprint.
-- Duplicate/repost detection, optionally using embeddings.
-
-## 5.0 — Real Machine Learning
-
-Only after enough real labelled data exists:
-
-- Personal Vacancy Preference Classifier: `P(user_would_apply | vacancy)`.
-- Employer Engagement ranking signal: `P(reply | application)`.
-- Optional call-duty and questionnaire classifiers from corrected labels.
-- Active learning based on confidence thresholds.
-- Model registry, dataset versions, offline evaluation and promotion gates.
-
-Initial baselines should be interpretable (for example Logistic Regression) before evaluating more complex models. Neural networks are not a project goal by themselves.
+Only after sufficient real usage: validated multi-site adapters, model monitoring, drift analysis and automated retraining proposals with explicit promotion approval.

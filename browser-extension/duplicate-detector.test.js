@@ -1,0 +1,4 @@
+const test=require('node:test');const assert=require('node:assert/strict');const D=require('./duplicate-detector.js');
+test('exact id is detected',()=>{assert.equal(D.similarity({vacancyId:'1'},{vacancyId:'1'}).exact,true);});
+test('repost detector uses company title and description similarity',()=>{const a={company:'Acme',title:'Специалист технической поддержки',description:'Поддержка пользователей тикеты база знаний API'};const b={company:'ACME',title:'Специалист технической поддержки',description:'Поддержка пользователей, тикеты, база знаний и API'};const s=D.similarity(a,b);assert.equal(s.repost,true);assert.ok(s.score>.8);});
+test('different jobs are not reposts',()=>{assert.equal(D.similarity({company:'A',title:'Backend C#',description:'api sql'},{company:'B',title:'Sales manager',description:'calls leads'}).repost,false);});

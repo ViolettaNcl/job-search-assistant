@@ -1,4 +1,4 @@
-# Supported Sites · 4.0.0
+# Supported Sites · 5.0.0 Foundation
 
 ## HeadHunter family
 
@@ -19,9 +19,9 @@
 | Recruiter chat | `✎ AI` draft assistant |
 | Local dashboard | Advanced backend mode |
 
-## 4.0 search-list intelligence
+## Search-list intelligence
 
-The 4.0 toolbar is enabled on supported HH search/list pages. It can analyze the visible unique vacancies with bounded concurrency, restore cached results by exact vacancy ID, calculate an explainable deterministic Fit Score, and build a user-controlled Ready Queue.
+The 5.0 toolbar is enabled on supported HH search/list pages. It can analyze the visible unique vacancies with bounded concurrency, restore cached results by exact vacancy ID, calculate an explainable deterministic Fit Score, and build a user-controlled Ready Queue.
 
 The score is **not a trained ML model** in 4.0. It uses `rules-v1` so every result can be explained and so the project can begin collecting clean structured signals for the 4.1 learning phase.
 

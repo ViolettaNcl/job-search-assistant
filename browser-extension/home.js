@@ -70,6 +70,7 @@ homeNode('rocketAutopilotHome').addEventListener('click',()=>void toggleHomeAuto
 homeNode('autopilotSettings').addEventListener('click',()=>chrome.tabs.create({url:chrome.runtime.getURL('popup.html')+(homeTab?.id?'?tab='+homeTab.id:'')}));
 homeNode('advanced').addEventListener('click',()=>chrome.tabs.create({url:chrome.runtime.getURL('popup.html')+(homeTab?.id?'?tab='+homeTab.id:'')}));
 homeNode('shortcuts').addEventListener('click',()=>chrome.tabs.create({url:'chrome://extensions/shortcuts'}));
+homeNode('learningCenter').addEventListener('click',()=>chrome.tabs.create({url:chrome.runtime.getURL('learning.html')}));
 function actionDate(ms){const d=new Date(Number(ms)||0);return Number.isNaN(d.getTime())?'':d.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}
 function renderAnalytics(summary){
  const box=homeNode('cvAnalytics');box.replaceChildren();if(!summary){box.textContent='Статистика пока недоступна.';return;}
@@ -88,6 +89,7 @@ async function loadApplications(){
   const select=document.createElement('select');select.setAttribute('aria-label','Статус отклика: '+a.title);
   for(const [value,label] of Object.entries(titles)){const o=document.createElement('option');o.value=value;o.textContent=label;o.selected=value===a.status;o.disabled=['Preparing','Ready','Needs review'].includes(value);select.append(o);}
   select.addEventListener('change',async()=>{const rr=await homeRequest('mark-status',{id:a.id,status:select.value});if(!rr.ok){homeNode('status').textContent=rr.error;select.value=a.status;}else{a.status=select.value;void loadApplications();}});row.append(link,company,select);
+  if(['Recruiter Replied','HR Interview','Technical Interview','Test Assignment','Offer'].includes(a.status)){const prep=document.createElement('button');prep.textContent='Interview Prep';prep.addEventListener('click',()=>chrome.tabs.create({url:chrome.runtime.getURL('interview.html')+'?id='+encodeURIComponent(a.id)}));row.append(prep);}
   if(a.detectedStage&&stageLabels[a.detectedStage]){const stage=document.createElement('span');stage.className='stageHint';stage.textContent='В чате: '+stageLabels[a.detectedStage];row.append(stage);}
   const next=a.nextAction&&!a.nextAction.doneAt&&!a.nextAction.dismissedAt?a.nextAction:null;
   if(next){
@@ -100,7 +102,7 @@ async function loadApplications(){
   container.append(row);
  }
  if(!apps.length)container.textContent='Пока нет подготовленных откликов.';
- const t=r.analytics?.total;homeNode('analytics').textContent=t?`Воронка: отправлено ${t.applied} · ответы ${t.response} · интервью ${t.interview} · тестовые ${t.test} · офферы ${t.offer}. Данные основаны на сохранённых статусах и истории.`:`Всего в реестре: ${apps.length}.`;
+ const t=r.analytics?.total,o=r.outcomeAnalytics;homeNode('analytics').textContent=t?`Воронка: отправлено ${t.applied} · ответы ${t.response} · интервью ${t.interview} · тестовые ${t.test} · офферы ${t.offer}.${o?` Reply rate ${o.replyRate}% · Interview rate ${o.interviewRate}% · n=${o.sampleSize}${o.lowSample?' (малая выборка)':''}.`:''} Данные основаны на сохранённых статусах и истории.`:`Всего в реестре: ${apps.length}.`;
  renderAnalytics(r.analytics);
 }
 void inspectHome();void loadApplications().catch(()=>{});void refreshHomeAutopilot();setInterval(()=>void refreshHomeAutopilot(),4000);

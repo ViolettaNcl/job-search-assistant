@@ -1,4 +1,4 @@
-VIOLETTA APPLY ASSISTANT 4.0.0 — START HERE
+VIOLETTA APPLY ASSISTANT 5.0.0 FOUNDATION — START HERE
 ============================================
 
 NORMAL USE
@@ -36,7 +36,7 @@ Analysis, Fit Score/features, queue decisions, application and questionnaire sta
 
 IMPORTANT
 ---------
-Fit Score 4.0 is deterministic rules-v1, not a trained ML model. 4.1 will add learning events after real usage creates reliable labels.
+Fit Score 5.0 uses deterministic rules plus bounded personal learning signals. Real ML training is available offline only after enough real labels are exported.
 
 ADVANCED MODE
 -------------
@@ -45,4 +45,4 @@ Run start-assistant.cmd only for the optional local dashboard/server Autopilot/a
 GITHUB UPDATE
 -------------
 Do NOT copy the whole FULL folder into the repository.
-Use Publish-Violetta-4.0.0.ps1.
+Use Publish-Violetta-5.0.0.ps1.

@@ -1,44 +1,30 @@
-# Model Evaluation Requirements
+# Model Evaluation
 
-These requirements apply once the project introduces trained models.
+A trained model must be evaluated on data not used for fitting.
 
-## Dataset split
+## Preference baseline
 
-Never evaluate a model on the same rows used for training. Use a time-aware or user-event-aware split when leakage from repeated/reposted vacancies is possible.
+Minimum tracked metrics:
 
-## Classification metrics
-
-For preference/call/question classifiers report, as appropriate:
-
+- validation sample size;
 - precision;
 - recall;
 - F1;
-- ROC-AUC;
-- PR-AUC;
-- confusion matrix.
+- accuracy;
+- log loss;
+- ROC-AUC when both classes exist.
 
-Accuracy alone is insufficient for imbalanced labels.
+## Promotion
 
-## Ranking metrics
+`tools/ml/promote_model.py` rejects candidates when:
 
-For ranked vacancy lists consider:
+- the model is not marked as trained on real labels;
+- validation sample size is below the required gate;
+- F1 is below the configured floor;
+- F1 regresses against the active model.
 
-- Precision@K;
-- NDCG@K;
-- MRR.
+The default production training command expects at least 100 labels. A larger dataset is preferred.
 
-## Product metrics
+## Test data
 
-Offline model quality is separate from job-search outcomes. Track user acceptance/override rates and later application/reply/interview rates with sample sizes.
-
-## Baseline comparison
-
-Every trained model must be compared with:
-
-1. a trivial baseline;
-2. the current deterministic `rules-v1` ranking;
-3. the previously promoted model, if one exists.
-
-## No causal claims
-
-Higher historical reply rate does not prove a feature caused employer engagement. Product analytics should report associations with sample size and uncertainty rather than causal claims.
+Synthetic fixtures may test code paths only. Their metrics are never reported as personal model quality and such models are marked `trainedOnRealLabels=false`, which prevents promotion.
