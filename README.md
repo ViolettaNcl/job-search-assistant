@@ -2,157 +2,144 @@
 
 # Violetta Apply Assistant
 
-**Current release: 5.0.0 Foundation**
+**Current release: 5.2.0 — Production Learning Loop**
 
-Violetta Apply Assistant is a vacancy-first job-search copilot centered on HeadHunter. It combines exact-vacancy analysis, no-calls detection, explainable fit ranking, persistent application memory, questionnaire autofill, recruiter assistance, outcome analytics and a privacy-conscious personal learning layer.
+Violetta Apply Assistant is a vacancy-first job-search copilot built around HeadHunter. It combines exact-vacancy reading, explicit calls/no-calls detection, explainable ranking, batch analysis, persistent application memory, questionnaire autofill, recruiter/interview assistance, outcome tracking and a local personal-learning system.
 
-5.0 is intentionally called **Foundation**: the product now contains the data/learning/model pipeline required for real ML, while production decisions still remain explainable and safe when no validated trained model exists. The extension never labels heuristics as machine learning.
+5.2 closes the main gap left by the 5.0 Foundation: a validated model can now move through a complete **offline train → calibrate → evaluate → register → explicitly promote → run → monitor → retrain-proposal** lifecycle. The extension still works without any trained model, and safety decisions such as calls/sales exclusions remain deterministic.
 
 ## Main workflow
 
 ```text
 HH search results
 → ⚡ Analyze page
-→ exact vacancyId + full vacancy read
-→ Calls status: ✓ no calls / ✕ calls / ? unknown
-→ explainable Fit Score
-→ personal learning adjustment from your real Apply / Save / Skip / ✓ / ✕ history
+→ exact vacancyId + full vacancy reader
+→ Calls: ✓ no calls / ✕ calls / ? unknown
+→ explainable rules Fit Score
+→ bounded personal signals from real feedback
+→ optional promoted preference model contribution
 → filters + Ready Queue
 → vacancy-specific ✦ Отклик + письмо
-→ questionnaire autofill + review gate
+→ questionnaire autofill + correction capture
+→ pre-submit change review
 → recruiter / interview workflow
-→ outcomes + timeline
-→ Learning Center
-→ export labelled dataset
-→ offline model training + evaluation + promotion gate
+→ application outcomes + timeline
+→ Learning & Model Center
+→ export real labelled datasets
+→ offline training / calibration / evaluation
+→ explicit model promotion
+→ prediction monitoring / drift / retraining proposal
 ```
 
-## What 5.0 adds
+## What 5.2 adds
 
-### Personal Learning Engine
+### Promoted-model runtime
 
-The extension records structured `LearningEvent` objects from real user actions. Examples:
+A preference model is no longer only an offline artifact. A model JSON can be imported into the local Model Registry and, after an explicit promotion gate, used as a **bounded ranking contribution**. It does not replace the deterministic Fit Score and cannot override hard Calls/Sales safety filters.
 
-- `VACANCY_APPLIED`
-- `VACANCY_SAVED`
-- `VACANCY_SKIPPED`
-- `FIT_ACCEPTED`
-- `FIT_REJECTED`
-- `COVER_LETTER_EDITED`
-- `OUTCOME_CHANGED`
+The same runtime also supports a separate **Employer Engagement** model. Its prediction is displayed as a separate signal and is never mixed into the user's personal Fit preference target.
 
-These are stored locally and used to derive explainable personal signals. A positive history around a role or technology can adjust the deterministic Fit Score; repeated skips can reduce it. The adjustment is bounded, visible in the Fit tooltip and never overrides hard safety constraints such as required phone calls when calls are disabled.
+### Calibration and threshold tuning
 
-### Clear Fit vs Calls UI
-
-`Fit` and `Calls` are separate indicators.
+`tools/ml/train_pipeline.py` implements a real offline workflow:
 
 ```text
-86% Match     ✓ Без звонков
-70% Match     ✕ Есть звонки
+validate dataset
+→ stratified temporal train / calibration / test split
+→ train logistic baseline
+→ tune temperature + decision threshold on calibration split
+→ evaluate once on held-out test split
+→ register candidate model
+→ optionally promote only through explicit gate
 ```
 
-Fit color means job-fit strength. Calls color means whether phone/voice duties were detected. They are not the same signal.
+Synthetic fixtures can exercise the pipeline with `--test-only`, but those artifacts remain `trainedOnRealLabels=false` and cannot be promoted.
 
-### Explicit and implicit feedback
+### Monitoring and drift
 
-The search page records:
+The Learning Center now reports, when enough post-prediction labels exist:
 
-- Apply → strong positive signal;
-- Save → positive signal;
-- Skip → negative signal;
-- ✓ next to Fit → score was useful;
-- ✕ next to Fit → score was wrong.
+- labelled prediction count;
+- accuracy / precision / recall / F1;
+- Brier score;
+- expected calibration error (ECE);
+- recent vs early prediction-rate / label-rate drift;
+- a retraining proposal when enough new evidence or degradation accumulates.
 
-The system does not silently change confirmed candidate facts from these signals.
+A retraining proposal is advisory. The extension does not silently train or promote a new model after every click.
 
-### Learning Center
+### Independent preference vs engagement datasets
 
-Open **Learning Center** from the extension popup to see:
+The project keeps two different targets:
 
-- number of learning events;
-- number of labelled vacancy decisions;
-- strongest role/technology preference signals;
-- application outcome funnel;
-- ML training readiness;
-- current model-registry state;
-- export/import/reset controls.
+1. **Preference:** `Would I apply to this vacancy?`
+2. **Engagement:** `Did this application produce meaningful employer engagement?`
 
-Exports are local JSON / JSONL files. Resetting learning data does not delete CVs or application history.
+The engagement dataset is derived from outcome events such as recruiter reply/interview/test/offer and is not treated as a substitute for user preference labels.
 
-### Outcome learning foundation
+### Semantic questionnaire retrieval
 
-Application outcomes remain separate from preference labels. `Would I apply?` and `Did the employer respond?` are different targets. Outcome analytics include sample-size warnings so a tiny sample is not presented as strong evidence.
+Confirmed reusable questionnaire answers can now be retrieved through a local deterministic semantic hash-vector index when exact semantic keys differ. Vacancy-specific answers remain isolated by vacancy/company context.
 
-### Recruiter and interview intelligence
+This mechanism is **not described as a trained embedding model**. It is a lightweight local retrieval index used until enough data exists to justify a learned semantic model.
 
-5.0 adds deterministic recruiter-intent classification and an evidence-safe interview-preparation plan. It can recognize salary questions, interview invitations, test assignments, technical questions, rejection and follow-up messages. Interview preparation uses the exact vacancy and confirmed profile evidence; it does not manufacture experience.
+### Richer correction learning
 
-### Multi-site adapter contract
+If the extension autofills or drafts a questionnaire answer and the user edits it, trusted user input is captured as a structured `QUESTIONNAIRE_EDITED` learning event containing the original answer, corrected answer, category and question context.
 
-`site-adapter-core.js` defines a formal `JobSiteAdapter` contract for future providers. HH remains the primary live-tested adapter. Other selectors already exist in the legacy adapter layer, but 5.0 does **not** claim full live support for every listed site.
+### Pre-submit diff
 
-### Repost / duplicate detection
+The final-review surface can show what the agent intends to submit: field, previous value, proposed value/action, review/blocked state, selected CV and cover-letter presence. The user retains control of complex final submission.
 
-A cross-ID detector compares company, normalized title and description similarity. It can flag a likely repost even when the source vacancy ID changes. This is advisory, not a destructive deduplication action.
+### Stronger interview practice
 
-## Real ML pipeline
-
-The repository now contains a real offline baseline pipeline under `tools/ml/`:
-
-```text
-tools/ml/train_preference.py
-tools/ml/evaluate_model.py
-tools/ml/model_registry.py
-tools/ml/promote_model.py
-```
-
-The first model is a logistic-regression preference baseline trained from exported real labels. It uses deterministic hashed features and produces a versioned model JSON.
-
-Important safeguards:
-
-1. production training requires a minimum labelled dataset;
-2. both positive and negative labels are required;
-3. training and evaluation are separate steps;
-4. model promotion refuses synthetic/test-only models;
-5. validation sample size and F1 thresholds are enforced;
-6. a candidate cannot replace an active model if the configured promotion metric regresses;
-7. no online retraining happens after every click.
-
-Synthetic data is used only in automated tests to prove the pipeline works. It is never represented as a real personal model.
+Interview Prep remains vacancy-grounded. 5.2 adds a local mock-answer review surface that evaluates response structure (clarity, relevance, specificity and evidence grounding) without claiming to assess a person's competence or invent missing experience.
 
 ## Existing protected workflows
 
-5.0 preserves the established 3.9/4.0 flows:
+5.2 keeps the established 3.9–5.0 behavior:
 
-- full exact-vacancy reader with hidden-tab + `api.hh.ru` fallback;
-- `Analysis` for calls/no-calls;
-- `⚡ Analyze page` batch processing with bounded concurrency;
-- user-controlled Ready Queue;
-- persistent vacancy memory by exact ID;
-- individual cover letters;
+- exact HH vacancy identity and full-vacancy reading;
+- hidden-tab reader + `api.hh.ru` fallback;
+- single-card and batch Analysis;
+- separate Fit and Calls indicators;
+- Ready Queue, Save, Skip and Apply;
+- persistent vacancy/application/questionnaire memory;
+- vacancy-specific cover letters;
 - employer-already-viewed auto-close;
-- smart questionnaire autofill and human fallback drafts;
-- final review gate;
-- recruiter-chat copilot;
-- application timeline and reminders.
+- questionnaire autofill with review-safe human drafts;
+- recruiter chat copilot and outcome timeline;
+- duplicate/repost advisory;
+- repository-hygiene guard.
+
+## AI / ML terminology
+
+The project deliberately separates:
+
+- **Rules:** deterministic calls detection, hard gates and base Fit features.
+- **Personal signals:** bounded weights derived from real user actions.
+- **LLM assistance:** writing/semantic generation when configured.
+- **Retrieval:** exact and semantic local memory lookup.
+- **ML:** trained model artifacts evaluated on held-out data and explicitly promoted.
+
+The repository does not claim that heuristics are machine learning.
 
 ## Installation
 
-1. Extract the FULL or standalone extension ZIP.
+1. Extract the FULL or standalone extension archive.
 2. Open `chrome://extensions`.
 3. Enable **Developer mode**.
 4. Choose **Load unpacked**.
 5. FULL build: select `extension/`.
 6. Git source: select `browser-extension/`.
-7. Grant HH access if Chrome asks.
-8. Reload already-open HH tabs once after upgrading.
+7. Grant HH permissions if Chrome asks.
+8. Reload already-open HH pages once after upgrading.
 
 See [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
 ## Repository layout
 
-The Git repository contains source, tests and docs only:
+Git tracks source, tests and documentation only:
 
 ```text
 .github/
@@ -164,44 +151,51 @@ tests/
 tools/
 ```
 
-Do not commit FULL releases, runtime `backend/`, packaged `extension/`, ZIPs, test-results, databases, logs or build output. Run:
+Do not commit FULL bundles, runtime `backend/`, packaged `extension/`, ZIPs, test output, local databases or build artifacts. Run:
 
 ```powershell
 python tools/check-repo-hygiene.py
 ```
 
-before publishing.
+before publication.
 
-## ML quick start
+## Model operations quick start
 
-After enough real decisions have been collected:
+After exporting real preference labels from Learning Center:
 
 ```powershell
-# Export dataset from Learning Center first.
-python tools/ml/train_preference.py violetta-preference-dataset.jsonl --out candidate-model.json
-python tools/ml/evaluate_model.py candidate-model.json violetta-preference-dataset.jsonl --out candidate-metrics.json
-python tools/ml/model_registry.py model-registry.json candidate-model.json --metrics candidate-metrics.json
-python tools/ml/promote_model.py model-registry.json <modelVersion>
+powershell -ExecutionPolicy Bypass -File tools/ml/train-model.ps1 `
+  -Dataset .\violetta-preference-dataset.jsonl `
+  -Target preference `
+  -OutputDir .\artifacts\preference-v1
 ```
 
-Default production training expects at least 100 labelled decisions. For meaningful personalization, several hundred real labels are preferred.
+The pipeline creates a candidate model, calibrated metrics and registry entry. Promotion remains explicit. Import the candidate model JSON in **Learning & Model Center**, inspect its metadata/metrics, then promote it only if the gate accepts it.
+
+For test-only pipeline validation, use the Python `--test-only` option. Test-only artifacts cannot be promoted.
+
+See [docs/MODEL_OPERATIONS.md](docs/MODEL_OPERATIONS.md).
+
+## Privacy
+
+Learning data, imported model artifacts and user state remain local by default. GitHub should contain code/schemas, not runtime learning databases. The Learning Center supports local export/import/reset controls; reset learning does not delete CVs or application history.
 
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
-- [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
 - [docs/FEATURES.md](docs/FEATURES.md)
-- [docs/DATA_MODEL.md](docs/DATA_MODEL.md)
+- [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
 - [docs/LEARNING_SYSTEM.md](docs/LEARNING_SYSTEM.md)
 - [docs/ML_ARCHITECTURE.md](docs/ML_ARCHITECTURE.md)
 - [docs/MODEL_EVALUATION.md](docs/MODEL_EVALUATION.md)
+- [docs/MODEL_OPERATIONS.md](docs/MODEL_OPERATIONS.md)
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md)
 - [docs/PRIVACY_AND_DATA.md](docs/PRIVACY_AND_DATA.md)
-- [docs/REPOSITORY_LAYOUT.md](docs/REPOSITORY_LAYOUT.md)
+- [docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)
 - [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md)
 - [TESTING_GUIDE.md](TESTING_GUIDE.md)
 - [ROADMAP.md](ROADMAP.md)
-- [WHAT_CHANGED.md](WHAT_CHANGED.md)
 
 ## Product principle
 
-The assistant should become more personal as real evidence accumulates, but automation must remain reversible, explainable and grounded in verified candidate facts. Rules, LLM assistance, retrieval, embeddings and trained ML models are documented as separate mechanisms.
+Automation should reduce repetitive work while remaining reversible, explainable and grounded in verified candidate facts. Model quality is earned from real labelled usage; it is not assumed from version numbers.

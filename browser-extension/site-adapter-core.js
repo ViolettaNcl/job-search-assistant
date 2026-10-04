@@ -1,4 +1,4 @@
-/* 5.0 multi-site adapter contract and registry. */
+/* 5.2 multi-site adapter contract and registry. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.vjaSiteAdapterCore=api;})(globalThis,function(){
   'use strict';const required=['detectPage','extractVacancy','extractVacancyId','readFullVacancy','findApplyControl','detectQuestionnaire','detectApplicationStatus','detectRecruiterChat'];
   function validate(adapter){if(!adapter||typeof adapter!=='object')return {ok:false,missing:required.slice()};const missing=required.filter(k=>typeof adapter[k]!=='function');return {ok:!missing.length,missing};}

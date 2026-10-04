@@ -1,4 +1,4 @@
-importScripts("candidate-seed.js", "candidate-truth.js", "relevance-engine.js", "vacancy-fit.js", "learning-core.js", "duplicate-detector.js", "recruiter-intelligence.js", "site-adapter-core.js", "outcome-analytics-v2.js", "context-reply.js", "writing-provider.js");
+importScripts("candidate-seed.js", "candidate-truth.js", "relevance-engine.js", "vacancy-fit.js", "learning-core.js", "model-runtime.js", "model-monitor.js", "semantic-index.js", "duplicate-detector.js", "recruiter-intelligence.js", "site-adapter-core.js", "outcome-analytics-v2.js", "context-reply.js", "writing-provider.js");
 importScripts("copilot-core.js", "hh-list-quick-apply-core.js", "profile-defaults.js", "quick-replies.js", "bundled-cv.js", "followup-intelligence.js", "application-analytics.js", "application-state-machine.js");
 importScripts("browser-autopilot.js", "hh-discovery-navigation.js", "hh-discovery-background.js", "application-executor.js", "dashboard-apply-background.js");
 
@@ -258,7 +258,7 @@ async function browserAutopilotApplyNext(api) {
       const seedVacancy=globalThis.vjaCopilotCore.vacancy({url:candidate.url,vacancyId:globalThis.vjaCopilotCore.idFromUrl(candidate.url),title:candidate.title,company:candidate.company,description:candidate.description||''});
       const letterVacancy=await cpCompleteVacancy(seedVacancy,{url:candidate.url});
       const writing=await cpCreateLetter(truthProfile,letterVacancy);
-      const draft={...backendDraft,coverLetter:writing.text,letterVersion:'5.0.0-evidence'};
+      const draft={...backendDraft,coverLetter:writing.text,letterVersion:'5.2.0-evidence'};
       const live=await browserAutopilotJson(`${api}/api/automation/status`);
       const reservations=(await applicationJobs()).filter(job=>!job.review&&!job.completed).length;
       if(!self.vjaBrowserAutopilot.shouldRun(live) || Number(live.remainingToday)<=reservations)break;

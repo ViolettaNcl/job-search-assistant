@@ -1,6 +1,30 @@
 let vjaFinalGate = null;
 let vjaFinalSubmitControl = null;
 let vjaManualAttachmentVerified = false;
+let vjaLastPreSubmitDiff = null;
+
+function vjaEnsurePreSubmitDiffUi() {
+  let card = $("preSubmitDiff");
+  if (card) return card;
+  const anchor = $("finalReviewGate") || $("recheckForm");
+  if (!anchor) return null;
+  card = document.createElement("section");
+  card.id = "preSubmitDiff";
+  card.className = "readinessCard readiness-neutral";
+  const h = document.createElement("strong"); h.textContent = "Pre-submit changes";
+  const p = document.createElement("p"); p.id = "preSubmitDiffSummary"; p.className = "readinessDetail"; p.textContent = "Проверка изменений появится после финального recheck.";
+  const list = document.createElement("div"); list.id = "preSubmitDiffRows";
+  card.append(h,p,list); anchor.insertAdjacentElement("afterend",card); return card;
+}
+
+function vjaRenderPreSubmitDiff(diff) {
+  vjaLastPreSubmitDiff = diff || null; const card=vjaEnsurePreSubmitDiffUi(); if(!card) return;
+  const summary=$("preSubmitDiffSummary"), rows=$("preSubmitDiffRows"); rows.replaceChildren();
+  if(!diff){summary.textContent="Нет diff-данных. Запустите Recheck submission checklist.";return;}
+  const c=diff.counts||{};summary.textContent=`Поля: fill ${c.fill||0} · review ${c.review||0} · blocked ${c.blocked||0} · overwrite ${c.overwrite||0}. CV: ${diff.cv||"не подтвержден"}.`;
+  for(const item of (diff.rows||[]).filter(x=>x.action!=="fill"||x.before!==x.after).slice(0,12)){const row=document.createElement("div");row.className="timelineItem";const before=item.before?`До: ${item.before}`:"До: пусто";const after=item.after?`После: ${item.after}`:`После: ${item.action}`;row.textContent=`${item.label} · ${before} → ${after}${item.required?" · required":""}`;rows.append(row);}
+  if(!(diff.rows||[]).length)rows.textContent="Изменений по полям не обнаружено.";
+}
 
 function vjaEnsureFinalReviewUi() {
   let card = $("finalReviewGate");
@@ -51,6 +75,7 @@ function vjaRenderFinalGate(gate, submitControl = null) {
   vjaFinalGate = gate;
   vjaFinalSubmitControl = submitControl;
   const card = vjaEnsureFinalReviewUi();
+vjaEnsurePreSubmitDiffUi();
   if (!card) return;
   const title = $("finalReviewTitle");
   const detail = $("finalReviewDetail");
@@ -89,6 +114,14 @@ async function vjaCheckFinalReview() {
     await refreshFieldPlan();
     window.vjaRenderSubmissionReadiness?.();
     const readiness = typeof vjaCurrentReadiness === "function" ? vjaCurrentReadiness() : null;
+    const diff = window.vjaPreSubmitDiff?.build?.(latestScan, latestPlan, {
+      vacancyId: latestPage?.vacancyId || latestPage?.id || '',
+      title: latestPage?.title || latest?.title || '',
+      company: latestPage?.company || latest?.company || '',
+      cv: window.vjaLastUploadedCvName || latest?.draft?.recommendedCv || '',
+      coverLetterChanged: Boolean($('coverLetter')?.value && $('coverLetter').value !== latest?.draft?.coverLetter)
+    }) || null;
+    vjaRenderPreSubmitDiff(diff);
     const options = { attachmentVerified: vjaManualAttachmentVerified };
     let gate = window.vjaFinalReviewGate.evaluate(readiness, null, options);
     let submitControl = null;
@@ -137,6 +170,7 @@ async function vjaConfirmFinalReview() {
     if (!gate?.canConfirmReview) return;
     const completed = window.vjaFinalReviewGate.afterCandidateReview(gate);
     const card = vjaEnsureFinalReviewUi();
+vjaEnsurePreSubmitDiffUi();
     if (card) card.className = "readinessCard readiness-clear";
     $("finalReviewTitle").textContent = completed.title;
     $("finalReviewDetail").textContent = "The assistant has not submitted anything. Do one last visual check on the employer page, then use the highlighted/final employer action yourself when ready.";
@@ -150,6 +184,7 @@ async function vjaConfirmFinalReview() {
 }
 
 vjaEnsureFinalReviewUi();
+vjaEnsurePreSubmitDiffUi();
 $("checkFinalReview")?.addEventListener("click", vjaCheckFinalReview);
 $("confirmAttachment")?.addEventListener("click", vjaConfirmAttachment);
 $("confirmFinalReview")?.addEventListener("click", vjaConfirmFinalReview);

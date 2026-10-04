@@ -1,32 +1,40 @@
 # Roadmap
 
-## 5.0 Foundation — current
+## 5.2 Production Learning Loop — current
 
-- Batch Analysis and explicit Fit vs Calls UI.
-- Personal Learning Event Store.
-- Implicit Apply/Save/Skip learning signals.
-- Explicit ✓ / ✕ Fit feedback.
-- Learning Center with export/import/reset.
-- Outcome funnel with sample-size warning.
-- Repost/duplicate advisory.
-- Recruiter intent + interview-prep foundation.
-- Formal multi-site adapter contract.
-- Offline logistic preference baseline.
-- Model registry and promotion gate.
+5.2 completes the main engineering loop planned after the 5.0 Foundation:
 
-## 5.1
+- runtime inference for explicitly promoted preference models;
+- independent employer-engagement model target;
+- train/calibration/test pipeline;
+- threshold + temperature calibration;
+- model registry v2 and explicit promotion/disable controls;
+- runtime prediction monitoring, calibration/drift and retraining proposals;
+- semantic questionnaire-memory retrieval;
+- richer questionnaire correction capture;
+- pre-submit change review;
+- stronger interview-practice UI.
 
-- Production import/inference for promoted preference models.
-- Calibration and threshold tuning from a larger real dataset.
-- Pre-submit diff center.
-- Richer questionnaire correction capture.
+## What comes next is mostly evidence, not architecture
 
-## 5.2
+### Real-data maturation
 
-- Engagement model trained independently from preference model.
-- Embedding index for semantic duplicates/question memory.
-- Stronger recruiter/interview UI.
+1. Collect real Apply / Save / Skip / correction labels.
+2. Collect real employer outcomes independently.
+3. Train candidate models after minimum sample requirements are met.
+4. Validate on held-out chronological data.
+5. Promote only if the candidate clears the gate and does not regress.
+6. Monitor post-promotion calibration/drift.
+7. Retrain when enough new evidence or degradation exists.
 
-## 6.0 candidate milestone
+### 6.0 only when justified by usage
 
-Only after sufficient real usage: validated multi-site adapters, model monitoring, drift analysis and automated retraining proposals with explicit promotion approval.
+Potential 6.0 work:
+
+- live-validated adapters for additional job sites;
+- richer semantic embeddings only after privacy/performance evaluation;
+- scheduled retraining **proposals** (not silent model replacement);
+- longer-horizon model-performance dashboards using real labels;
+- optional encrypted local vault / desktop service for portable private data.
+
+The project should not increase major versions merely to add cosmetic features. The next meaningful milestone should be driven by real-world evidence and validated provider support.

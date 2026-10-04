@@ -1,30 +1,39 @@
-# Violetta Apply Assistant — Chrome Extension 5.0.0 Foundation
+# Violetta Apply Assistant — Chrome Extension 5.2.0
 
-`extension/` is the packaged Chrome runtime inside the FULL bundle. In the Git source repository the same source is published as `browser-extension/`.
+`extension/` is the packaged Chrome runtime in the FULL bundle. The same source is published to `browser-extension/` in Git.
 
-## Search-page workflow
+## Search
 
-- `⚡ Analyze page` — bounded batch analysis of unique visible HH vacancy IDs.
-- Explainable `rules-v1` Fit Score with reasons and risks.
-- Local Job Preference Profile.
-- Filters: all / no calls / fit threshold / ready / saved.
-- User-controlled Ready to Apply queue with Apply / Show / Save / Skip.
+- exact per-card `Analysis`;
+- `⚡ Analyze page` with bounded concurrency;
+- separate Fit and Calls indicators;
+- deterministic base Fit + bounded real-user preference signals;
+- optional explicitly-promoted preference-model contribution;
+- separate optional employer-engagement prediction;
+- filters and Ready Queue;
+- Save / Skip / Fit feedback learning signals.
 
-## Existing protected capabilities
+## Apply / forms
 
-- exact full-vacancy `Analysis`;
-- HH API fallback;
-- `✦ Отклик + письмо`;
-- persistent vacancy/application/questionnaire memory;
-- Smart Questionnaire Autofill and reviewable human drafts;
-- employer-already-viewed handling;
-- recruiter-chat `✎ AI` drafts;
-- optional local/backend advanced mode.
+- exact vacancy-specific `✦ Отклик + письмо`;
+- persistent vacancy/application memory;
+- Smart Questionnaire Autofill;
+- confirmed-answer retrieval, including local semantic fallback;
+- trusted user-correction learning;
+- review-safe human drafts;
+- pre-submit change summary;
+- employer-already-viewed recovery.
 
-## Important
+## Learning & Model Center
 
-Fit Score 5.0 combines deterministic explainable rules with bounded personal-learning signals. A trained ML model is not claimed unless a validated promoted model exists.
+The popup exposes local learning statistics, preference/engagement dataset export, backup/import/reset, model-candidate import, explicit promotion/disable and post-promotion monitoring/drift when real labels exist.
+
+Importing a model never activates it automatically. Test-only/synthetic models are rejected by the promotion gate.
+
+## Recruiter / interview
+
+Recruiter intent and Interview Prep use vacancy context and confirmed profile evidence. Mock-practice feedback evaluates answer structure/evidence grounding only.
 
 ## Installation
 
-Chrome → `chrome://extensions` → Developer mode → Load unpacked → choose this `extension` directory.
+Chrome → `chrome://extensions` → Developer mode → Load unpacked → select this `extension` directory.

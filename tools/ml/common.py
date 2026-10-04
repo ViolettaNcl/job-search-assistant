@@ -1,4 +1,4 @@
-"""Shared deterministic feature encoding for Violetta 5.0 preference baseline."""
+"""Shared deterministic feature encoding for Violetta 5.2 preference/engagement baselines."""
 from __future__ import annotations
 import hashlib, json, math
 DIM=256

@@ -1,28 +1,34 @@
-# What Changed · 5.0.0 Foundation
+# What Changed · 5.2.0 Production Learning Loop
 
-## Product
+5.2 turns the 5.0 ML foundation into an end-to-end operational loop without pretending that a personal model is already good before real data exists.
 
-- Added Personal Learning Engine event store.
-- Apply / Save / Skip now create structured preference signals.
-- Added explicit ✓ / ✕ Fit feedback.
-- Fit personalization uses bounded explainable learning adjustments.
-- Split Fit and Calls into separate visible chips.
-- Added Learning Center with data export/import/reset.
-- Added outcome analytics v2 with sample-size warning.
-- Added duplicate/repost advisory across different vacancy IDs.
-- Added recruiter intent classification and interview-prep foundation.
-- Added formal multi-site adapter contract.
+## Model operations
 
-## ML foundation
+- Added runtime inference compatible with the Python hashed-feature baseline.
+- Added local candidate-model import and explicit promotion/disable controls.
+- Model Registry upgraded to separate preference and employer-engagement active models.
+- Promotion requires real-label metadata and held-out quality gates.
+- Added calibration/threshold tuning and a full train/calibration/test pipeline.
+- Added independent employer-engagement training target.
+- Added post-prediction metrics, calibration/drift summary and retraining proposals.
 
-- Added real logistic-regression training pipeline under `tools/ml/`.
-- Added dataset validation, offline evaluation, registry and promotion gate.
-- Synthetic test models are explicitly non-promotable.
-- No production ML model is claimed when no real validated model is active.
+## Learning quality
 
-## Safety / integrity
+- Preference dataset now collapses repeated vacancy preference decisions to the latest label.
+- Outcome/engagement labels remain separate from preference labels.
+- Questionnaire user edits are captured as correction learning events.
+- Confirmed generic questionnaire answers can use local semantic hash-vector retrieval when exact keys differ.
 
-- Existing exact-vacancy, calls, questionnaire and application protections remain in place.
-- Learning does not rewrite candidate facts.
-- Outcome target is kept separate from user-preference target.
-- Learning reset does not delete applications or CVs.
+## User review
+
+- Added pre-submit diff summary for fields/CV/cover-letter review.
+- Added stronger mock-interview practice UI with structure/evidence feedback.
+- Learning Center now exposes model registry, monitoring, datasets and model controls.
+
+## Safety
+
+- Calls/Sales hard gates remain deterministic.
+- Preference ML contributes only a bounded part of Fit.
+- Engagement prediction is shown separately and does not alter preference Fit.
+- Synthetic/test-only models cannot be promoted.
+- No silent online retraining or automatic model replacement was added.

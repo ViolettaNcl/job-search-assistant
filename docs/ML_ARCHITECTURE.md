@@ -1,64 +1,56 @@
-# ML Architecture · 5.0 Foundation
+# ML Architecture · 5.2
 
-## Separation of mechanisms
+## Mechanisms are kept separate
 
-The project distinguishes:
+1. deterministic safety/ranking rules;
+2. bounded user-derived personal signals;
+3. LLM-assisted writing/semantic generation where configured;
+4. exact/semantic retrieval;
+5. trained ML models.
 
-1. deterministic rules;
-2. user-derived personal signals;
-3. LLM-assisted text generation;
-4. retrieval/memory;
-5. embeddings/similarity;
-6. trained ML models.
+Only item 5 is called ML.
 
-Only item 6 is called machine learning.
-
-## First real model
+## Model A — Personal Vacancy Preference
 
 Target: `P(user_would_apply | vacancy)`.
 
-Baseline: logistic regression over structured + hashed sparse features.
+Baseline: logistic regression over structured and deterministic hashed features. The browser implements the same SHA-256-based feature hashing as the Python trainer, allowing imported model JSON to score vacancies consistently.
 
-Features currently exported:
+Runtime use is conservative: the promoted model contributes a bounded portion of Fit and never overrides hard Calls/Sales gates.
 
-- role;
-- remote;
-- calls status;
-- sales;
-- senior/junior flags;
-- required years;
-- technologies;
-- hashed title/company tokens.
+## Model B — Employer Engagement
 
-The baseline is deliberately simple so it is debuggable and easy to compare with deterministic rules.
+Target: `P(meaningful_employer_engagement | application)`.
 
-## Training lifecycle
+It is trained from outcome labels and stays separate from preference Fit. Runtime output can be surfaced as an additional advisory signal.
+
+## End-to-end lifecycle
 
 ```text
-Learning Events
-→ labelled JSONL export
+real LearningEvents
+→ dataset export
 → dataset validation
-→ stratified train/validation split
-→ candidate model
-→ offline evaluation
-→ registry
-→ promotion gate
-→ active model
+→ stratified temporal train/calibration/test split
+→ train candidate baseline
+→ temperature + threshold calibration on calibration split
+→ one held-out test evaluation
+→ versioned candidate model + metrics
+→ model registry
+→ explicit promotion gate
+→ runtime inference
+→ later real labels
+→ monitoring / calibration / drift
+→ retraining proposal
 ```
 
-No model is promoted merely because training finished.
+## Model artifact
 
-## Online behavior
+A model JSON contains model type/version, dimension, weights/bias, threshold, calibration metadata, dataset/training metadata and evaluation metrics. Registry metadata includes SHA-256.
 
-5.0 does not retrain after every click. The extension continues to work with rules + personal signals when no validated model is active.
+## Promotion
 
-## Later models
+Promotion requires a real-label model and sufficient held-out validation evidence. A candidate cannot silently replace the active model. Preference and engagement have independent active slots.
 
-Potential independent models:
+## Test-only training
 
-- calls classifier;
-- questionnaire category classifier;
-- employer engagement model;
-- duplicate/repost semantic model.
-
-These targets must remain separate because the labels and risks differ.
+Synthetic fixtures are useful for testing pipeline mechanics only. `--test-only` outputs remain `trainedOnRealLabels=false`; promotion refuses them.

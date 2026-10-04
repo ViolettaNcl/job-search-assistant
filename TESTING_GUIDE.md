@@ -1,57 +1,49 @@
-# Testing Guide · 5.0.0 Foundation
+# Testing Guide · 5.2.0
 
-## JavaScript regression
+## Release layers
 
-```powershell
-node --test browser-extension/*.test.js
-```
+A release is checked through independent layers:
 
-FULL bundle: use `extension/*.test.js`.
+1. extension Node/unit regression;
+2. focused Chromium HH reader/memory/questionnaire/batch/Learning Center scenarios;
+3. full synthetic browser integration fixture;
+4. ML/model-operations tests;
+5. Python and JavaScript syntax checks;
+6. workflow YAML parsing;
+7. source-publication plan tests;
+8. repository-hygiene tests;
+9. release ZIP integrity and SHA-256 generation.
 
-Current 5.0.0 release run: **275 / 275 PASS**.
+## 5.2.0 release results
 
-## ML pipeline
+- Node regression: **295 / 295 PASS**.
+- Focused Chromium: **31 / 31 PASS**.
+  - HH reader/API fallback: 3/3.
+  - vacancy/form memory: 8/8.
+  - questionnaire: 9/9.
+  - Batch Analysis: 6/6.
+  - Learning & Model Center: 5/5.
+- Full synthetic browser integration: **102 / 102 assertions PASS**.
+- Python unit tests (ML + compatibility + publication/hygiene): **20 / 20 PASS**.
+- JavaScript/CJS syntax: **158 files PASS**.
+- Python compile: **22 files PASS**.
+- Workflow YAML: **5 / 5 PASS**.
+- Backend runtime preservation: **369 checked, 0 changed** vs 5.0.0.
+- Bundled CV preservation: **3 / 3 unchanged**.
 
-```powershell
-python tests/test_ml_foundation.py
-```
+## Browser-harness shutdown limitation
 
-The ML test uses synthetic fixtures only to exercise training/evaluation/registry/promotion code. Test models are explicitly marked non-real and promotion is required to reject them. Synthetic fixture metrics are not product-quality claims.
+The full browser fixture reaches and prints `102 browser integration assertions passed.` with no uncaught DOM JS errors. In this environment the surrounding Playwright/browser process can remain alive after that marker and exceed an external tool timeout. Treat the assertion result as PASS and the process shutdown as a separate harness issue; do not claim a clean exit.
 
-## Browser fixtures
+## ML rules
 
-Focused suites:
+- Synthetic data may verify pipeline mechanics only.
+- `--test-only` artifacts must remain `trainedOnRealLabels=false`.
+- Model promotion must reject test-only artifacts.
+- Preference and engagement datasets are separate targets.
+- Calibration/tuning data must not be reused as the final held-out test set.
+- Runtime quality/drift metrics require later real labels.
 
-```powershell
-python tests/browser_batch_400.py
-python tests/browser_memory_399.py
-python tests/browser_questionnaire_3912.py
-python tests/hh_read_fallback_3910.py
-```
+## Live-site validation
 
-Full legacy integration fixture:
-
-```powershell
-python tests/browser_e2e.py
-```
-
-The 5.0.0 release reached **102 / 102 PASS assertions** in the full fixture. The fixture prints its successful completion before the surrounding local browser process sometimes remains alive long enough for an external harness timeout; this is recorded as a harness-shutdown limitation, not hidden as a clean process exit.
-
-## Publication / hygiene
-
-```powershell
-python tests/test_source_publication.py
-python tests/test_repository_hygiene.py
-python tools/check-repo-hygiene.py
-```
-
-## Syntax / compile
-
-```powershell
-Get-ChildItem browser-extension -Filter *.js | ForEach-Object { node --check $_.FullName }
-python -m py_compile tests/*.py tools/*.py tools/ml/*.py
-```
-
-## Real-site validation
-
-Synthetic fixtures are not equivalent to future HH production DOM verification. 4.0 Batch Analysis was manually confirmed in a real HH session before this 5.0 foundation work. New 5.0 Learning Center / feedback / interview-prep / offline ML-tooling surfaces still need normal user verification after installing the release.
+Synthetic fixtures cannot certify future HH changes. Before relying on a new release, run the manual checklist in `docs/PRODUCTION_CHECKLIST.md`.

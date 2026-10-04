@@ -5,7 +5,7 @@ param([string]$Destination)
 $ErrorActionPreference = 'Stop'
 $source = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 try {
-    Write-Host 'Violetta Apply Assistant 5.0.0 - in-place update' -ForegroundColor Cyan
+    Write-Host 'Violetta Apply Assistant 5.2.0 - in-place update' -ForegroundColor Cyan
     Write-Host 'Close the previous assistant backend window before continuing.'
     Write-Host 'Do NOT remove the existing extension from Chrome.'
     if ([string]::IsNullOrWhiteSpace($Destination)) {

@@ -1,30 +1,37 @@
-# Model Evaluation
+# Model Evaluation · 5.2
 
-A trained model must be evaluated on data not used for fitting.
+## Split discipline
 
-## Preference baseline
+Training, calibration and final test roles are separated. Threshold/temperature tuning uses the calibration subset; final reported test metrics come from held-out rows not used for fitting/tuning.
 
-Minimum tracked metrics:
+The pipeline prefers a stratified temporal split so later examples are not casually leaked into training.
 
-- validation sample size;
+## Metrics
+
+Preference and engagement models track, when defined:
+
+- sample size and class balance;
+- accuracy;
 - precision;
 - recall;
 - F1;
-- accuracy;
+- Brier score;
 - log loss;
 - ROC-AUC when both classes exist.
 
-## Promotion
+Runtime monitoring additionally tracks expected calibration error (ECE) and recent-vs-early rate drift.
 
-`tools/ml/promote_model.py` rejects candidates when:
+## Promotion gate
 
-- the model is not marked as trained on real labels;
-- validation sample size is below the required gate;
-- F1 is below the configured floor;
-- F1 regresses against the active model.
+A candidate must:
 
-The default production training command expects at least 100 labels. A larger dataset is preferred.
+- be marked trained on real labels;
+- have sufficient held-out sample size;
+- meet the configured F1 floor;
+- not regress against the active same-target model under the configured metric gate.
 
-## Test data
+Promotion is explicit.
 
-Synthetic fixtures may test code paths only. Their metrics are never reported as personal model quality and such models are marked `trainedOnRealLabels=false`, which prevents promotion.
+## Interpretation
+
+Metrics on tiny samples are unstable. The product should display sample size and avoid claiming model quality before enough real labels exist.

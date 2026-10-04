@@ -1,99 +1,72 @@
-# User Guide · 4.0
+# User Guide · 5.2
 
-## Installation
+## Install
 
-### Standalone extension
-
-1. Extract the standalone ZIP.
+1. Extract the standalone extension or FULL bundle.
 2. Open `chrome://extensions`.
-3. Enable **Developer mode**.
-4. Click **Load unpacked**.
-5. Select the extracted extension folder.
-
-### FULL bundle
-
-Load `extension/` in Chrome. Run `start-assistant.cmd` only when you need the optional local dashboard/backend workflows.
-
-After an upgrade reload already-open HH tabs once.
+3. Enable Developer mode.
+4. Load `extension/` from FULL, or the standalone extension folder.
+5. Reload existing HH tabs once after upgrade.
 
 ## Search-page workflow
 
-### Analyze one vacancy
+### One vacancy
 
-Use `Analysis` on a card when you want an immediate phone-duty check for that vacancy only.
+Use `Analysis` for a single exact vacancy.
 
-### Analyze the page
+Calls status is separate from Fit:
 
-Use the compact toolbar:
+- `✓ Без звонков` — no required phone/voice duties detected in the full vacancy.
+- `✕ Есть звонки` — phone/voice duties detected.
+- `?` — full evidence unavailable/uncertain.
 
-`⚡ Analyze page`
+### Whole page
 
-The assistant analyzes unique rendered vacancy IDs with limited parallelism. You can press the same button while it is running to stop scheduling additional vacancies.
+Use `⚡ Analyze page`. The extension processes unique rendered vacancy IDs with bounded concurrency, restores cached results and computes Fit.
 
-Each completed vacancy gets a badge such as:
+Fit tooltip explains rules/personal/ML contributions. A promoted ML model never changes the Calls hard gate.
 
-`91% Match`
+## Queue and feedback
 
-Hover the badge to see the main positive reasons, risks and the algorithm ID.
+- **Apply** — starts the exact existing vacancy-specific apply flow.
+- **Save** — positive preference signal.
+- **Skip** — negative preference signal.
+- **✓ / ✕ next to Fit** — explicit feedback on ranking quality.
 
-## Fit Score settings
+## Questionnaire workflow
 
-Open `⚙` in the search toolbar.
+Confirmed facts are used first. Safe subjective fields can receive reviewable drafts. High-risk factual/legal fields remain review-gated.
 
-You can change:
+If you edit an autofilled/drafted answer, the extension records the correction as a learning example. Confirmed generic answers can later be retrieved for semantically similar questions; vacancy-specific motivation answers remain isolated.
 
-- minimum Fit Score;
-- avoid calls;
-- remote preference;
-- whether office vacancies are allowed;
-- avoid sales;
-- Batch Analysis concurrency (1–4).
+## Pre-submit review
 
-Changing settings causes vacancies to be re-evaluated under the new preference profile when analyzed/restored.
+The final review can summarize proposed field changes, overwrite/review/blocked counts, CV and cover-letter state. Review unresolved fields before final submission.
 
-Fit Score 4.0 is an explainable rules baseline, not a trained model.
+## Learning & Model Center
 
-## Filters
+Open **Learning** from the extension home page.
 
-The toolbar can show:
+You can:
 
-- **All**;
-- **✓ Без звонков**;
-- **Fit ≥ threshold**;
-- **Готовы к отклику**;
-- **Сохранённые**.
+- inspect event / preference-label / engagement-label counts;
+- export a full backup;
+- export preference or engagement JSONL datasets;
+- import a learning backup;
+- reset learning data;
+- import a candidate model JSON;
+- explicitly promote a valid real-label model;
+- disable active preference ML;
+- inspect model monitoring/drift/retraining information.
 
-This only changes the visible cards on the current page.
+Importing a model does not activate it. Promotion is a separate action.
 
-## Ready to Apply
+## Training a model
 
-Open `Очередь N`.
+Training happens offline, not inside Chrome. See [MODEL_OPERATIONS.md](MODEL_OPERATIONS.md).
 
-Available actions:
+Never treat synthetic test metrics as personal model quality.
 
-- **Отклик** — locate the exact card and start the existing `✦ Отклик + письмо` flow;
-- **Показать** — scroll to the card for manual review;
-- **Сохранить** — keep it in Saved;
-- **Пропустить** — persist a skip decision.
+## Interview practice
 
-The queue never mass-submits applications by itself.
-
-## Application and questionnaire
-
-The existing 3.9.x behaviour remains:
-
-- exact vacancy-specific cover letter;
-- application state persisted across navigation;
-- Smart Questionnaire Autofill;
-- confirmed evidence first;
-- reviewable human fallback drafts for subjective free text;
-- legal/factual unknowns remain for review;
-- complex final submission remains user-controlled when unresolved fields exist.
-
-## Memory
-
-Per-vacancy memory now includes Analysis, Fit Score/features, queue decision, application state and questionnaire state. Repeated cards should restore this data automatically.
-
-## Optional backend
-
-Core 4.0 Batch Analysis and queue do not need the backend. The backend is still used by the advanced dashboard/server Autopilot/analytics mode.
+Interview Prep uses the exact vacancy plus confirmed profile evidence. Mock practice scores response structure/evidence grounding only. It does not invent experience or make claims about personal competence.

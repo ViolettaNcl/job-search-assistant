@@ -1,0 +1,3 @@
+const test=require('node:test');const assert=require('node:assert/strict');const S=require('./semantic-index.js');
+test('similar questionnaire wording ranks above unrelated text',()=>{const similar=S.similarity('Какой у вас уровень английского языка?','Укажите уровень владения английским языком');const unrelated=S.similarity('Какой у вас уровень английского языка?','Когда вы готовы выйти на работу?');assert.ok(similar>unrelated);});
+test('topK returns the closest confirmed-like memory item',()=>{const items=[{q:'зарплата и ожидания'},{q:'уровень английского языка'},{q:'переезд'}];const r=S.topK('Какой уровень английского?',items,x=>x.q,1);assert.equal(r[0].item.q,'уровень английского языка');});

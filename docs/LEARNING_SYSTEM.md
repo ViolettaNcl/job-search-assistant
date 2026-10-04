@@ -1,69 +1,49 @@
-# Personal Learning System · 5.0
+# Personal Learning System · 5.2
 
-## Goal
+## Purpose
 
-Learn from the user's real decisions without silently rewriting factual candidate data.
+Learn from real user behavior while keeping factual candidate data immutable unless explicitly confirmed.
 
-## Event store
+## LearningEvent store
 
-The extension stores bounded `LearningEvent` records in `chrome.storage.local` under `vjaLearningEventsV1`.
+Local events may include:
 
-Each event may contain:
-
-- event ID and timestamp;
-- vacancy identity;
-- structured vacancy features;
-- model/rule decision at the time;
-- user action;
-- original/corrected text when relevant;
+- vacancy identity and structured features;
+- rule/ML decision at the time;
+- Apply / Save / Skip / Fit feedback;
+- questionnaire original + corrected text;
+- application outcome changes;
+- interview-prep usage;
 - confidence/source metadata.
 
-## Signals
+## Preference labels
 
-Current production personalization is **not an ML model**. It derives bounded weights from real events:
+Positive signals include Apply, Save and Fit accepted. Negative signals include Skip and Fit rejected.
 
-- role weights;
-- technology weights;
-- remote preference signal;
-- calls/sales history;
-- weak company-specific signal.
+Dataset generation keeps the **latest preference decision per vacancy** so repeated UI interactions do not create artificial duplicated labels.
 
-The adjustment is capped so learning cannot turn a hard mismatch into an extreme score simply because of a few clicks.
+## Engagement labels
 
-## Labels
+Employer engagement is an independent target. Outcome events can create engagement labels from recruiter reply/interview/test/offer versus terminal rejection/closure. They are never mixed with user-preference labels.
 
-Positive preference labels:
+## Questionnaire correction learning
 
-- Apply
-- Save
-- Fit accepted
+When an autofilled or drafted field is later changed by trusted user input, the extension records a `QUESTIONNAIRE_EDITED` event with original/corrected text, category and question context. Programmatic synthetic DOM events are not treated as user corrections.
 
-Negative preference labels:
+## Semantic answer memory
 
-- Skip
-- Fit rejected
+Exact semantic keys remain the first lookup. For generic confirmed answers, a deterministic local hash-vector index can retrieve a similar prior question within the same category. Vacancy-specific answers are excluded from generic reuse.
 
-Outcome events are stored separately and must not be mixed with preference labels.
+This is local retrieval, not a trained embedding model.
 
-## Active learning
+## Active learning policy
 
-Confidence policy:
+- high confidence: eligible safe automation;
+- medium confidence: suggestion/review;
+- low confidence: leave for user input.
 
-- >= 0.90: safe auto-classification when the feature itself is allowed to be automatic;
-- 0.65–0.90: suggestion / review;
-- < 0.65: ask or leave for user review.
+Legal, work-authorization, unconfirmed salary and other high-risk categories remain review-gated regardless of confidence.
 
-This policy does not override legal, salary, work-authorization or other high-risk review gates.
+## Monitoring
 
-## Learning Center
-
-The local Learning Center can export:
-
-- a full learning backup (`.json`);
-- preference training rows (`.jsonl`).
-
-Import deduplicates by `eventId`. Reset deletes learning events and local model registry only; applications and CVs are not deleted.
-
-## Future
-
-When enough real labels exist, the exported dataset can train the 5.0 logistic baseline. Promotion remains an explicit offline step.
+When an active preference model has enough later labels, the system can calculate prediction quality/calibration and compare early vs recent windows. It can recommend retraining, but it does not train/promote silently.

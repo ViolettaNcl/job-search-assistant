@@ -38,7 +38,7 @@ async function cpCreateLetter(profile,v){
   }catch(e){providerError=e.message;}
   if(!result?.ok){const rejected=result?.validation?.errors||[];result=R.localCover(profile,v,lang);result.providerWarning=providerError||rejected.join(', ');}
   if(!result.ok)throw new Error('Письмо не прошло проверку: '+(result.validation?.errors||result.errors||[]).join(', '));
-  return {...result,audit:{version:'5.0.0',createdAt:Date.now(),profileRevision:T.revision(profile),vacancyHash:selection.analysis.descriptionHash,coverage:v.descriptionCoverage,source:result.source,factIds:result.factIds,facts:selection.allRanked.filter(x=>result.factIds.includes(x.fact.id)).map(x=>({id:x.fact.id,sourceId:x.fact.sourceId,reason:x.reason})),requirementMap:selection.requirementMap,excluded:selection.excluded,validation:result.validation,providerWarning:result.providerWarning||''}};
+  return {...result,audit:{version:'5.2.0',createdAt:Date.now(),profileRevision:T.revision(profile),vacancyHash:selection.analysis.descriptionHash,coverage:v.descriptionCoverage,source:result.source,factIds:result.factIds,facts:selection.allRanked.filter(x=>result.factIds.includes(x.fact.id)).map(x=>({id:x.fact.id,sourceId:x.fact.sourceId,reason:x.reason})),requirementMap:selection.requirementMap,excluded:selection.excluded,validation:result.validation,providerWarning:result.providerWarning||''}};
  })();
  cpWritingCache.set(key,task);task.then(result=>{if(result.providerWarning)cpWritingCache.delete(key);},()=>cpWritingCache.delete(key));if(cpWritingCache.size>40)cpWritingCache.delete(cpWritingCache.keys().next().value);return task;
 }
@@ -89,5 +89,5 @@ async function cpEnrichExistingPlan(plan){
  const role=writing.selection.analysis.role,language=writing.selection.analysis.language;
  const stored=await chrome.storage.local.get(['cvVaultRu','cvVaultEn']),cv=cpCore.cvSelection(role,language,stored);
  const version=cv.file?`${cv.file.savedAt||''}:${cv.file.size}:${cpCore.hash(cv.file.base64?.slice(-100)||'')}`:'';
- return {plan:{...plan,coverLetter:writing.text,letterVersion:'5.0.0-evidence',roleVariant:role,cvKey:cv.key,fileData:cv.file||null,resumeHint:vacancy.provider==='hh'?vacancy.title:(cv.file?.name||vacancy.title)},context:{vacancy,role,language,profileSnapshot:data.profile,cvKey:cv.key,cvVersion:version,cvName:cv.file?.name||'',coverLetter:writing.text,evidenceAudit:writing.audit,coverLetterMemory:{text:writing.text,source:writing.source,evidenceAudit:writing.audit,generatedAt:Date.now()},status:'Preparing'}};
+ return {plan:{...plan,coverLetter:writing.text,letterVersion:'5.2.0-evidence',roleVariant:role,cvKey:cv.key,fileData:cv.file||null,resumeHint:vacancy.provider==='hh'?vacancy.title:(cv.file?.name||vacancy.title)},context:{vacancy,role,language,profileSnapshot:data.profile,cvKey:cv.key,cvVersion:version,cvName:cv.file?.name||'',coverLetter:writing.text,evidenceAudit:writing.audit,coverLetterMemory:{text:writing.text,source:writing.source,evidenceAudit:writing.audit,generatedAt:Date.now()},status:'Preparing'}};
 }

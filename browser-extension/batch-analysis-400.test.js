@@ -1,7 +1,7 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
 const read=n=>fs.readFileSync(path.join(__dirname,n),'utf8');
 
-test('4.0 manifest loads ranking and batch surfaces after exact HH quick-apply',()=>{const m=JSON.parse(read('manifest.json'));const js=m.content_scripts.find(x=>x.js.includes('hh-list-quick-apply.js')).js;assert.equal(m.version,'5.0.0');assert.ok(js.indexOf('vacancy-fit.js')>js.indexOf('hh-list-quick-apply.js'));assert.ok(js.indexOf('hh-list-intelligence.js')>js.indexOf('vacancy-fit.js'));});
+test('4.0 manifest loads ranking and batch surfaces after exact HH quick-apply',()=>{const m=JSON.parse(read('manifest.json'));const js=m.content_scripts.find(x=>x.js.includes('hh-list-quick-apply.js')).js;assert.equal(m.version,'5.2.0');assert.ok(js.indexOf('vacancy-fit.js')>js.indexOf('hh-list-quick-apply.js'));assert.ok(js.indexOf('hh-list-intelligence.js')>js.indexOf('vacancy-fit.js'));});
 
 test('4.0 service worker imports explainable fit rules before copilot background',()=>{const bg=read('background.js');assert.match(bg,/vacancy-fit\.js/);assert.ok(bg.indexOf('vacancy-fit.js')<bg.lastIndexOf('copilot-background.js'));});
 

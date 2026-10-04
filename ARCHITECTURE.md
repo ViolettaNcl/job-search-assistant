@@ -1,47 +1,103 @@
-# Architecture · 5.0.0 Foundation
+# Architecture · 5.2.0 Production Learning Loop
 
-## Runtime layers
+## Runtime flow
 
 ```text
-HH / job-site DOM
+Job-site DOM / HH API
   ↓
-Site adapter / exact vacancy identity
+Site adapter + exact vacancy identity
   ↓
-Vacancy Reader (DOM + API fallback)
+Full Vacancy Reader
   ↓
-Rules: calls + structured features
+Deterministic safety analysis (Calls / Sales / factual constraints)
   ↓
-Base Fit Score
+Structured feature extraction
   ↓
-Personal Learning Signals (bounded)
+Base explainable Fit Score
   ↓
-Search UI / Queue / Apply
+Bounded personal signals from real feedback
   ↓
-Application / Questionnaire / Recruiter workflow
+Optional explicitly-promoted preference model (bounded blend)
   ↓
-Outcome + Learning Events
+Search UI / Ready Queue / Apply
   ↓
-Learning Center / Dataset Export
+Application + Questionnaire + Pre-submit Diff
   ↓
-Offline ML Training → Evaluation → Registry → Promotion
+Recruiter / Interview workflow
+  ↓
+Outcome Timeline + Learning Events
+  ↓
+Learning & Model Center
+  ↓
+Dataset export → offline ML pipeline → registry → explicit promotion
+  ↓
+Runtime monitoring / drift / retraining proposal
 ```
 
-## Key modules
+## Extension modules
 
-- `hh-list-intelligence.js` — Batch Analysis, Fit/Calls UI, queue and feedback.
-- `vacancy-fit.js` — deterministic base scoring.
-- `learning-core.js` — event normalization, derived personal signals, bounded score adjustment, dataset rows.
-- `duplicate-detector.js` — cross-ID repost similarity.
-- `outcome-analytics-v2.js` — preference-independent outcome funnel.
-- `recruiter-intelligence.js` — deterministic recruiter intent and interview prep.
-- `site-adapter-core.js` — future provider contract.
-- `learning.html/js` — local Learning Center.
-- `tools/ml/*` — offline ML lifecycle.
+### Vacancy/search intelligence
+
+- `hh-list-quick-apply*.js` — exact-card apply and full-vacancy preparation.
+- `vacancy-fit.js` — deterministic rules-v1 Fit Score.
+- `job-search-page-core.js` — feature extraction / ranking helpers.
+- `hh-list-intelligence.js` — Batch Analysis, filters, queue, Fit/Calls UI and feedback.
+- `duplicate-detector.js` — cross-ID repost advisory.
+
+### Learning and model runtime
+
+- `learning-core.js` — LearningEvent normalization, preference signals and dataset creation.
+- `model-runtime.js` — compatible feature hashing, calibrated probability and bounded Fit blend.
+- `model-monitor.js` — post-prediction metrics, calibration/drift summary and retraining proposal.
+- `semantic-index.js` — deterministic local semantic hash-vector retrieval.
+- `learning.html/js` — Learning & Model Center, datasets, registry import/promotion/disable.
+
+### Applications/questionnaires
+
+- `questionnaire-core.js` — form semantics.
+- `questionnaire-memory.js` — exact + semantic confirmed-answer retrieval.
+- `questionnaire-answer-engine.js` — evidence-first answers and safe fallbacks.
+- `questionnaire-content.js` — DOM autofill plus trusted user-correction capture.
+- `pre-submit-diff.js` — proposed field-change summary.
+- `final-review-popup.js` — review gate and diff rendering.
+
+### Recruiter/interview
+
+- `recruiter-intelligence.js` — message intent and vacancy-grounded preparation.
+- `interview-practice.js` — local answer-structure feedback.
+- `interview.html/js` — interview-prep and mock-practice surface.
+
+### Provider abstraction
+
+- `site-adapter-core.js` — formal adapter contract.
+- HH is the primary validated provider. Other providers must not be called live-supported until their adapters are verified against their current sites.
+
+## ML tools
+
+`tools/ml/` contains the offline lifecycle:
+
+- dataset validation;
+- preference and employer-engagement logistic baselines;
+- train/calibration/test splitting;
+- threshold and temperature calibration;
+- held-out evaluation;
+- model registry;
+- explicit promotion gate;
+- prediction monitoring and retraining recommendation.
+
+The browser does not execute Python training.
 
 ## Trust boundaries
 
-Candidate facts come from confirmed profile/CV memory. Learning events may change ranking preference, but they cannot create new biographical facts. High-risk questionnaire categories remain review-gated.
+Candidate facts come only from confirmed profile/CV memory or explicit user edits. Learning events can affect ranking preference and answer retrieval but cannot create new factual biography. High-risk legal/work-authorization fields remain review-gated.
 
-## Model lifecycle
+## Safety separation
 
-Production model activation is intentionally separate from event collection. Model artifacts are versioned files, evaluated offline and promoted through an explicit gate. Extension operation does not depend on a model being present.
+Calls and Sales exclusions are deterministic hard gates. A promoted ML model is a ranking signal, not authority to bypass those gates or submit an application silently.
+
+## Storage
+
+- vacancy/application/questionnaire state: local extension storage;
+- learning events/model registry: local extension storage;
+- exported datasets/model artifacts: user-selected local files;
+- repository: source/tests/docs only.

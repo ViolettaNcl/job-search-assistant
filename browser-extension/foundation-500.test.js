@@ -9,7 +9,7 @@ const readRoot=relative=>fs.readFileSync(path.join(ROOT,relative),'utf8');
 
 test('5.0 manifest and background load learning foundation',()=>{
   const m=JSON.parse(readExtension('manifest.json'));
-  assert.equal(m.version,'5.0.0');
+  assert.equal(m.version,'5.2.0');
   const bg=readExtension('background.js');
   for(const f of ['learning-core.js','duplicate-detector.js','recruiter-intelligence.js','site-adapter-core.js','outcome-analytics-v2.js'])assert.ok(bg.includes(f),f);
 });

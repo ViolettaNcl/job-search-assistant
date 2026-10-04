@@ -20,7 +20,7 @@ Host access is explicitly declared for HH/HeadHunter and HH API. Optional broad 
 
 Candidate profile, CV assets and answer memory may contain personal information. Keep that in mind before making a repository public.
 
-The current release package can contain candidate-specific assets. A future public-safe vault is listed in the roadmap.
+The current personalized release package can contain candidate-specific assets and learning/model exports can encode behavioral preferences. Treat those artifacts as private unless intentionally shared. 5.2 does not claim encrypted-vault storage.
 
 See [docs/PRIVACY_AND_DATA.md](docs/PRIVACY_AND_DATA.md).
 

@@ -5,9 +5,9 @@ const path=require('node:path');
 const root=__dirname;
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 
-test('manifest and core expose 5.0.0',()=>{
-  assert.equal(JSON.parse(read('manifest.json')).version,'5.0.0');
-  assert.match(read('copilot-core.js'),/VERSION = '5\.0\.0'/);
+test('manifest and core expose 5.2.0',()=>{
+  assert.equal(JSON.parse(read('manifest.json')).version,'5.2.0');
+  assert.match(read('copilot-core.js'),/VERSION = '5\.2\.0'/);
 });
 
 test('main Apply routes job descriptions directly to auto-apply without opening popup auto page',()=>{
@@ -54,7 +54,7 @@ test('user-controlled HH autopilot is present and targets remote IT vacancies',(
   const popup=read('popup.html'),auto=read('browser-autopilot.js'),bg=read('background.js');
   assert.match(popup,/Запустить автопилот/);assert.match(popup,/Удалённо · IT по профилю/);
   assert.match(auto,/programmingOnly:true/);assert.match(auto,/remoteOnly:true/);assert.match(auto,/sessionLimit:5/);
-  assert.match(bg,/browserAutopilotSession/);assert.match(bg,/5\.0\.0-evidence/);
+  assert.match(bg,/browserAutopilotSession/);assert.match(bg,/5\.2\.0-evidence/);
 });
 
 test('backend dashboard no longer claims autopilot is disabled by Copilot 3.0',()=>{
@@ -178,7 +178,7 @@ test('3.7 autopilot targets junior-compatible development QA and technical suppo
 
 test('3.9 standalone mode keeps Apply and Chat AI available without backend readiness',()=>{
   const manifest=JSON.parse(read('manifest.json')),adapters=read('site-adapters.js'),universal=read('universal-content.js'),chat=read('recruiter-chat-content.js'),home=read('home.js');
-  assert.equal(manifest.version,'5.0.0');
+  assert.equal(manifest.version,'5.2.0');
   assert.ok(manifest.icons?.['128']);
   assert.ok(manifest.action?.default_icon?.['48']);
   assert.match(adapters,/direct HH vacancy URL/);

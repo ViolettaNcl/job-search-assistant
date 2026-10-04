@@ -1,35 +1,40 @@
-# Data Model · 5.0
+# Data Model · 5.2
 
-## Core entities
+## Vacancy
 
-### Vacancy
+`provider`, `vacancyId`, `url`, `title`, `company`, full text and structured features.
 
-`provider`, `vacancyId`, `url`, `title`, `company`, `description`, `requirements`, structured features.
+## VacancyIntelligence
 
-### VacancyIntelligence
+Calls status/evidence, deterministic Fit, personal adjustment, optional preference-ML output, optional separate engagement-ML output, reasons/risks and timestamps.
 
-Calls analysis, Fit Score, personal-learning adjustment, duplicate/repost advisory and timestamp/source.
+## Application
 
-### Application
+Vacancy identity, CV/cover letter, questionnaire state, timeline and current outcome.
 
-Vacancy reference, CV/cover-letter state, questionnaire memory, timeline, current outcome/status.
+## LearningEvent
 
-### LearningEvent
+Event ID/time, vacancy context/features, decision context, optional ML prediction, user action, optional original/corrected text, source/confidence and outcome metadata.
 
-User decision or correction with the decision context and structured vacancy features.
+## Preference dataset row
 
-### PreferenceSignals
+One latest preference label per vacancy plus structured features. Target: `labelUserApply`.
 
-Derived local weights used by the explainable personalization layer.
+## Engagement dataset row
 
-### ApplicationOutcome
+Derived from outcome events. Target: `labelEmployerEngagement`. Independent from preference.
 
-Applied/viewed/reply/interview/test/offer/rejection state; kept conceptually separate from preference labels.
+## Model Registry v2
 
-### ModelRegistry
+```text
+models[]
+activeModels.preference
+activeModels.engagement
+updatedAt
+```
 
-Versioned candidate/active model metadata, evaluation metrics, SHA-256 and promotion status.
+Each entry stores version/type/status, SHA-256, threshold/calibration and evaluation/training metadata.
 
 ## Storage
 
-Extension state remains local by default (`chrome.storage.local` / session where appropriate). The Git repository stores code/schemas, not runtime databases.
+Runtime data is local by default (`chrome.storage.local` / session where appropriate). Git stores source, schemas and tests, not user runtime databases.

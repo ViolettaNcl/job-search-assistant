@@ -1,4 +1,4 @@
-/* Questionnaire answer memory (5.0.0). */
+/* Questionnaire answer memory (5.2.0). */
 (function(root,factory){
   const api=factory(root);
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -16,10 +16,14 @@
     try{if(root.chrome?.storage?.local)await chrome.storage.local.set({[KEY]:value});}catch{}
     return value;
   }
-  async function get(semanticKey,{vacancyKey='',vacancySpecific=false}={}){
-    if(!semanticKey)return null;const all=await read(),item=all[semanticKey];if(!item)return null;
-    if(vacancySpecific&&String(item.vacancyKey||'')!==String(vacancyKey||''))return null;
-    return item;
+  async function get(semanticKey,{vacancyKey='',vacancySpecific=false,question=''}={}){
+    if(!semanticKey)return null;const all=await read(),item=all[semanticKey];
+    if(item){if(vacancySpecific&&String(item.vacancyKey||'')!==String(vacancyKey||''))return null;return item;}
+    if(vacancySpecific||!question||!root.vjaSemanticIndex?.topK)return null;
+    const category=String(semanticKey).split(':')[0]||'';const candidates=Object.values(all).filter(x=>x?.userConfirmed&&!x?.vacancyKey&&String(x?.answer||'').trim()&&String(x?.normalizedQuestion||'').trim()&&(!category||String(x.category||'')===category));
+    const best=root.vjaSemanticIndex.topK(question,candidates,x=>x.normalizedQuestion,1)[0];
+    if(!best||best.score<.25)return null;
+    return {...best.item,retrievedBy:'semantic-hash-v1',similarity:best.score};
   }
   async function remember(entry={}){
     if(!entry.semanticKey||!String(entry.answer||'').trim())return null;

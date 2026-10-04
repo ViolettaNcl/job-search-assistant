@@ -69,7 +69,7 @@
           const result=typeof vjaUploadCv==='function'?vjaUploadCv(data.cvFile,el):{success:false};
           if(result.success){cvUploaded=true;filled++;filledFields.push({semanticKey,category,label:C.clip(f.label,180),source:'selected-cv',required:Boolean(f.required)});QC?.decorate?.(el,'filled',{category,semanticKey,reason:'Выбрано сохранённое CV'});}else{addReview(f,'Файл не прикреплён',{category,semanticKey});mark(el,'Файл не прикреплён');QC?.decorate?.(el,'review',{category,semanticKey,reason:'Файл не прикреплён'});}return;
         }
-        const memoryEntry=QM?.get?await QM.get(semanticKey,{vacancyKey,vacancySpecific:Boolean(Q?.isVacancySpecific?.(category))}):null;
+        const memoryEntry=QM?.get?await QM.get(semanticKey,{vacancyKey,vacancySpecific:Boolean(Q?.isVacancySpecific?.(category)),question}):null;
         let d=QE?.decide?.({question,field:f,profile:data.profile,context:{coverLetter:data.coverLetter,role:data.role,vacancy,vacancyKey},memoryEntry})||null;
         if(!d||d.category==='UNKNOWN'){
           const fallback=C.fieldDecision(f,data.profile,{coverLetter:data.coverLetter,role:data.role});

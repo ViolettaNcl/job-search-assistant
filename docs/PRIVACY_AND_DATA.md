@@ -1,55 +1,39 @@
-# Privacy and Local Data
+# Privacy and Local Data · 5.2
 
-Violetta Apply Assistant keeps candidate context and job-search memory locally in the extension so it can prepare letters, questionnaires, recruiter-chat drafts, and restore vacancy state.
+## Local runtime state
 
-## 4.0 local intelligence data
+The extension keeps vacancy/application/questionnaire/learning/model-registry state locally by default. Important families include:
 
-Version 4.0 adds local structured job-search intelligence. Typical keys include:
+- job preferences;
+- per-vacancy intelligence and decisions;
+- application/questionnaire memory;
+- `vjaLearningEventsV1` learning events;
+- local model registry with imported model artifacts.
 
-- `vjaJobPreferencesV1` — editable job-search preferences;
-- `vjaVacancyIntel:<vacancyId>` — exact-vacancy Analysis, extracted features and Fit Score;
-- `vjaVacancyDecision:<vacancyId>` — Saved / Skipped / Reviewed decisions.
+## Learning exports
 
-The 4.0 Fit Score is deterministic `rules-v1`. **These records are not evidence that a machine-learning model has been trained.** They are the clean structured signals needed for the later 4.1 Personal Learning Engine.
+Learning Center can export:
 
-## Candidate data
+- full learning backup JSON;
+- preference dataset JSONL;
+- employer-engagement dataset JSONL.
 
-A FULL bundle may contain:
+These files may contain job context and behavioral labels. Treat them as private data and store them locally unless you intentionally share them.
 
-- CV assets;
-- Candidate Truth / candidate seed;
-- local profile defaults;
-- application and questionnaire memory.
+## Reset controls
 
-The current packaged extension remains personalized. Treat its contents as private candidate data.
+Reset Learning removes learning events and local model-registry state. It does not delete CVs or application history. Model disable is separate from data reset.
 
-## GitHub visibility
+## Candidate assets
 
-If the repository is temporarily public, any tracked CV/candidate files become publicly accessible. Switching the repository back to private does not undo earlier exposure or remove copies that may already have been downloaded.
+The personalized FULL/extension bundle can contain CV assets and candidate seed/profile information. If the Git repository tracks those files, making the repository public exposes them to anyone who can access that revision. Switching back to private later does not revoke copies already downloaded.
 
-The planned privacy architecture moves candidate documents, personal facts, learning events and future model datasets into a local private vault, for example under `%LOCALAPPDATA%\ViolettaApplyAssistant\`, while GitHub keeps only code, schemas, tests and non-personal templates.
+A future encrypted external vault may further separate personal assets from source distribution, but 5.2 should not be described as providing encrypted vault storage.
 
 ## Secrets
 
-Do not commit:
+Do not commit API keys, `.env`, `candidate.private.json`, `appsettings.local.json`, `user-settings.cmd`, browser cookies or authentication tokens. Repository hygiene and the release publisher block known runtime/secret paths, but they do not replace human review of repository visibility.
 
-- API keys;
-- `.env` files;
-- `user-settings.cmd`;
-- `candidate.private.json`;
-- `appsettings.local.json`;
-- browser session cookies or authentication tokens.
+## Models
 
-Publisher and repository-hygiene rules block the known private/runtime paths, but repository visibility and commit contents should still be reviewed before publishing.
-
-## Future learning controls
-
-Before 4.1/5.0 model learning becomes active, the product should expose explicit controls for:
-
-- export local learning data;
-- reset learning;
-- delete local learning data;
-- import/export a backup;
-- inspect which events are used as training labels.
-
-Production models must never be retrained silently from every click. New labels should be accumulated, evaluated offline, and promoted only after the candidate model beats the current baseline.
+Imported/trained model artifacts are local files/state unless deliberately committed. A model may encode behavioral patterns even when direct PII is excluded; treat personal model artifacts as private.

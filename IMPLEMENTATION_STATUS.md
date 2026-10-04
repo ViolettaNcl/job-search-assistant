@@ -1,33 +1,64 @@
-# Implementation Status · 5.0.0 Foundation
+# Implementation Status · 5.2.0
 
-## Production-ready extension paths
+## Implemented and regression-covered
 
-- HH exact vacancy Analysis.
-- Calls / no-calls classification with full-vacancy verification.
+### Search / HH workflow
+- Exact vacancyId binding.
+- Full vacancy reader with hidden-tab and `api.hh.ru` fallback.
+- Calls / no-calls / unknown classification.
 - Batch Analysis with bounded concurrency.
-- Explainable rules-v1 Fit Score.
-- Bounded personal-learning adjustment from real decisions.
-- Explicit Fit vs Calls UI.
-- Ready Queue / Save / Skip / Apply.
-- Persistent vacancy/application/questionnaire memory.
+- Explainable base Fit Score and explicit Fit-vs-Calls UI.
+- Ready Queue, Save, Skip, Apply and persistent vacancy memory.
+- Cross-ID duplicate/repost advisory.
+
+### Applications
 - Vacancy-specific cover letters.
-- Questionnaire autofill + human fallback + review gate.
 - Employer-already-viewed recovery.
-- Recruiter chat foundation and application timeline.
-- Learning Center and local learning export/import/reset.
+- Questionnaire classification/autofill.
+- Review-safe human fallback drafts.
+- Confirmed-answer memory and local semantic fallback retrieval.
+- Trusted user correction capture.
+- Pre-submit field-change summary and final review gate.
 
-## Foundation / offline-ready
+### Personal learning
+- Structured LearningEvent store.
+- Apply/Save/Skip implicit labels and explicit Fit feedback.
+- Bounded preference signals.
+- Preference dataset and independent engagement dataset exports.
+- Learning backup/import/reset.
 
-- Cross-ID duplicate/repost similarity.
-- Recruiter intent classifier and interview plan generator.
-- Multi-site adapter contract.
-- Logistic preference training/evaluation pipeline.
-- Model registry and promotion gate.
+### Model lifecycle
+- Preference logistic baseline.
+- Employer-engagement logistic baseline.
+- Dataset validation.
+- Temporal/stratified training pipeline.
+- Calibration and threshold tuning.
+- Held-out evaluation.
+- Model Registry schema v2 with separate preference/engagement active slots.
+- Candidate model import into extension.
+- Explicit real-label promotion gate.
+- Runtime inference for promoted models.
+- Prediction monitoring, calibration/drift summary and retraining proposal.
+- Synthetic/test-only model promotion rejection.
 
-## Not claimed as production ML yet
+### Recruiter/interview
+- Recruiter message intent classification.
+- Vacancy-grounded interview-prep plan.
+- Local mock-answer structure feedback.
 
-No trained personal ML model is bundled as active by default. The user must first accumulate real labelled decisions, export them, train/evaluate a candidate and pass promotion. Until then Fit uses deterministic rules + personal event-derived signals.
+### Engineering
+- Repository hygiene checks.
+- Source-only publisher with hashed allowlist.
+- Documentation for learning/model operations.
 
-## Live-site scope
+## Intentionally not claimed
 
-HH is the primary site tested against the project's live workflow. Other site selector profiles are not equivalent to full verified adapters.
+- No bundled “smart personal model” is claimed before enough real user labels exist.
+- No silent online retraining or automatic promotion.
+- No live production-quality metric is reported from synthetic fixtures.
+- HH is the primary validated provider; additional sites require live adapter validation.
+- Mock interview feedback evaluates answer structure, not human intelligence/fitness/competence.
+
+## What remains data-dependent
+
+The engineering loop is present. The remaining improvement is operational rather than another fake feature layer: collect real labelled decisions/outcomes, train candidate models, validate on held-out data, explicitly promote good models, observe post-promotion calibration/drift, and retrain only when evidence justifies it.

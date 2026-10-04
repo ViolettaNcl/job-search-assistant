@@ -2,6 +2,7 @@
 No login, real employer traffic, real PDF, or AI credits. Not live site certification.
 """
 import asyncio, base64, json, tempfile, threading, http.server, shutil
+from contextlib import suppress
 from pathlib import Path
 from playwright.async_api import async_playwright
 ROOT=Path(__file__).resolve().parents[1]
@@ -233,6 +234,14 @@ async def main():
    check('model payload carries last employer question, candidate evidence and application identity',payload['latestRecruiterMessage']['text']=='Работали с API?' and payload['candidateFacts'] and payload['applicationContext']['conversationId']=='chat-A')
    check('no uncaught DOM JavaScript errors',not page_errors)
   finally:
-   (RESULTS/'browser-e2e.json').write_text(json.dumps({'passed':passed,'count':len(passed),'pageErrors':page_errors,'boundary':'Offline Chromium DOM + actual worker JS; mocked Chrome APIs, HTTP and page URLs. MV3 load blocked by test-environment administrator policy; not certified live sites.'},ensure_ascii=False,indent=2));await browser.close();proc.terminate();await proc.wait();reader_task.cancel()
+   (RESULTS/'browser-e2e.json').write_text(json.dumps({'passed':passed,'count':len(passed),'pageErrors':page_errors,'boundary':'Offline Chromium DOM + actual worker JS; mocked Chrome APIs, HTTP and page URLs. MV3 load blocked by test-environment administrator policy; not certified live sites.'},ensure_ascii=False,indent=2));await browser.close();
+   if proc.stdin and not proc.stdin.is_closing(): proc.stdin.close()
+   if proc.returncode is None:
+    proc.terminate()
+    try: await asyncio.wait_for(proc.wait(),2)
+    except asyncio.TimeoutError:
+     proc.kill();await proc.wait()
+   reader_task.cancel()
+   with suppress(asyncio.CancelledError): await reader_task
  print(f'{len(passed)} browser integration assertions passed.',flush=True)
 if __name__=='__main__':asyncio.run(main())

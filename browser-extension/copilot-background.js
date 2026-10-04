@@ -7,6 +7,8 @@ const cpState=globalThis.vjaApplicationState;
 const cpHhList=globalThis.vjaHhListQuickApply;
 const cpFit=globalThis.vjaVacancyFit;
 const cpLearning=globalThis.vjaLearningCore;
+const cpModelRuntime=globalThis.vjaModelRuntime;
+const cpModelMonitor=globalThis.vjaModelMonitor;
 const cpDuplicate=globalThis.vjaDuplicateDetector;
 const cpRecruiterIntel=globalThis.vjaRecruiterIntelligence;
 const cpOutcome2=globalThis.vjaOutcomeAnalyticsV2;
@@ -46,8 +48,8 @@ async function cpInitialize(){
     const initPatch={};
     if(!Array.isArray(foundation[cpLearningEventsKey]))initPatch[cpLearningEventsKey]=[];
     if(!foundation[cpLearningSettingsKey])initPatch[cpLearningSettingsKey]={enabled:true,explicitFeedback:true,implicitFeedback:true,maxEvents:5000,activeLearning:true};
-    if(!foundation[cpModelRegistryKey])initPatch[cpModelRegistryKey]={schemaVersion:1,activeModel:null,models:[],updatedAt:Date.now()};
-    if(!foundation[cpFeatureFlagsKey])initPatch[cpFeatureFlagsKey]={batchAnalysis:true,personalRanking:true,learningEngine:true,outcomeLearning:true,recruiterCopilot:true,multiSite:true,mlRanking:false};
+    if(!foundation[cpModelRegistryKey])initPatch[cpModelRegistryKey]={schemaVersion:2,activeModel:null,activeModels:{preference:null,engagement:null},models:[],updatedAt:Date.now()};
+    if(!foundation[cpFeatureFlagsKey])initPatch[cpFeatureFlagsKey]={batchAnalysis:true,personalRanking:true,learningEngine:true,outcomeLearning:true,recruiterCopilot:true,multiSite:true,mlRanking:false,modelMonitoring:true,preSubmitDiff:true,semanticQuestionMemory:true};
     if(Object.keys(initPatch).length)await chrome.storage.local.set(initPatch);
     else {const next={...stored.vjaCopilotSettings,historyLimit:Number(stored.vjaCopilotSettings.historyLimit)===8?24:(stored.vjaCopilotSettings.historyLimit||24),floatingApplyMode:'auto',alwaysCoverLetter:true,compactApplyStatus:true,quickListCoverLetter:stored.vjaCopilotSettings.quickListCoverLetter!==false};if(JSON.stringify(next)!==JSON.stringify(stored.vjaCopilotSettings))await chrome.storage.local.set({vjaCopilotSettings:next});}
   })().catch(e=>{cpInit=null;throw e;});return cpInit;
@@ -98,7 +100,7 @@ async function cpFetchHhVacancy(vInput,timeoutMs=4200){
   const v=cpCore.vacancy(vInput),apiUrl=cpHhList?.hhApiVacancyUrl?.(v.url,v.vacancyId);if(!apiUrl)throw new Error('Не удалось построить HH API-запрос для этой вакансии.');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.max(1200,Number(timeoutMs)||4200));
   try{
-    const response=await fetch(apiUrl,{method:'GET',headers:{'Accept':'application/json','HH-User-Agent':'ViolettaApplyAssistant/5.0.0 (github.com/ViolettaNcl/job-search-assistant)'},signal:controller.signal,credentials:'omit',cache:'no-store'});
+    const response=await fetch(apiUrl,{method:'GET',headers:{'Accept':'application/json','HH-User-Agent':'ViolettaApplyAssistant/5.2.0 (github.com/ViolettaNcl/job-search-assistant)'},signal:controller.signal,credentials:'omit',cache:'no-store'});
     if(!response?.ok)throw new Error(`HH API: ${response?.status||'error'}`);
     const data=await response.json(),id=String(data?.id||'');if(!id||id!==String(v.vacancyId))throw new Error('HH API вернул другую вакансию.');
     const title=cpCore.clip(data?.name||v.title,300);if(cpCore.suspiciousVacancyTitle?.(title))throw new Error('HH API не подтвердил название вакансии.');
@@ -138,12 +140,37 @@ async function cpRecordLearningEvent(input){
   let e;try{e=cpLearning.event(input);}catch{return null;}const events=await cpLearningEvents();events.push(e);if(events.length>settings.maxEvents)events.splice(0,events.length-settings.maxEvents);await chrome.storage.local.set({[cpLearningEventsKey]:events});return e;
 }
 async function cpLearningSignals(){return cpLearning?.deriveSignals?.(await cpLearningEvents())||{total:0};}
-async function cpLearningSummary(){const events=await cpLearningEvents(),signals=cpLearning?.summary?.(events)||{total:events.length};const rows=cpLearning?.datasetRows?.(events)||[],registry=(await chrome.storage.local.get(cpModelRegistryKey))[cpModelRegistryKey]||{activeModel:null,models:[]};return {schemaVersion:1,events:events.length,labels:rows.length,signals,registry,trainingReady:rows.length>=20,minimumRecommendedLabels:100};}
-async function cpLearningExport(){const events=await cpLearningEvents();return {schemaVersion:1,exportedAt:new Date().toISOString(),events,dataset:cpLearning?.datasetRows?.(events)||[],summary:cpLearning?.summary?.(events)||{},preferences:await cpJobPreferences(),registry:(await chrome.storage.local.get(cpModelRegistryKey))[cpModelRegistryKey]||null};}
-async function cpLearningImport(payload){
-  if(!payload||Number(payload.schemaVersion)!==1||!Array.isArray(payload.events))throw new Error('Некорректный learning backup.');const settings=await cpLearningSettings(),events=[];for(const raw of payload.events){try{events.push(cpLearning.event(raw));}catch{}}if(!events.length&&payload.events.length)throw new Error('Learning backup не содержит допустимых событий.');const merged=[...(await cpLearningEvents()),...events];const map=new Map();for(const e of merged)map.set(e.eventId,e);const out=[...map.values()].sort((a,b)=>Number(a.timestamp)-Number(b.timestamp)).slice(-settings.maxEvents);await chrome.storage.local.set({[cpLearningEventsKey]:out});return cpLearningSummary();
+async function cpModelRegistry(){
+  const raw=(await chrome.storage.local.get(cpModelRegistryKey))[cpModelRegistryKey]||{};
+  const reg={schemaVersion:2,activeModel:raw.activeModel||raw.activeModels?.preference||null,activeModels:{preference:raw.activeModels?.preference||raw.activeModel||null,engagement:raw.activeModels?.engagement||null},models:Array.isArray(raw.models)?raw.models:[],updatedAt:Number(raw.updatedAt)||Date.now()};
+  if(JSON.stringify(raw)!==JSON.stringify(reg))await chrome.storage.local.set({[cpModelRegistryKey]:reg});return reg;
 }
-async function cpLearningReset(){await chrome.storage.local.set({[cpLearningEventsKey]:[],[cpModelRegistryKey]:{schemaVersion:1,activeModel:null,models:[],updatedAt:Date.now()}});return cpLearningSummary();}
+function cpModelKind(modelType=''){return modelType==='employer-engagement-logreg'?'engagement':'preference';}
+async function cpActiveModel(kind='preference'){const reg=await cpModelRegistry(),version=reg.activeModels?.[kind]||(kind==='preference'?reg.activeModel:null),entry=reg.models.find(x=>x?.modelVersion===version);return entry?.model||null;}
+async function cpImportModel(model){
+  const checked=cpModelRuntime?.validate?.(model,{requireReal:false});if(!checked)throw new Error('Model runtime unavailable.');
+  const reg=await cpModelRegistry(),kind=cpModelKind(checked.modelType),evaluation=checked.testMetrics||checked.validation||{},entry={modelVersion:String(checked.modelVersion||`model-${Date.now()}`),modelType:checked.modelType,kind,trainingLabels:Number(checked.trainingLabels||0),trainedOnRealLabels:checked.trainedOnRealLabels===true,validation:evaluation,testMetrics:checked.testMetrics||null,threshold:Number(checked.threshold??.5),calibration:checked.calibration||null,status:'candidate',importedAt:Date.now(),model:checked};
+  reg.models=reg.models.filter(x=>x?.modelVersion!==entry.modelVersion).concat(entry).slice(-20);reg.updatedAt=Date.now();await chrome.storage.local.set({[cpModelRegistryKey]:reg});return {entry,registry:reg};
+}
+async function cpPromoteModel(version){
+  const reg=await cpModelRegistry(),cand=reg.models.find(x=>x?.modelVersion===String(version||''));if(!cand)throw new Error('Candidate model not found.');if(cand.trainedOnRealLabels!==true)throw new Error('Promotion rejected: model is not trained on real labels.');
+  const n=Number(cand.validation?.n||0),f1=Number(cand.validation?.f1||0);if(n<20||f1<.55)throw new Error(`Promotion rejected: validation n=${n}, f1=${f1.toFixed(3)}.`);
+  const kind=cand.kind||cpModelKind(cand.modelType),activeVersion=reg.activeModels?.[kind],active=reg.models.find(x=>x?.modelVersion===activeVersion);if(active&&f1+1e-9<Number(active.validation?.f1||0))throw new Error('Promotion rejected: F1 regressed vs active model.');
+  for(const x of reg.models){if((x.kind||cpModelKind(x.modelType))===kind&&x.status==='active')x.status='superseded';}cand.status='active';reg.activeModels[kind]=cand.modelVersion;if(kind==='preference')reg.activeModel=cand.modelVersion;reg.updatedAt=Date.now();
+  const patch={[cpModelRegistryKey]:reg};if(kind==='preference'){const flags=(await chrome.storage.local.get(cpFeatureFlagsKey))[cpFeatureFlagsKey]||{};patch[cpFeatureFlagsKey]={...flags,mlRanking:true};}await chrome.storage.local.set(patch);return reg;
+}
+async function cpDisableModel(kind='preference'){
+  const reg=await cpModelRegistry(),version=reg.activeModels?.[kind];const entry=reg.models.find(x=>x?.modelVersion===version);if(entry)entry.status='disabled';reg.activeModels[kind]=null;if(kind==='preference')reg.activeModel=null;reg.updatedAt=Date.now();const patch={[cpModelRegistryKey]:reg};if(kind==='preference'){const flags=(await chrome.storage.local.get(cpFeatureFlagsKey))[cpFeatureFlagsKey]||{};patch[cpFeatureFlagsKey]={...flags,mlRanking:false};}await chrome.storage.local.set(patch);return reg;
+}
+async function cpLearningSummary(){
+  const events=await cpLearningEvents(),signals=cpLearning?.summary?.(events)||{total:events.length},rows=cpLearning?.datasetRows?.(events)||[],engagementRows=cpLearning?.engagementDatasetRows?.(events)||[],registry=await cpModelRegistry(),activePreference=await cpActiveModel('preference'),activeEngagement=await cpActiveModel('engagement'),monitor=cpModelMonitor?.summarize?.(events,activePreference,'preference')||null,engagementMonitor=cpModelMonitor?.summarize?.(events,activeEngagement,'engagement')||null;
+  return {schemaVersion:2,events:events.length,labels:rows.length,engagementLabels:engagementRows.length,signals,registry,monitor,engagementMonitor,experimentalTrainingReady:rows.length>=20,trainingReady:rows.length>=100,engagementTrainingReady:engagementRows.length>=100,minimumRecommendedLabels:100};
+}
+async function cpLearningExport(){const events=await cpLearningEvents();return {schemaVersion:2,exportedAt:new Date().toISOString(),events,dataset:cpLearning?.datasetRows?.(events)||[],engagementDataset:cpLearning?.engagementDatasetRows?.(events)||[],summary:cpLearning?.summary?.(events)||{},preferences:await cpJobPreferences(),registry:await cpModelRegistry()};}
+async function cpLearningImport(payload){
+  if(!payload||![1,2].includes(Number(payload.schemaVersion))||!Array.isArray(payload.events))throw new Error('Некорректный learning backup.');const settings=await cpLearningSettings(),events=[];for(const raw of payload.events){try{events.push(cpLearning.event(raw));}catch{}}if(!events.length&&payload.events.length)throw new Error('Learning backup не содержит допустимых событий.');const merged=[...(await cpLearningEvents()),...events];const map=new Map();for(const e of merged)map.set(e.eventId,e);const out=[...map.values()].sort((a,b)=>Number(a.timestamp)-Number(b.timestamp)).slice(-settings.maxEvents);await chrome.storage.local.set({[cpLearningEventsKey]:out});return cpLearningSummary();
+}
+async function cpLearningReset(){await chrome.storage.local.set({[cpLearningEventsKey]:[],[cpModelRegistryKey]:{schemaVersion:2,activeModel:null,activeModels:{preference:null,engagement:null},models:[],updatedAt:Date.now()}});return cpLearningSummary();}
 async function cpFindDuplicate(vacancy){
   if(!cpDuplicate?.bestMatch)return null;const keys=await chrome.storage.local.get(null),records=[];for(const [k,v] of Object.entries(keys))if(k.startsWith('vjaVacancyIntel:')&&v?.vacancy&&String(v.vacancy.vacancyId)!==String(vacancy.vacancyId))records.push(v);const best=cpDuplicate.bestMatch(vacancy,records);return best?.similarity?.repost?{vacancyId:best.vacancy.vacancyId,title:best.vacancy.title,company:best.vacancy.company,similarity:best.similarity}:null;
 }
@@ -178,7 +205,9 @@ async function cpQuickListFullAnalysis(vInput,sender,{force=false}={}){
     const relevance=globalThis.vjaRelevance?.analyze?.(full)||{};
     const profile=(await cpData()).profile;
     const baseFit=cpFit?.scoreVacancy?.(full,profile,preferences,analysis,relevance)||{score:0,decision:'REVIEW',ready:false,reasons:[],risks:['Fit Score недоступен'],features:{},algorithm:'unavailable'};
-    const signals=await cpLearningSignals();const fit=cpLearning?.adjustFit?.({...baseFit,preferences},signals,full)||baseFit;fit.baseScore=baseFit.score;fit.ready=(analysis.status==='no-calls'||!preferences.avoidCalls)&&!fit.features?.sales&&fit.score>=preferences.minimumFitScore;
+    const signals=await cpLearningSignals();let fit=cpLearning?.adjustFit?.({...baseFit,preferences},signals,full)||baseFit;fit.baseScore=baseFit.score;fit.rulesScoreBeforeMl=fit.score;
+    const flags=(await chrome.storage.local.get(cpFeatureFlagsKey))[cpFeatureFlagsKey]||{};if(cpModelRuntime?.predict){if(flags.mlRanking){const activeModel=await cpActiveModel('preference');if(activeModel){try{const pred=await cpModelRuntime.predict(activeModel,cpModelRuntime.rowFromFit(full,fit));fit=cpModelRuntime.blendFit(fit,pred,{weight:.25});}catch(error){fit.mlError=String(error?.message||error);}}}const engagementModel=await cpActiveModel('engagement');if(engagementModel){try{fit.engagement=await cpModelRuntime.predict(engagementModel,cpModelRuntime.rowFromFit(full,fit));}catch(error){fit.engagementError=String(error?.message||error);}}}
+    fit.ready=(analysis.status==='no-calls'||!preferences.avoidCalls)&&!fit.features?.sales&&fit.score>=preferences.minimumFitScore;
     const vacancy={provider:full.provider,url:full.url,vacancyId:full.vacancyId,title:full.title,company:full.company||'',location:full.location||'',remote:Boolean(full.remote)};
     const duplicate=await cpFindDuplicate({...vacancy,description:full.description,requirements:full.requirements});
     const record={schemaVersion:2,vacancy,analysis:{...analysis,source,coverage:full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom')},fit,features:{...(fit.features||{}),descriptionHash:relevance.descriptionHash||'',descriptionCoverage:relevance.descriptionCoverage||full.descriptionCoverage||''},duplicate,preferenceKey,source,at:Date.now()};
@@ -191,7 +220,7 @@ async function cpQuickListDecision(vInput,sender,decision){
   cpAssertEmbeddedVacancy(sender,vInput);const v=cpCore.vacancy(vInput),id=String(v.vacancyId||'');const allowed=new Set(['SAVED','SKIPPED','REVIEWED','']);
   decision=String(decision||'').toUpperCase();if(decision==='CLEAR')decision='';if(!allowed.has(decision))throw new Error('Неизвестное решение по вакансии.');
   const key=cpVacancyDecisionKey(id);if(!decision)await chrome.storage.local.remove(key);else await chrome.storage.local.set({[key]:{vacancyId:id,url:v.url,title:v.title,decision,at:Date.now()}});
-  if(decision){const intel=(await chrome.storage.local.get(cpVacancyIntelKey(id)))[cpVacancyIntelKey(id)];const type=decision==='SAVED'?'VACANCY_SAVED':decision==='SKIPPED'?'VACANCY_SKIPPED':'VACANCY_REVIEWED';await cpRecordLearningEvent({type,vacancy:v,userAction:decision,source:'quick-list',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{}},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score}});}
+  if(decision){const intel=(await chrome.storage.local.get(cpVacancyIntelKey(id)))[cpVacancyIntelKey(id)];const type=decision==='SAVED'?'VACANCY_SAVED':decision==='SKIPPED'?'VACANCY_SKIPPED':'VACANCY_REVIEWED';await cpRecordLearningEvent({type,vacancy:v,userAction:decision,source:'quick-list',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{},ml:intel?.fit?.ml||null},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score,ml:intel?.fit?.ml||null}});}
   return {vacancyId:id,decision};
 }
 async function cpQuickListCallAnalysis(vInput,sender){
@@ -375,7 +404,7 @@ async function cpQuickListComplete(message,sender){
   const reason=employerAlreadyViewed||letterSent?null:'Сопроводительное письмо не подтверждено сайтом.';
   const next=await updateApplicationJob(message.id,{context,completed:true,review:false,reason,pending:null,result:{id:message.id,trackedId:job.plan?.trackedId||job.plan?.vacancyId||'',sourceUrl:job.plan?.sourceUrl||'',coverLetter:job.context?.coverLetter||'',createdAt:now,result}});
   await chrome.storage.session.remove(cpQuickListActiveKey(sender)).catch(()=>{});
-  const intel=(await chrome.storage.local.get(cpVacancyIntelKey(job.plan?.vacancyId||'')))[cpVacancyIntelKey(job.plan?.vacancyId||'')];await cpRecordLearningEvent({type:'VACANCY_APPLIED',vacancy:job.context?.vacancy||{},userAction:'APPLY',accepted:true,source:'quick-list',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{}},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score}});
+  const intel=(await chrome.storage.local.get(cpVacancyIntelKey(job.plan?.vacancyId||'')))[cpVacancyIntelKey(job.plan?.vacancyId||'')];await cpRecordLearningEvent({type:'VACANCY_APPLIED',vacancy:job.context?.vacancy||{},userAction:'APPLY',accepted:true,source:'quick-list',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{},ml:intel?.fit?.ml||null},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score,ml:intel?.fit?.ml||null}});
   return {ok:true,application:cpPublicApplication(cpCore.application(next||job)),result};
 }
 async function cpVacancyStatus(vInput,sender){
@@ -620,7 +649,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
         const j=await applicationJob(message.id);if(!j)throw new Error('Отклик не найден.');
         let nextAction=j.context?.nextAction;if(['Offer','Rejected','Closed'].includes(message.status)&&nextAction&&!nextAction.doneAt)nextAction={...nextAction,doneAt:Date.now()};
         const context=cpWithTimeline({...j.context,status:message.status,statusSource:'user-confirmed',nextAction},'status',`Статус: ${message.status}`,{status:message.status});
-        await updateApplicationJob(message.id,{context,completed:message.status==='Applied'||j.completed});await cpRecordLearningEvent({type:'OUTCOME_CHANGED',vacancy:j.context?.vacancy||{},userAction:message.status,source:'user-status',meta:{status:message.status}});await cpUpdateReminderBadge().catch(()=>{});return {ok:true};
+        await updateApplicationJob(message.id,{context,completed:message.status==='Applied'||j.completed});const outcomeVacancy=j.context?.vacancy||cpCore.application(j).vacancy||{};const outcomeIntel=(await chrome.storage.local.get(cpVacancyIntelKey(outcomeVacancy.vacancyId||'')))[cpVacancyIntelKey(outcomeVacancy.vacancyId||'')];await cpRecordLearningEvent({type:'OUTCOME_CHANGED',vacancy:outcomeVacancy,userAction:message.status,source:'user-status',modelDecision:{score:outcomeIntel?.fit?.score,decision:outcomeIntel?.fit?.decision,features:outcomeIntel?.features||outcomeIntel?.fit?.features||{},ml:outcomeIntel?.fit?.ml||null,engagement:outcomeIntel?.fit?.engagement||null},meta:{status:message.status,features:outcomeIntel?.features||outcomeIntel?.fit?.features||{},ml:outcomeIntel?.fit?.ml||null,engagement:outcomeIntel?.fit?.engagement||null}});await cpUpdateReminderBadge().catch(()=>{});return {ok:true};
       }
       if(op==='next-action')return {ok:true,application:await cpChangeNextAction(message.id,message.mode,Number(message.days)||1)};
       if(op==='set-followup')return {ok:true,application:await cpChangeNextAction(message.id,'manual',Number(message.days)||3)};
@@ -629,12 +658,16 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
       if(op==='learning-export')return {ok:true,data:await cpLearningExport()};
       if(op==='learning-import')return {ok:true,...await cpLearningImport(message.data)};
       if(op==='learning-reset')return {ok:true,...await cpLearningReset()};
+      if(op==='learning-model-import')return {ok:true,...await cpImportModel(message.model)};
+      if(op==='learning-model-promote')return {ok:true,registry:await cpPromoteModel(message.version)};
+      if(op==='learning-model-disable')return {ok:true,registry:await cpDisableModel(message.kind||'preference')};
       if(op==='learning-settings'){if(message.value)await chrome.storage.local.set({[cpLearningSettingsKey]:{...(await cpLearningSettings()),...message.value}});return {ok:true,settings:await cpLearningSettings()};}
       if(op==='feature-flags'){const old=(await chrome.storage.local.get(cpFeatureFlagsKey))[cpFeatureFlagsKey]||{};if(message.value)await chrome.storage.local.set({[cpFeatureFlagsKey]:{...old,...message.value}});return {ok:true,flags:(await chrome.storage.local.get(cpFeatureFlagsKey))[cpFeatureFlagsKey]||old};}
-      if(op==='interview-plan'){const j=await applicationJob(message.id);if(!j)throw new Error('Отклик не найден.');const data=await cpData();return {ok:true,plan:cpRecruiterIntel?.interviewPlan?.(j.context?.vacancy||cpCore.application(j).vacancy,data.profile)||null};}
+      if(op==='interview-plan'){const j=await applicationJob(message.id);if(!j)throw new Error('Отклик не найден.');const data=await cpData(),vacancy=j.context?.vacancy||cpCore.application(j).vacancy;await cpRecordLearningEvent({type:'INTERVIEW_PREP_USED',vacancy,userAction:'OPEN_INTERVIEW_PREP',source:'interview-center'});return {ok:true,plan:cpRecruiterIntel?.interviewPlan?.(vacancy,data.profile)||null};}
     }
     const chatOps=new Set(['quick-context','observe-chat','resolve','analyze','remember-template','remember-ai-draft','map']);
-    if(op==='quick-list-prepare'||op==='quick-list-call-analysis'||op==='quick-list-state'||op==='quick-list-full-analysis'||op==='quick-list-decision'||op==='learning-feedback')cpAssertEmbeddedVacancy(sender,message.vacancy||{});
+    if(op==='questionnaire-correction'){if(!sender.tab?.id||!/^https?:\/\//i.test(sender.url||''))throw new Error('Questionnaire correction must come from a live application page.');}
+    else if(op==='quick-list-prepare'||op==='quick-list-call-analysis'||op==='quick-list-state'||op==='quick-list-full-analysis'||op==='quick-list-decision'||op==='learning-feedback')cpAssertEmbeddedVacancy(sender,message.vacancy||{});
     else if(op==='job-preferences-get'||op==='job-preferences-save')cpAssertHhListSender(sender);
     else if(chatOps.has(op)&&message.snapshot)cpAssertChatPage(sender,message.snapshot);
     else cpAssertPage(sender,message.snapshot?.url||message.vacancy?.url||message.url);
@@ -660,7 +693,8 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(op==='quick-list-state')return {ok:true,...await cpQuickListState(message.vacancy,sender)};
     if(op==='quick-list-full-analysis')return {ok:true,...await cpQuickListFullAnalysis(message.vacancy,sender,{force:message.force===true})};
     if(op==='quick-list-decision')return {ok:true,...await cpQuickListDecision(message.vacancy,sender,message.decision)};
-    if(op==='learning-feedback'){const v=cpCore.vacancy(message.vacancy||{}),accepted=String(message.sentiment||'').toLowerCase()==='accepted',rejected=String(message.sentiment||'').toLowerCase()==='rejected';if(!accepted&&!rejected)throw new Error('Неизвестная обратная связь.');const intel=(await chrome.storage.local.get(cpVacancyIntelKey(v.vacancyId)))[cpVacancyIntelKey(v.vacancyId)];const e=await cpRecordLearningEvent({type:accepted?'FIT_ACCEPTED':'FIT_REJECTED',vacancy:v,accepted,rejected,userAction:accepted?'ACCEPT':'REJECT',source:'fit-feedback',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{}},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score}});return {ok:true,event:e,summary:await cpLearningSummary()};}
+    if(op==='learning-feedback'){const v=cpCore.vacancy(message.vacancy||{}),accepted=String(message.sentiment||'').toLowerCase()==='accepted',rejected=String(message.sentiment||'').toLowerCase()==='rejected';if(!accepted&&!rejected)throw new Error('Неизвестная обратная связь.');const intel=(await chrome.storage.local.get(cpVacancyIntelKey(v.vacancyId)))[cpVacancyIntelKey(v.vacancyId)];const e=await cpRecordLearningEvent({type:accepted?'FIT_ACCEPTED':'FIT_REJECTED',vacancy:v,accepted,rejected,userAction:accepted?'ACCEPT':'REJECT',source:'fit-feedback',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{},ml:intel?.fit?.ml||null},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score,ml:intel?.fit?.ml||null}});return {ok:true,event:e,summary:await cpLearningSummary()};}
+    if(op==='questionnaire-correction'){const vacancyId=String(message.vacancyId||cpFormVacancyId(sender.url)||'');const jobs=(await applicationJobs()).filter(j=>String(j.plan?.vacancyId||j.context?.vacancy?.vacancyId||'')===vacancyId);const job=jobs.sort((a,b)=>Number(b.context?.updatedAt||0)-Number(a.context?.updatedAt||0))[0]||null;const vacancy=job?.context?.vacancy||{vacancyId,url:sender.url,title:'',company:'',provider:cpCore.provider(sender.url)};const e=await cpRecordLearningEvent({type:'QUESTIONNAIRE_EDITED',vacancy,originalValue:message.originalValue,correctedValue:message.correctedValue,edited:true,userAction:'EDIT',source:'questionnaire-user-correction',meta:{category:String(message.category||'UNKNOWN'),semanticKey:String(message.semanticKey||''),question:cpCore.clip(message.question||'',1000),pageUrl:cpCore.canonicalUrl(sender.url)}});return {ok:true,event:e};}
     if(op==='job-preferences-get')return {ok:true,preferences:await cpJobPreferences()};
     if(op==='job-preferences-save')return {ok:true,preferences:await cpSaveJobPreferences(message.preferences,sender)};
     if(op==='quick-list-complete')return cpQuickListComplete(message,sender);

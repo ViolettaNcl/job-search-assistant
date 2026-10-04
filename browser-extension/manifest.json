@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "5.0.0",
-  "description": "Violetta 5.0 Foundation: batch analysis, explicit Calls status, personal learning signals, outcomes, recruiter/interview intelligence, multi-site architecture and ML-ready pipeline.",
+  "version": "5.2.0",
+  "description": "Violetta 5.2 Production Learning Loop: promoted-model runtime, monitoring/drift, semantic answer retrieval, engagement datasets, pre-submit diff, and calibrated ML operations.",
   "permissions": [
     "activeTab",
     "storage",
@@ -81,6 +81,7 @@
         "hh-list-intelligence.js",
         "application-state-machine.js",
         "questionnaire-core.js",
+        "semantic-index.js",
         "questionnaire-memory.js",
         "questionnaire-answer-engine.js",
         "questionnaire-content.js",

@@ -1,50 +1,62 @@
-# Feature Reference · 4.0
+# Feature Reference · 5.2
 
-## HH search page
+## Search and ranking
 
-| Feature | Status | Behaviour |
+| Feature | Status | Notes |
 |---|---|---|
-| Exact-card detection | Ready | Uses exact `vacancyId` |
-| Single-card Analysis | Ready | Full DOM + HH API fallback |
-| Batch Analysis | Ready | Current rendered page, bounded concurrency |
-| Call-duty classification | Ready | Calls / no-calls / unknown |
-| Structured feature extraction | Ready | Role, tech, remote, calls, sales, seniority, experience |
-| Explainable Fit Score | Ready | Deterministic `rules-v1` |
-| Job Preference Profile | Ready | Local, editable search preferences |
-| Search filters | Ready | All / no calls / fit / ready / saved |
-| Ready to Apply queue | Ready | User-controlled actions |
-| Save / Skip decision memory | Ready | Per vacancy ID |
-| Quick apply + cover letter | Ready | Exact vacancy only |
+| Exact HH vacancy identity | Ready | Uses exact `vacancyId` |
+| Full vacancy reader | Ready | DOM + hidden-tab retry + HH API fallback |
+| Single Analysis | Ready | Calls / no-calls / unknown |
+| Batch Analysis | Ready | Bounded concurrency |
+| Explainable rules Fit | Ready | Always available |
+| Personal signal adjustment | Ready | Bounded from real feedback |
+| Promoted preference ML | Ready when model promoted | Bounded contribution only |
+| Engagement ML | Ready when model promoted | Separate signal; not Fit |
+| Filters / Ready Queue | Ready | User-controlled |
+| Duplicate/repost advisory | Ready | Cross-ID similarity |
 
-## Application forms
+## Applications and forms
 
 | Feature | Status |
 |---|---|
+| Vacancy-specific cover letter | Ready |
 | Persistent application context | Ready |
-| Questionnaire semantic classification | Ready |
-| Confirmed answer autofill | Ready |
+| Questionnaire classification/autofill | Ready |
 | Human fallback drafts | Ready / reviewable |
-| DOM write verification | Ready |
-| Dynamic/multi-step forms | Ready |
+| Exact confirmed-answer memory | Ready |
+| Semantic confirmed-answer retrieval | Ready; deterministic local vector index |
+| User correction learning | Ready |
+| Pre-submit diff | Ready |
 | Final submit safety gate | Ready |
 
-## Recruiter workflow
+## Learning / ML
+
+| Feature | Status |
+|---|---|
+| LearningEvent store | Ready |
+| Explicit/implicit preference labels | Ready |
+| Preference dataset export | Ready |
+| Engagement dataset export | Ready |
+| Offline preference model | Ready |
+| Offline engagement model | Ready |
+| Calibration / threshold tuning | Ready |
+| Model Registry v2 | Ready |
+| Import / explicit promotion / disable | Ready |
+| Runtime inference | Ready after promotion |
+| Prediction monitoring / drift | Ready after enough post-prediction labels |
+| Retraining proposal | Ready; advisory only |
+| Silent online retraining | Not implemented by design |
+
+## Recruiter / interview
 
 | Feature | Status |
 |---|---|
 | Recruiter chat context | Ready |
-| AI draft insertion | Ready |
-| Automatic Send | Disabled by design |
-| Follow-up memory | Available |
+| Intent classification | Ready |
+| Suggested replies | Ready; Send remains user-controlled |
+| Interview prep | Ready |
+| Mock-answer structure feedback | Ready |
 
-## Advanced backend
+## Providers
 
-Local dashboard, advanced Autopilot and server analytics remain available when the backend is running. The new 4.0 search-page ranking/queue does not require it.
-
-## Planned intelligence
-
-- 4.1: Learning Event Store and personalization from accepted/edited/skipped decisions.
-- 4.2: outcome analytics and application lifecycle learning.
-- 4.3: recruiter/interview intelligence.
-- 4.4: multi-site adapters and duplicate/repost detection.
-- 5.0: trained ML models after sufficient real labelled data exists.
+HH is the primary validated provider. The adapter contract exists for additional providers, but no site is labelled fully supported until its current live flow is validated.

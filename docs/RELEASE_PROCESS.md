@@ -1,47 +1,33 @@
-# Release Process
+# Release Process · 5.2
 
 ## Main rule
 
-Never copy a FULL bundle over the Git source repository.
+Never copy a FULL bundle over the Git source repository. FULL contains packaged runtime material; GitHub receives only the hash-verified source subset from `source-sync-manifest.json`.
 
-Wrong:
-
-```powershell
-robocopy "...FULL" "...job-search-assistant" /E
-```
-
-A FULL bundle contains packaged `extension/`, runtime `backend/`, test output and release helpers. GitHub should receive only the source subset defined by `source-sync-manifest.json`.
-
-## Safe 5.0 publication
-
-1. Clone/open the existing repository and ensure it is clean.
+## Safe publication
 
 ```powershell
 cd C:\Users\1\Downloads\job-search-assistant
-git status
+git switch main
 git pull --ff-only origin main
-```
-
-2. Run repository hygiene.
-
-```powershell
+git status
 python tools/check-repo-hygiene.py
 ```
 
-3. Run the release publisher from the extracted FULL bundle.
+From the extracted FULL bundle run:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 
-& "<FULL_FOLDER>\Publish-Violetta-5.0.0.ps1" `
+& "<FULL_FOLDER>\Publish-Violetta-5.2.0.ps1" `
   -RepoPath "C:\Users\1\Downloads\job-search-assistant" `
   -PackagePath "<FULL_FOLDER>" `
   -Push
 ```
 
-The publisher verifies origin, `main`, clean working tree, file SHA-256 values and the target whitelist. It keeps a backup outside the repository and does not use reset/clean/stash/force-push.
+The publisher verifies origin, branch, clean working tree, manifest version, SHA-256 hashes and target allowlist. It creates an external backup and never uses reset/clean/stash/force-push.
 
-## Verify after publication
+## Verify
 
 ```powershell
 (Get-Content .\browser-extension\manifest.json -Raw | ConvertFrom-Json).version
@@ -51,4 +37,4 @@ git status
 git log -3 --oneline
 ```
 
-Expected release version: `5.0.0`.
+Expected version: `5.2.0`.

@@ -1,52 +1,33 @@
-# Troubleshooting
+# Troubleshooting · 5.2
 
-## Analysis показывает `↻ Повторить`
+## Analysis shows Retry
 
-Возможные причины:
+Possible causes include HH navigation/content-script timing, temporary HH API failure or missing host permission. Reload the HH page, verify extension site access, then retry. Current reader logic does not require the tab to remain `complete`; it accepts a readable exact vacancy DOM and can use `api.hh.ru` fallback.
 
-- HH не дал прочитать hidden tab;
-- service worker потерял message channel во время SPA navigation;
-- HH API временно недоступен;
-- Chrome не выдал host permission.
+## Fit and Calls seem inconsistent
 
-Что проверить:
+They are different signals. Fit is role/profile ranking; Calls is a separate safety/requirement classification. A high Fit vacancy can still be excluded if Calls are required and calls are disabled.
 
-1. Обновить страницу HH.
-2. Открыть `chrome://extensions` и убедиться, что расширение 5.0.0 включено.
-3. Проверить Site access для HH.ru.
-4. Нажать Analysis повторно.
+## Questionnaire field stayed empty
 
-3.9.10+ не требует `tab.status === complete`: DOM читается, когда точная vacancy уже доступна и document готов к чтению.
+This may be intentional when the answer requires an unconfirmed factual/legal value, a numeric salary, or a DOM write cannot be verified. Subjective free text may receive a reviewable draft. Edit suggestions when needed; trusted edits become correction-learning events.
 
-## Нет кнопок Analysis / ✦ Отклик + письмо
+## Model import works but Fit does not change
 
-- Перезагрузите открытую до установки вкладку HH.
-- Проверьте разрешение расширения на текущий HH host/subdomain.
-- Убедитесь, что открыта поддерживаемая vacancy/search page.
+Import creates a candidate only. The model must pass explicit promotion. Preference ML also has to be enabled by promotion and remains a bounded contribution.
 
-## Анкета не заполнила часть полей
+## Model cannot be promoted
 
-Это не всегда ошибка. Поле может быть оставлено на review, если:
+Expected reasons include test-only/synthetic training metadata, insufficient held-out sample size, F1 below the floor or regression against the active same-target model.
 
-- ответ требует факта, которого нет в профиле;
-- поле юридическое;
-- это numeric salary без подтверждённой суммы;
-- DOM-контрол не удалось надёжно верифицировать после записи.
+## Monitoring is empty
 
-Свободные текстовые вопросы без подтверждённого факта могут получить `✎ Черновик — проверьте`.
+Monitoring requires predictions made by an active model followed by later real labels. Before that, there is no honest post-promotion performance sample to score.
 
-## После Back пропали статусы
+## Semantic memory does not reuse an answer
 
-1. Подождите динамического восстановления карточек.
-2. Убедитесь, что это та же `vacancyId`.
-3. Обновите страницу один раз.
+The fallback only considers confirmed generic answers in the same category and requires sufficient local semantic similarity. Vacancy-specific answers are intentionally excluded.
 
-Если vacancy ID изменился из-за нового repost, состояние намеренно не переносится автоматически как на ту же вакансию.
+## Backend does not start
 
-## HH пишет «Отклик уже просмотрен работодателем»
-
-Расширение должно закрыть известное окно автоматически и сохранить статус `✓ Уже просмотрен`. Другие ошибки не скрываются автоматически.
-
-## Backend не запускается
-
-Core extension продолжает работать без backend. Для диагностики advanced mode используйте `BACKEND_DIAGNOSTICS.cmd` и убедитесь, что порт `127.0.0.1:8080` свободен.
+Core extension functions continue without the optional backend. Use `BACKEND_DIAGNOSTICS.cmd` for advanced dashboard/server workflows.

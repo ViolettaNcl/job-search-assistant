@@ -214,7 +214,7 @@
     function detectApplyButton(){
       return all('a[href]',doc).filter(visible).find(a=>C.safeApplyLink({label:text(a,120),href:a.href,base:url,inForm:Boolean(a.closest('form'))}))||null;
     }
-    return {provider,extractVacancy,detectPageType,detectVacancy:()=>detectPageType()==='JOB_DESCRIPTION',detectApplicationForm,extractFormFields:()=>formFields(detectApplicationForm()||doc).map(descriptor),getReplyInput,chatRoot,getMessages,conversation,detectApplyButton};
+    return {provider,extractVacancy,extractVacancyId:()=>extractVacancy().vacancyId||'',readFullVacancy:async()=>extractVacancy(doc),detectPageType,detectVacancy:()=>detectPageType()==='JOB_DESCRIPTION',detectApplicationForm,detectQuestionnaire:()=>{const form=detectApplicationForm();return form?{detected:true,form,fields:formFields(form).map(descriptor)}:{detected:false,form:null,fields:[]};},extractFormFields:()=>formFields(detectApplicationForm()||doc).map(descriptor),getReplyInput,chatRoot,getMessages,conversation,detectRecruiterChat:()=>conversation(),detectApplyButton,findApplyControl:()=>detectApplyButton(),detectApplicationStatus:()=>{const body=text(doc.body,5000);if(/отклик уже просмотрен работодателем/i.test(body))return 'VIEWED';if(/вы откликнулись|отклик отправлен|application submitted/i.test(body))return 'APPLIED';if(/отказ|rejected/i.test(body))return 'REJECTED';return 'UNKNOWN';}};
   }
   root.vjaSiteAdapters={profiles,make,all,visible,text,label,descriptor,formFields};
 })(globalThis);
