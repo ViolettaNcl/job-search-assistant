@@ -7,7 +7,7 @@
       if(e?.type!=='OUTCOME_CHANGED')return null;
       const status=String(e?.meta?.status||e?.userAction||'');
       if(['Recruiter Replied','HR Interview','Technical Interview','Test Assignment','Offer'].includes(status))return 1;
-      if(['Rejected','Closed'].includes(status))return 0;
+      if(['Rejected'].includes(status))return 0;
       return null;
     }
     if(['VACANCY_APPLIED','VACANCY_SAVED','FIT_ACCEPTED'].includes(e?.type))return 1;

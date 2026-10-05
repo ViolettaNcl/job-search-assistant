@@ -53,3 +53,8 @@ jobs:
           if(!/^\d+\.\d+\.\d+$/.test(manifest.version)) throw new Error(`Invalid extension version: ${manifest.version}`);
           console.log(`Extension release: ${manifest.version}; compatible backend source release: ${backendVersion}`);
           NODE
+
+      - name: Product Center worker regression
+        run: node tests/product_worker_600.cjs
+      - name: Product ML regression
+        run: python -m unittest discover -s tests -p 'test_product_ml.py' -v

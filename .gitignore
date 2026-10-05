@@ -57,3 +57,11 @@ FILE_HASHES.sha256
 **/candidate.private.json
 **/appsettings.local.json
 **/user-settings.cmd
+*.vja
+*.jsonl
+*.pyc
+__pycache__/
+/Violetta-Apply-Assistant-*/
+/backups/
+/private-data/
+/github-source/

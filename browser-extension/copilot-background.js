@@ -14,6 +14,7 @@ const cpRecruiterIntel=globalThis.vjaRecruiterIntelligence;
 const cpOutcome2=globalThis.vjaOutcomeAnalyticsV2;
 const cpKey='vjaCandidateTruthProfile';
 let cpInit=null;
+let cpLearningWriteQueue=Promise.resolve();
 const cpAiRequests=new Map();
 const cpVacancyIntelInFlight=new Map();
 const cpPreferencesKey='vjaJobPreferencesV1';
@@ -51,7 +52,7 @@ async function cpInitialize(){
     if(!foundation[cpModelRegistryKey])initPatch[cpModelRegistryKey]={schemaVersion:2,activeModel:null,activeModels:{preference:null,engagement:null},models:[],updatedAt:Date.now()};
     if(!foundation[cpFeatureFlagsKey])initPatch[cpFeatureFlagsKey]={batchAnalysis:true,personalRanking:true,learningEngine:true,outcomeLearning:true,recruiterCopilot:true,multiSite:true,mlRanking:false,modelMonitoring:true,preSubmitDiff:true,semanticQuestionMemory:true};
     if(Object.keys(initPatch).length)await chrome.storage.local.set(initPatch);
-    else {const next={...stored.vjaCopilotSettings,historyLimit:Number(stored.vjaCopilotSettings.historyLimit)===8?24:(stored.vjaCopilotSettings.historyLimit||24),floatingApplyMode:'auto',alwaysCoverLetter:true,compactApplyStatus:true,quickListCoverLetter:stored.vjaCopilotSettings.quickListCoverLetter!==false};if(JSON.stringify(next)!==JSON.stringify(stored.vjaCopilotSettings))await chrome.storage.local.set({vjaCopilotSettings:next});}
+    if(stored.vjaCopilotSettings) {const next={...stored.vjaCopilotSettings,historyLimit:Number(stored.vjaCopilotSettings.historyLimit)===8?24:(stored.vjaCopilotSettings.historyLimit||24),floatingApplyMode:'auto',alwaysCoverLetter:true,compactApplyStatus:true,quickListCoverLetter:stored.vjaCopilotSettings.quickListCoverLetter!==false};if(JSON.stringify(next)!==JSON.stringify(stored.vjaCopilotSettings))await chrome.storage.local.set({vjaCopilotSettings:next});}
   })().catch(e=>{cpInit=null;throw e;});return cpInit;
 }
 async function cpData(){
@@ -137,12 +138,14 @@ async function cpLearningSettings(){
 }
 async function cpRecordLearningEvent(input){
   if(!cpLearning?.event)return null;const settings=await cpLearningSettings();if(!settings.enabled)return null;
-  let e;try{e=cpLearning.event(input);}catch{return null;}const events=await cpLearningEvents();events.push(e);if(events.length>settings.maxEvents)events.splice(0,events.length-settings.maxEvents);await chrome.storage.local.set({[cpLearningEventsKey]:events});return e;
+  let e;try{e=cpLearning.event(input);}catch{return null;}
+  const write=cpLearningWriteQueue.then(async()=>{const events=await cpLearningEvents();if(!events.some(x=>x.eventId===e.eventId))events.push(e);if(events.length>settings.maxEvents)events.splice(0,events.length-settings.maxEvents);await chrome.storage.local.set({[cpLearningEventsKey]:events});return e;});
+  cpLearningWriteQueue=write.catch(()=>null);return write;
 }
 async function cpLearningSignals(){return cpLearning?.deriveSignals?.(await cpLearningEvents())||{total:0};}
 async function cpModelRegistry(){
   const raw=(await chrome.storage.local.get(cpModelRegistryKey))[cpModelRegistryKey]||{};
-  const reg={schemaVersion:2,activeModel:raw.activeModel||raw.activeModels?.preference||null,activeModels:{preference:raw.activeModels?.preference||raw.activeModel||null,engagement:raw.activeModels?.engagement||null},models:Array.isArray(raw.models)?raw.models:[],updatedAt:Number(raw.updatedAt)||Date.now()};
+  const reg={...raw,schemaVersion:2,activeModel:raw.activeModel||raw.activeModels?.preference||null,activeModels:{preference:raw.activeModels?.preference||raw.activeModel||null,engagement:raw.activeModels?.engagement||null},models:Array.isArray(raw.models)?raw.models:[],updatedAt:Number(raw.updatedAt)||Date.now()};
   if(JSON.stringify(raw)!==JSON.stringify(reg))await chrome.storage.local.set({[cpModelRegistryKey]:reg});return reg;
 }
 function cpModelKind(modelType=''){return modelType==='employer-engagement-logreg'?'engagement':'preference';}
@@ -150,12 +153,18 @@ async function cpActiveModel(kind='preference'){const reg=await cpModelRegistry(
 async function cpImportModel(model){
   const checked=cpModelRuntime?.validate?.(model,{requireReal:false});if(!checked)throw new Error('Model runtime unavailable.');
   const reg=await cpModelRegistry(),kind=cpModelKind(checked.modelType),evaluation=checked.testMetrics||checked.validation||{},entry={modelVersion:String(checked.modelVersion||`model-${Date.now()}`),modelType:checked.modelType,kind,trainingLabels:Number(checked.trainingLabels||0),trainedOnRealLabels:checked.trainedOnRealLabels===true,validation:evaluation,testMetrics:checked.testMetrics||null,threshold:Number(checked.threshold??.5),calibration:checked.calibration||null,status:'candidate',importedAt:Date.now(),model:checked};
-  reg.models=reg.models.filter(x=>x?.modelVersion!==entry.modelVersion).concat(entry).slice(-20);reg.updatedAt=Date.now();await chrome.storage.local.set({[cpModelRegistryKey]:reg});return {entry,registry:reg};
+  const same=reg.models.find(x=>x?.modelVersion===entry.modelVersion);
+  if(same){if(JSON.stringify(same.model)!==JSON.stringify(checked))throw new Error('Model version already exists with different content. Use a new version.');return {entry:same,registry:reg};}
+  if(reg.models.length>=20)throw new Error('Model registry has 20 entries. Remove an unused candidate before importing. Active models are never evicted.');
+  entry.sha256=await globalThis.vjaProductModels.digest(checked);reg.models=reg.models.concat(entry);reg.updatedAt=Date.now();await chrome.storage.local.set({[cpModelRegistryKey]:reg});return {entry,registry:reg};
 }
 async function cpPromoteModel(version){
   const reg=await cpModelRegistry(),cand=reg.models.find(x=>x?.modelVersion===String(version||''));if(!cand)throw new Error('Candidate model not found.');if(cand.trainedOnRealLabels!==true)throw new Error('Promotion rejected: model is not trained on real labels.');
-  const n=Number(cand.validation?.n||0),f1=Number(cand.validation?.f1||0);if(n<20||f1<.55)throw new Error(`Promotion rejected: validation n=${n}, f1=${f1.toFixed(3)}.`);
-  const kind=cand.kind||cpModelKind(cand.modelType),activeVersion=reg.activeModels?.[kind],active=reg.models.find(x=>x?.modelVersion===activeVersion);if(active&&f1+1e-9<Number(active.validation?.f1||0))throw new Error('Promotion rejected: F1 regressed vs active model.');
+  const n=Number(cand.validation?.n||0),f1=Number(cand.validation?.f1||0);if(!Number.isFinite(n)||!Number.isFinite(f1)||n<20||f1<.55)throw new Error(`Promotion rejected: validation n=${n}, f1=${f1.toFixed(3)}.`);
+  await globalThis.vjaProductModels.verify(cand);
+  const kind=cand.kind||cpModelKind(cand.modelType),activeVersion=reg.activeModels?.[kind],active=reg.models.find(x=>x?.modelVersion===activeVersion);
+  if(activeVersion&&activeVersion!==cand.modelVersion){reg.previousModels={...(reg.previousModels||{}),[kind]:activeVersion};}
+  if(active&&f1+1e-9<Number(active.validation?.f1||0))throw new Error('Promotion rejected: F1 regressed vs active model.');
   for(const x of reg.models){if((x.kind||cpModelKind(x.modelType))===kind&&x.status==='active')x.status='superseded';}cand.status='active';reg.activeModels[kind]=cand.modelVersion;if(kind==='preference')reg.activeModel=cand.modelVersion;reg.updatedAt=Date.now();
   const patch={[cpModelRegistryKey]:reg};if(kind==='preference'){const flags=(await chrome.storage.local.get(cpFeatureFlagsKey))[cpFeatureFlagsKey]||{};patch[cpFeatureFlagsKey]={...flags,mlRanking:true};}await chrome.storage.local.set(patch);return reg;
 }
@@ -164,7 +173,7 @@ async function cpDisableModel(kind='preference'){
 }
 async function cpLearningSummary(){
   const events=await cpLearningEvents(),signals=cpLearning?.summary?.(events)||{total:events.length},rows=cpLearning?.datasetRows?.(events)||[],engagementRows=cpLearning?.engagementDatasetRows?.(events)||[],registry=await cpModelRegistry(),activePreference=await cpActiveModel('preference'),activeEngagement=await cpActiveModel('engagement'),monitor=cpModelMonitor?.summarize?.(events,activePreference,'preference')||null,engagementMonitor=cpModelMonitor?.summarize?.(events,activeEngagement,'engagement')||null;
-  return {schemaVersion:2,events:events.length,labels:rows.length,engagementLabels:engagementRows.length,signals,registry,monitor,engagementMonitor,experimentalTrainingReady:rows.length>=20,trainingReady:rows.length>=100,engagementTrainingReady:engagementRows.length>=100,minimumRecommendedLabels:100};
+  return {schemaVersion:2,events:events.length,labels:rows.length,engagementLabels:engagementRows.length,signals,registry,monitor,engagementMonitor,experimentalTrainingReady:rows.length>=20,trainingReady:globalThis.vjaProductCore.datasetQuality(rows).ready,engagementTrainingReady:globalThis.vjaProductCore.datasetQuality(engagementRows,'labelEmployerEngagement').ready,minimumRecommendedLabels:100};
 }
 async function cpLearningExport(){const events=await cpLearningEvents();return {schemaVersion:2,exportedAt:new Date().toISOString(),events,dataset:cpLearning?.datasetRows?.(events)||[],engagementDataset:cpLearning?.engagementDatasetRows?.(events)||[],summary:cpLearning?.summary?.(events)||{},preferences:await cpJobPreferences(),registry:await cpModelRegistry()};}
 async function cpLearningImport(payload){
@@ -207,7 +216,8 @@ async function cpQuickListFullAnalysis(vInput,sender,{force=false}={}){
     const baseFit=cpFit?.scoreVacancy?.(full,profile,preferences,analysis,relevance)||{score:0,decision:'REVIEW',ready:false,reasons:[],risks:['Fit Score недоступен'],features:{},algorithm:'unavailable'};
     const signals=await cpLearningSignals();let fit=cpLearning?.adjustFit?.({...baseFit,preferences},signals,full)||baseFit;fit.baseScore=baseFit.score;fit.rulesScoreBeforeMl=fit.score;
     const flags=(await chrome.storage.local.get(cpFeatureFlagsKey))[cpFeatureFlagsKey]||{};if(cpModelRuntime?.predict){if(flags.mlRanking){const activeModel=await cpActiveModel('preference');if(activeModel){try{const pred=await cpModelRuntime.predict(activeModel,cpModelRuntime.rowFromFit(full,fit));fit=cpModelRuntime.blendFit(fit,pred,{weight:.25});}catch(error){fit.mlError=String(error?.message||error);}}}const engagementModel=await cpActiveModel('engagement');if(engagementModel){try{fit.engagement=await cpModelRuntime.predict(engagementModel,cpModelRuntime.rowFromFit(full,fit));}catch(error){fit.engagementError=String(error?.message||error);}}}
-    fit.ready=(analysis.status==='no-calls'||!preferences.avoidCalls)&&!fit.features?.sales&&fit.score>=preferences.minimumFitScore;
+    fit.ready=cpFit.isEligible(fit.features||{},preferences)&&fit.score>=preferences.minimumFitScore;
+    await cpCaptureShadow(full,fit).catch(()=>null);
     const vacancy={provider:full.provider,url:full.url,vacancyId:full.vacancyId,title:full.title,company:full.company||'',location:full.location||'',remote:Boolean(full.remote)};
     const duplicate=await cpFindDuplicate({...vacancy,description:full.description,requirements:full.requirements});
     const record={schemaVersion:2,vacancy,analysis:{...analysis,source,coverage:full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom')},fit,features:{...(fit.features||{}),descriptionHash:relevance.descriptionHash||'',descriptionCoverage:relevance.descriptionCoverage||full.descriptionCoverage||''},duplicate,preferenceKey,source,at:Date.now()};
@@ -631,7 +641,20 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(message?.type!=='vjaCopilot')return false;
   (async()=>{
     const op=message.op;
+    if(op==='questionnaire-memory'){
+      if(!cpExtensionSender(sender)&&(!sender.tab?.id||!/^https:\/\/(?:[a-z0-9-]+\.)*(?:hh\.ru|headhunter\.kg)\//i.test(sender.url||'')))throw new Error('Questionnaire memory: unsupported sender.');
+      const memory=globalThis.vjaQuestionnaireMemory;
+      if(message.action==='get')return {ok:true,value:await memory.get(String(message.key||'').slice(0,500),message.options||{})};
+      if(message.action==='remember'){const entry=message.entry||{};globalThis.vjaProductCore.assertTree(entry);return {ok:true,value:await memory.remember(entry)};}
+      if(message.action==='confirm')return {ok:true,value:await memory.confirm(String(message.key||'').slice(0,500),String(message.answer||'').slice(0,8000))};
+      throw new Error('Unknown questionnaire memory operation.');
+    }
+
     if(cpExtensionSender(sender)){
+      if(op==='product-model-shadow')return {ok:true,...await cpSetShadow(message.version)};
+      if(op==='product-model-rollback')return {ok:true,registry:await cpRollbackModel(message.kind||'preference')};
+      if(op==='product-restore')return {ok:true,...await cpRestoreProduct(message.data)};
+
       if(op==='memory'){const data=await cpData();return {ok:true,profile:data.profile,writingProvider:(await chrome.storage.local.get('vjaWritingProvider')).vjaWritingProvider||{mode:'local'}};}
       if(op==='preview-letter'){const data=await cpData();const v=cpCore.vacancy(message.vacancy||{});return {ok:true,...await cpCreateLetter(data.profile,v)};}
       if(op==='source-preview'){const data=await cpData();return {ok:true,proposal:globalThis.vjaCandidateTruth.propose(data.profile,message.facts||[],message.source||{})};}

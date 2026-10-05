@@ -11,7 +11,14 @@ def probability(m,row):return calibrated(m,predict(m['weights'],features(row)))
 def auc(rows,m,label_field):
     pairs=sorted((probability(m,r),r[label_field]) for r in rows if r.get(label_field) in (0,1));pos=sum(y for _,y in pairs);neg=len(pairs)-pos
     if not pos or not neg:return None
-    rank_sum=sum(i+1 for i,(_,y) in enumerate(pairs) if y==1);return (rank_sum-pos*(pos+1)/2)/(pos*neg)
+    rank_sum=0.0;i=0
+    while i<len(pairs):
+        j=i+1
+        while j<len(pairs) and pairs[j][0]==pairs[i][0]:j+=1
+        rank=(i+1+j)/2
+        rank_sum+=rank*sum(y for _,y in pairs[i:j]);i=j
+    return (rank_sum-pos*(pos+1)/2)/(pos*neg)
+
 def metrics(rows,m,label_field):
     t=float(m.get('threshold',.5));tp=fp=tn=fn=0;brier=loss=0.0
     for r in rows:

@@ -1,201 +1,57 @@
-<p align="center"><img src="docs/assets/hero.svg" alt="Violetta Apply Assistant" width="100%"></p>
-
 # Violetta Apply Assistant
 
-**Current release: 5.2.0 — Production Learning Loop**
+**6.0.0 RC1 — Product Center & Recovery** · тестовая сборка для проверки перед публикацией.
 
-Violetta Apply Assistant is a vacancy-first job-search copilot built around HeadHunter. It combines exact-vacancy reading, explicit calls/no-calls detection, explainable ranking, batch analysis, persistent application memory, questionnaire autofill, recruiter/interview assistance, outcome tracking and a local personal-learning system.
+Помощник для поиска работы: анализ полных вакансий HH, отдельная проверка звонков, объяснимый Fit Score, очередь, индивидуальные письма, анкеты и локальная память. Этот релиз продолжает 5.2.0, не создаёт второй backend и не меняет историю Git.
 
-5.2 closes the main gap left by the 5.0 Foundation: a validated model can now move through a complete **offline train → calibrate → evaluate → register → explicitly promote → run → monitor → retrain-proposal** lifecycle. The extension still works without any trained model, and safety decisions such as calls/sales exclusions remain deterministic.
+## Быстрый старт
 
-## Main workflow
+Для проверки используйте распакованную папку `extension` из FULL или папку `Violetta-Apply-Assistant-6.0.0-RC1-EXTENSION` из Standalone. В Chrome выберите папку с `manifest.json`.
 
-```text
-HH search results
-→ ⚡ Analyze page
-→ exact vacancyId + full vacancy reader
-→ Calls: ✓ no calls / ✕ calls / ? unknown
-→ explainable rules Fit Score
-→ bounded personal signals from real feedback
-→ optional promoted preference model contribution
-→ filters + Ready Queue
-→ vacancy-specific ✦ Отклик + письмо
-→ questionnaire autofill + correction capture
-→ pre-submit change review
-→ recruiter / interview workflow
-→ application outcomes + timeline
-→ Learning & Model Center
-→ export real labelled datasets
-→ offline training / calibration / evaluation
-→ explicit model promotion
-→ prediction monitoring / drift / retraining proposal
-```
+**Не удаляйте существующее расширение без копии данных.** Чтобы сохранить идентификатор и память, обновляйте файлы в той же установленной папке и нажмите «Обновить» на `chrome://extensions`. Не держите две активные установки одновременно.
 
-## What 5.2 adds
+Откройте popup → **Центр управления · 6.0 RC1**. Существующие Apply, Analysis и анкеты остаются на страницах HH.
 
-### Promoted-model runtime
+## В центре управления
 
-A preference model is no longer only an offline artifact. A model JSON can be imported into the local Model Registry and, after an explicit promotion gate, used as a **bounded ranking contribution**. It does not replace the deterministic Fit Score and cannot override hard Calls/Sales safety filters.
+| Раздел | Назначение |
+|---|---|
+| Обзор | Локальные счётчики и отчёт за последние 7 дней |
+| Отклики и журнал | Поиск, страницы по 25 записей, события конкретного отклика |
+| Подходящие вакансии | Сохранённые результаты с отдельными Fit и статусом звонков |
+| Качество данных | Баланс классов, дубликаты, отсутствие признаков и временных меток |
+| Модели и Shadow | Сравнение метрик, теневые предсказания без влияния на Fit, откат |
+| Резервные копии | Файлы `.vja` с паролем, encrypted checkpoints в IndexedDB, проверка перед восстановлением |
+| Диагностика | Техническая сводка без текста CV, контактов, вопросов и вакансий |
+| Первый запуск | Проверка наличия профиля, фактов, CV и предпочтений |
 
-The same runtime also supports a separate **Employer Engagement** model. Its prediction is displayed as a separate signal and is never mixed into the user's personal Fit preference target.
+## Что исправлено в процессе
 
-### Calibration and threshold tuning
+Параллельная запись learning events теперь сериализуется. Повторное Apply не увеличивает персональный вес бесконечно. Идентичные ID разных провайдеров разделяются. Офисные ограничения, звонки и настройки sales применяются при формировании очереди. Состояние Closed не используется как доказанный отказ работодателя.
 
-`tools/ml/train_pipeline.py` implements a real offline workflow:
+Исправлены вычисление ROC-AUC при равных вероятностях и глобальное временное разделение train/calibration/test. Заменять содержимое уже импортированной модели под тем же номером версии нельзя. Импортированная модель получает SHA-256.
 
-```text
-validate dataset
-→ stratified temporal train / calibration / test split
-→ train logistic baseline
-→ tune temperature + decision threshold on calibration split
-→ evaluate once on held-out test split
-→ register candidate model
-→ optionally promote only through explicit gate
-```
+Ответы анкет сохраняются через ограниченный канал фоновой службы, в том числе при `TRUSTED_CONTEXTS` для локального хранилища.
 
-Synthetic fixtures can exercise the pipeline with `--test-only`, but those artifacts remain `trainedOnRealLabels=false` and cannot be promoted.
+## Безопасность данных
 
-### Monitoring and drift
+`.vja` и checkpoints защищены паролем. Рабочая память Chrome не объявляется полностью зашифрованной. Backup не включает session storage, API-провайдеров, cookies, pending-send команды или неизвестные ключи. Свободный текст может содержать личные сведения.
 
-The Learning Center now reports, when enough post-prediction labels exist:
+После восстановления задания ставятся на ручную проверку, модели отключаются, согласие на внешнюю AI-обработку сбрасывается. Ничего не отправляется работодателям. Checkpoint на этом же компьютере не заменяет внешний файл backup.
 
-- labelled prediction count;
-- accuracy / precision / recall / F1;
-- Brier score;
-- expected calibration error (ECE);
-- recent vs early prediction-rate / label-rate drift;
-- a retraining proposal when enough new evidence or degradation accumulates.
+FULL/Standalone сохраняют ваши прежние CV и персональный seed из 5.2.0. **Не публикуйте FULL целиком.** `GITHUB-UPDATE.zip` содержит только изменённые исходники, тесты и документацию; неизменённые CV и candidate-seed туда не включены. Это не удаляет персональные сведения из прежних коммитов.
 
-A retraining proposal is advisory. The extension does not silently train or promote a new model after every click.
+## Проверки и границы
 
-### Independent preference vs engagement datasets
+См. `TEST_REPORT.md` в дистрибутиве. Node tests и worker tests выполняются с описанными границами, browser fixtures не являются проверкой всех форм живого HH. Сборка RC1 не сопровождается обещанием «без багов» или утверждением, что весь многопровайдерный roadmap завершён.
 
-The project keeps two different targets:
+Второй полноценно проверенный job provider, внешнее шифрование всей рабочей базы и обученная на ваших данных модель в этом релизе не заявлены. Бинарный Windows backend сохранён из дистрибутива 5.2.0, заново здесь не компилировался.
 
-1. **Preference:** `Would I apply to this vacancy?`
-2. **Engagement:** `Did this application produce meaningful employer engagement?`
+## Документация
 
-The engagement dataset is derived from outcome events such as recruiter reply/interview/test/offer and is not treated as a substitute for user preference labels.
-
-### Semantic questionnaire retrieval
-
-Confirmed reusable questionnaire answers can now be retrieved through a local deterministic semantic hash-vector index when exact semantic keys differ. Vacancy-specific answers remain isolated by vacancy/company context.
-
-This mechanism is **not described as a trained embedding model**. It is a lightweight local retrieval index used until enough data exists to justify a learned semantic model.
-
-### Richer correction learning
-
-If the extension autofills or drafts a questionnaire answer and the user edits it, trusted user input is captured as a structured `QUESTIONNAIRE_EDITED` learning event containing the original answer, corrected answer, category and question context.
-
-### Pre-submit diff
-
-The final-review surface can show what the agent intends to submit: field, previous value, proposed value/action, review/blocked state, selected CV and cover-letter presence. The user retains control of complex final submission.
-
-### Stronger interview practice
-
-Interview Prep remains vacancy-grounded. 5.2 adds a local mock-answer review surface that evaluates response structure (clarity, relevance, specificity and evidence grounding) without claiming to assess a person's competence or invent missing experience.
-
-## Existing protected workflows
-
-5.2 keeps the established 3.9–5.0 behavior:
-
-- exact HH vacancy identity and full-vacancy reading;
-- hidden-tab reader + `api.hh.ru` fallback;
-- single-card and batch Analysis;
-- separate Fit and Calls indicators;
-- Ready Queue, Save, Skip and Apply;
-- persistent vacancy/application/questionnaire memory;
-- vacancy-specific cover letters;
-- employer-already-viewed auto-close;
-- questionnaire autofill with review-safe human drafts;
-- recruiter chat copilot and outcome timeline;
-- duplicate/repost advisory;
-- repository-hygiene guard.
-
-## AI / ML terminology
-
-The project deliberately separates:
-
-- **Rules:** deterministic calls detection, hard gates and base Fit features.
-- **Personal signals:** bounded weights derived from real user actions.
-- **LLM assistance:** writing/semantic generation when configured.
-- **Retrieval:** exact and semantic local memory lookup.
-- **ML:** trained model artifacts evaluated on held-out data and explicitly promoted.
-
-The repository does not claim that heuristics are machine learning.
-
-## Installation
-
-1. Extract the FULL or standalone extension archive.
-2. Open `chrome://extensions`.
-3. Enable **Developer mode**.
-4. Choose **Load unpacked**.
-5. FULL build: select `extension/`.
-6. Git source: select `browser-extension/`.
-7. Grant HH permissions if Chrome asks.
-8. Reload already-open HH pages once after upgrading.
-
-See [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
-
-## Repository layout
-
-Git tracks source, tests and documentation only:
-
-```text
-.github/
-browser-extension/
-docs/
-scripts/
-src/
-tests/
-tools/
-```
-
-Do not commit FULL bundles, runtime `backend/`, packaged `extension/`, ZIPs, test output, local databases or build artifacts. Run:
-
-```powershell
-python tools/check-repo-hygiene.py
-```
-
-before publication.
-
-## Model operations quick start
-
-After exporting real preference labels from Learning Center:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools/ml/train-model.ps1 `
-  -Dataset .\violetta-preference-dataset.jsonl `
-  -Target preference `
-  -OutputDir .\artifacts\preference-v1
-```
-
-The pipeline creates a candidate model, calibrated metrics and registry entry. Promotion remains explicit. Import the candidate model JSON in **Learning & Model Center**, inspect its metadata/metrics, then promote it only if the gate accepts it.
-
-For test-only pipeline validation, use the Python `--test-only` option. Test-only artifacts cannot be promoted.
-
-See [docs/MODEL_OPERATIONS.md](docs/MODEL_OPERATIONS.md).
-
-## Privacy
-
-Learning data, imported model artifacts and user state remain local by default. GitHub should contain code/schemas, not runtime learning databases. The Learning Center supports local export/import/reset controls; reset learning does not delete CVs or application history.
-
-## Documentation
-
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-- [docs/FEATURES.md](docs/FEATURES.md)
-- [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
-- [docs/LEARNING_SYSTEM.md](docs/LEARNING_SYSTEM.md)
-- [docs/ML_ARCHITECTURE.md](docs/ML_ARCHITECTURE.md)
-- [docs/MODEL_EVALUATION.md](docs/MODEL_EVALUATION.md)
-- [docs/MODEL_OPERATIONS.md](docs/MODEL_OPERATIONS.md)
-- [docs/DATA_MODEL.md](docs/DATA_MODEL.md)
-- [docs/PRIVACY_AND_DATA.md](docs/PRIVACY_AND_DATA.md)
-- [docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)
-- [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md)
-- [TESTING_GUIDE.md](TESTING_GUIDE.md)
-- [ROADMAP.md](ROADMAP.md)
-
-## Product principle
-
-Automation should reduce repetitive work while remaining reversible, explainable and grounded in verified candidate facts. Model quality is earned from real labelled usage; it is not assumed from version numbers.
+- `docs/PRODUCT_CENTER.md` — использование новых разделов.
+- `docs/BACKUP_AND_RECOVERY.md` — экспорт, проверка и восстановление.
+- `docs/RELEASE_PROCESS.md` — безопасный source-only commit.
+- `docs/PRIVACY_AND_DATA.md` — конкретные границы защиты.
+- `TESTING_GUIDE.md` — воспроизводимые команды.
+- `IMPLEMENTATION_STATUS.md` — реализованное и оставшееся.

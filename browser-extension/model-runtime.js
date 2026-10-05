@@ -29,7 +29,7 @@
   function validate(model,{requireReal=true}={}){
     if(!model||model.schemaVersion!==1)throw new Error('Unsupported model schema.');
     if(!['personal-vacancy-logreg','employer-engagement-logreg'].includes(model.modelType))throw new Error('Unsupported model type.');
-    const dim=Math.max(8,Number(model.dimension)||DEFAULT_DIM);if(!Array.isArray(model.weights)||model.weights.length!==dim)throw new Error('Model weights do not match dimension.');
+    const dim=Number(model.dimension||DEFAULT_DIM);if(!Number.isInteger(dim)||dim<8||dim>4096)throw new Error('Invalid model dimension.');if(model.threshold!==undefined&&(!Number.isFinite(model.threshold)||model.threshold<.05||model.threshold>.95))throw new Error('Invalid model threshold.');if(!Array.isArray(model.weights)||model.weights.length!==dim)throw new Error('Model weights do not match dimension.');
     if(!model.weights.every(Number.isFinite))throw new Error('Model contains invalid weights.');
     if(requireReal&&model.trainedOnRealLabels!==true)throw new Error('Only models trained on real labels may be activated.');
     return {...model,dimension:dim,threshold:clamp(model.threshold??.5,.05,.95)};

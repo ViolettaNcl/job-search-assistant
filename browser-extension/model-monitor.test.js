@@ -20,3 +20,5 @@ test('engagement monitor uses outcome labels and the separate engagement predict
   const r=M.summarize(ev,{modelVersion:'e1',trainedAt:0},'engagement');
   assert.equal(r.kind,'engagement');assert.equal(r.labelledPredictions,2);assert.equal(r.metrics.accuracy,1);
 });
+
+test('closed vacancy is censored, not a negative engagement label',()=>{assert.equal(M.labelFor({type:'OUTCOME_CHANGED',userAction:'Closed'},'engagement'),null);});

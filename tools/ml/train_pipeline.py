@@ -8,14 +8,14 @@ from pathlib import Path
 from common import load_jsonl
 
 def split_three(rows,label_field):
-    groups={0:[],1:[]}
-    for r in rows:
-        if r.get(label_field) in (0,1):groups[int(r[label_field])].append(r)
-    for g in groups.values():g.sort(key=lambda r:int(r.get('timestamp') or 0))
-    train=[];cal=[];test=[]
-    for g in groups.values():
-        n=len(g);nt=max(1,int(n*.2));nc=max(1,int((n-nt)*.2));test+=g[-nt:];cal+=g[-(nt+nc):-nt] if nc else [];train+=g[:-(nt+nc)] if n>nt+nc else g[:max(1,n-2)]
-    return train,cal,test
+    ordered=sorted((dict(r) for r in rows if r.get(label_field) in (0,1)),key=lambda r:int(r.get('timestamp') or 0))
+    if len(ordered)<6:raise ValueError('Need six rows for three disjoint splits')
+    if any(int(r.get('timestamp') or 0)<=0 for r in ordered):raise ValueError('Positive timestamps required for temporal evaluation')
+    boundaries=[i for i in range(1,len(ordered)) if int(ordered[i-1]['timestamp'])<int(ordered[i]['timestamp'])]
+    if len(boundaries)<2:raise ValueError('Need at least three distinct temporal groups')
+    first=min(boundaries[:-1],key=lambda i:abs(i/len(ordered)-.64))
+    second=min((i for i in boundaries if i>first),key=lambda i:abs(i/len(ordered)-.8))
+    return ordered[:first],ordered[first:second],ordered[second:]
 def write_jsonl(path,rows):Path(path).write_text(''.join(json.dumps(r,ensure_ascii=False)+'\n' for r in rows),encoding='utf-8')
 def run(args,cwd):subprocess.check_call([sys.executable,*map(str,args)],cwd=cwd)
 def main():
@@ -32,7 +32,7 @@ def main():
     raw=out/'model.raw.json';calibrated=out/'model.json';metrics=out/'test-metrics.json'
     trainer='train_preference.py' if a.target=='preference' else 'train_engagement.py';train_args=[root/trainer,out/'train.jsonl','--out',raw,'--min-labels',max(2,min(a.min_labels,len(train)))];train_args+=['--allow-small'] if a.test_only else [];run(train_args,root)
     run([root/'tune_threshold.py',raw,out/'calibration.jsonl','--label-field',label,'--out',calibrated],root);run([root/'evaluate_model.py',calibrated,out/'test.jsonl','--label-field',label,'--out',metrics],root)
-    model=json.loads(calibrated.read_text(encoding='utf-8'));model['trainedOnRealLabels']=not a.test_only;model['trainingLabels']=len(labelled);model['datasetSplit']={'train':len(train),'calibration':len(cal),'test':len(test),'strategy':'stratified-temporal-v1'};model['testMetrics']=json.loads(metrics.read_text(encoding='utf-8'));calibrated.write_text(json.dumps(model,ensure_ascii=False,indent=2),encoding='utf-8')
+    model=json.loads(calibrated.read_text(encoding='utf-8'));model['trainedOnRealLabels']=not a.test_only;model['trainingLabels']=len(labelled);model['datasetSplit']={'train':len(train),'calibration':len(cal),'test':len(test),'strategy':'global-temporal-v2'};model['testMetrics']=json.loads(metrics.read_text(encoding='utf-8'));calibrated.write_text(json.dumps(model,ensure_ascii=False,indent=2),encoding='utf-8')
     registry=Path(a.registry) if a.registry else out/'registry.json';run([root/'model_registry.py',registry,calibrated,'--metrics',metrics],root)
     if a.promote and a.test_only:raise SystemExit('Refusing promotion in --test-only mode')
     if a.promote:run([root/'promote_model.py',registry,model['modelVersion']],root)

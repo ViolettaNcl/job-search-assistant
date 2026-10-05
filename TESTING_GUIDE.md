@@ -1,49 +1,21 @@
-# Testing Guide · 5.2.0
+# Testing — 6.0 RC1
 
-## Release layers
+In source clone, extension path is browser-extension; in FULL it is extension.
 
-A release is checked through independent layers:
+```sh
+node --test browser-extension/*.test.js
+node tests/product_worker_600.cjs
+python -m unittest discover -s tests -p 'test_*.py' -v
+python tests/browser_product_600.py
+python tests/browser_memory_399.py
+python tests/browser_questionnaire_3912.py
+python tests/browser_batch_400.py
+python tests/hh_read_fallback_3910.py
+python tests/browser_learning_520.py
+python tests/browser_e2e.py
+python tools/check-repo-hygiene.py
+```
 
-1. extension Node/unit regression;
-2. focused Chromium HH reader/memory/questionnaire/batch/Learning Center scenarios;
-3. full synthetic browser integration fixture;
-4. ML/model-operations tests;
-5. Python and JavaScript syntax checks;
-6. workflow YAML parsing;
-7. source-publication plan tests;
-8. repository-hygiene tests;
-9. release ZIP integrity and SHA-256 generation.
+Browser tests require Playwright and Chromium. Product browser tests use explicit Chrome/IDB/crypto boundary mocks. Native WebCrypto encrypt/decrypt/tamper behavior is covered separately in Node. Worker integration uses actual background JS with mocked Chrome/HTTP, not live HH.
 
-## 5.2.0 release results
-
-- Node regression: **295 / 295 PASS**.
-- Focused Chromium: **31 / 31 PASS**.
-  - HH reader/API fallback: 3/3.
-  - vacancy/form memory: 8/8.
-  - questionnaire: 9/9.
-  - Batch Analysis: 6/6.
-  - Learning & Model Center: 5/5.
-- Full synthetic browser integration: **102 / 102 assertions PASS**.
-- Python unit tests (ML + compatibility + publication/hygiene): **20 / 20 PASS**.
-- JavaScript/CJS syntax: **158 files PASS**.
-- Python compile: **22 files PASS**.
-- Workflow YAML: **5 / 5 PASS**.
-- Backend runtime preservation: **369 checked, 0 changed** vs 5.0.0.
-- Bundled CV preservation: **3 / 3 unchanged**.
-
-## Browser-harness shutdown limitation
-
-The full browser fixture reaches and prints `102 browser integration assertions passed.` with no uncaught DOM JS errors. In this environment the surrounding Playwright/browser process can remain alive after that marker and exceed an external tool timeout. Treat the assertion result as PASS and the process shutdown as a separate harness issue; do not claim a clean exit.
-
-## ML rules
-
-- Synthetic data may verify pipeline mechanics only.
-- `--test-only` artifacts must remain `trainedOnRealLabels=false`.
-- Model promotion must reject test-only artifacts.
-- Preference and engagement datasets are separate targets.
-- Calibration/tuning data must not be reused as the final held-out test set.
-- Runtime quality/drift metrics require later real labels.
-
-## Live-site validation
-
-Synthetic fixtures cannot certify future HH changes. Before relying on a new release, run the manual checklist in `docs/PRODUCTION_CHECKLIST.md`.
+The Test Report lists exactly which commands completed and which failed/timed out. A timeout is not reported as a clean pass. No .NET rebuild or Windows PowerShell execution is implied by Python publication-plan tests.

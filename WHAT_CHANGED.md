@@ -1,34 +1,11 @@
-# What Changed · 5.2.0 Production Learning Loop
+# 6.0.0 RC1 — Product Center & Recovery
 
-5.2 turns the 5.0 ML foundation into an end-to-end operational loop without pretending that a personal model is already good before real data exists.
+Release candidate based on 5.2.0. Not a blanket production certification.
 
-## Model operations
+Added local Product Center (overview, weekly counts, application pagination/timeline, queue view, dataset quality, model comparison/shadow/rollback, onboarding and redacted diagnostics).
+Added password-protected backup export/import and encrypted IndexedDB checkpoints; runtime Chrome storage remains unencrypted. Restore requires preview and confirmation and pauses restored actions/models.
+Fixed learning write races, repeated-signal amplification, provider ID collisions, office eligibility, censored closed outcomes, ROC-AUC ties and globally disjoint temporal splits.
+Added questionnaire memory gateway for restricted storage contexts and model identity/hash protection.
+Source-only update package excludes unchanged personal CV/seed files. Publication is guarded by old/new content hashes and never resets history or force-pushes.
 
-- Added runtime inference compatible with the Python hashed-feature baseline.
-- Added local candidate-model import and explicit promotion/disable controls.
-- Model Registry upgraded to separate preference and employer-engagement active models.
-- Promotion requires real-label metadata and held-out quality gates.
-- Added calibration/threshold tuning and a full train/calibration/test pipeline.
-- Added independent employer-engagement training target.
-- Added post-prediction metrics, calibration/drift summary and retraining proposals.
-
-## Learning quality
-
-- Preference dataset now collapses repeated vacancy preference decisions to the latest label.
-- Outcome/engagement labels remain separate from preference labels.
-- Questionnaire user edits are captured as correction learning events.
-- Confirmed generic questionnaire answers can use local semantic hash-vector retrieval when exact keys differ.
-
-## User review
-
-- Added pre-submit diff summary for fields/CV/cover-letter review.
-- Added stronger mock-interview practice UI with structure/evidence feedback.
-- Learning Center now exposes model registry, monitoring, datasets and model controls.
-
-## Safety
-
-- Calls/Sales hard gates remain deterministic.
-- Preference ML contributes only a bounded part of Fit.
-- Engagement prediction is shown separately and does not alter preference Fit.
-- Synthetic/test-only models cannot be promoted.
-- No silent online retraining or automatic model replacement was added.
+Remaining: live RC validation on the user's HH session; native extension/IndexedDB lifecycle validation in a unrestricted Windows Chrome environment; broader provider support and full working-data vault migration.

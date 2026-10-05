@@ -1,0 +1,11 @@
+/* Extension-origin IndexedDB: encrypted checkpoints only. Never runs in a job-site content script. */
+(function(root,factory){const api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.vjaProductStore=api;})(globalThis,function(root){
+  'use strict';const NAME='violetta-product',VERSION=1;let pending=null;
+  function db(){if(pending)return pending;pending=new Promise((resolve,reject)=>{if(!root.indexedDB)return reject(new Error('IndexedDB недоступен.'));const request=root.indexedDB.open(NAME,VERSION);request.onupgradeneeded=()=>{const d=request.result;if(!d.objectStoreNames.contains('checkpoints')){const s=d.createObjectStore('checkpoints',{keyPath:'id'});s.createIndex('createdAt','createdAt');}if(!d.objectStoreNames.contains('meta'))d.createObjectStore('meta',{keyPath:'key'});};request.onerror=()=>{pending=null;reject(request.error);};request.onblocked=()=>{pending=null;reject(new Error('Закройте другие вкладки центра управления и повторите.'));};request.onsuccess=()=>{request.result.onversionchange=()=>{request.result.close();pending=null;};resolve(request.result);};});return pending;}
+  async function transact(mode,fn){const d=await db();return new Promise((resolve,reject)=>{const tx=d.transaction('checkpoints',mode);let result;try{const req=fn(tx.objectStore('checkpoints'));req.onsuccess=()=>{result=req.result;};}catch(e){tx.abort();reject(e);return;}tx.oncomplete=()=>resolve(result);tx.onabort=tx.onerror=()=>reject(tx.error||new Error('Не удалось сохранить checkpoint.'));});}
+  async function save(envelope){if(envelope?.format!=='violetta-encrypted-backup')throw new Error('Локальный vault принимает только зашифрованные копии.');const id=crypto.randomUUID();await transact('readwrite',s=>s.put({id,createdAt:Date.now(),envelope}));return id;}
+  async function list(){return (await transact('readonly',s=>s.getAll())).map(({id,createdAt,envelope})=>({id,createdAt,bytes:envelope.data.length})).sort((a,b)=>b.createdAt-a.createdAt);}
+  async function read(id){return (await transact('readonly',s=>s.get(id)))?.envelope||null;}
+  async function remove(id){await transact('readwrite',s=>s.delete(id));}
+  return {NAME,VERSION,save,list,read,remove};
+});

@@ -1,39 +1,13 @@
-# Privacy and Local Data · 5.2
+# Privacy and data — 6.0 RC1
 
-## Local runtime state
+Runtime data remain local unless the user enables an external AI provider. The Product Center itself makes no network requests for analytics or telemetry.
 
-The extension keeps vacancy/application/questionnaire/learning/model-registry state locally by default. Important families include:
+Backup exports and IndexedDB checkpoints are encrypted. Active Chrome storage is not encrypted by this release. Do not describe the product as providing a fully encrypted external working vault.
 
-- job preferences;
-- per-vacancy intelligence and decisions;
-- application/questionnaire memory;
-- `vjaLearningEventsV1` learning events;
-- local model registry with imported model artifacts.
+The personalized FULL/Standalone distribution retains candidate seed and CV assets from 5.2.0 for compatibility. Do not upload the FULL directory or .vja/.jsonl files into a repository.
 
-## Learning exports
+GITHUB-UPDATE is a delta: only changed source files/docs/tests; it excludes unchanged candidate-seed.js, profile-defaults.js, CV PDFs and candidate-source/requirements documents. This does not remove earlier personal data already tracked in the repository or history. Repository visibility remains the owner's responsibility.
 
-Learning Center can export:
+The updater adds ignore rules for backup/dataset/runtime artifacts and verifies intended paths. Hygiene is not a content-level secret scanner.
 
-- full learning backup JSON;
-- preference dataset JSONL;
-- employer-engagement dataset JSONL.
-
-These files may contain job context and behavioral labels. Treat them as private data and store them locally unless you intentionally share them.
-
-## Reset controls
-
-Reset Learning removes learning events and local model-registry state. It does not delete CVs or application history. Model disable is separate from data reset.
-
-## Candidate assets
-
-The personalized FULL/extension bundle can contain CV assets and candidate seed/profile information. If the Git repository tracks those files, making the repository public exposes them to anyone who can access that revision. Switching back to private later does not revoke copies already downloaded.
-
-A future encrypted external vault may further separate personal assets from source distribution, but 5.2 should not be described as providing encrypted vault storage.
-
-## Secrets
-
-Do not commit API keys, `.env`, `candidate.private.json`, `appsettings.local.json`, `user-settings.cmd`, browser cookies or authentication tokens. Repository hygiene and the release publisher block known runtime/secret paths, but they do not replace human review of repository visibility.
-
-## Models
-
-Imported/trained model artifacts are local files/state unless deliberately committed. A model may encode behavioral patterns even when direct PII is excluded; treat personal model artifacts as private.
+No production model is bundled or silently trained. User-created artifacts and datasets can encode behavioral information and should be treated as private.

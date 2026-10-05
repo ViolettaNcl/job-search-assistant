@@ -1,64 +1,11 @@
-VIOLETTA APPLY ASSISTANT 5.2.0 — PRODUCTION LEARNING LOOP
-=========================================================
+VIOLETTA 6.0.0 RC1 — TEST BUILD
 
-NORMAL USE
-----------
-1. Extract the FULL ZIP.
-2. Open Chrome -> chrome://extensions
-3. Enable Developer mode.
-4. Click Load unpacked.
-5. Select the extension folder from this FULL bundle.
-6. Grant HH.ru / HeadHunter access if Chrome asks.
-7. Reload already-open HH tabs once after upgrading.
+1. Test the extension/ folder. Manifest version: 6.0.0 (RC1 in version_name).
+2. Do not uninstall the existing extension before exporting its data.
+3. Popup -> Product Center / Центр управления.
+4. Verify Analysis, Apply, questionnaire and Back before GitHub publication.
+5. Use the separate GITHUB-UPDATE package / publisher; do not copy FULL into Git.
+6. Read TEST_REPORT.md and docs/BACKUP_AND_RECOVERY.md.
 
-HH SEARCH PAGE
---------------
-Analysis               -> one exact full vacancy + calls/no-calls check.
-⚡ Analyze page         -> bounded batch analysis of rendered vacancies.
-Fit badge               -> explainable ranking; hover for reasons/risks/model contribution.
-Calls badge             -> separate ✓ no calls / ✕ calls / ? unknown signal.
-Filters                 -> All / No calls / Fit / Ready / Saved.
-Очередь                 -> user-controlled Apply / Show / Save / Skip.
-✓ / ✕ near Fit         -> explicit ranking feedback.
-
-APPLICATION / QUESTIONNAIRE
----------------------------
-✦ Отклик + письмо      -> vacancy-specific application and letter.
-Questionnaire answers  -> confirmed evidence first, safe drafts only where appropriate.
-User edits              -> captured as correction-learning examples.
-Pre-submit review       -> shows proposed changes and unresolved risks before complex submission.
-
-LEARNING & MODEL CENTER
------------------------
-Open Learning from the extension home page.
-
-It can:
-- show preference and engagement label counts;
-- export learning backup / preference dataset / engagement dataset;
-- import or reset learning state;
-- import a trained candidate-model JSON;
-- explicitly promote or disable a model;
-- show prediction quality / drift / retraining proposal after enough real post-promotion labels.
-
-IMPORTANT ML RULE
------------------
-Rules and personal signals work without a trained model.
-A model becomes active only after explicit promotion.
-Synthetic/test-only models cannot be promoted.
-Preference and employer-engagement are separate targets.
-Calls/Sales hard safety gates remain deterministic.
-
-OFFLINE TRAINING
-----------------
-See docs/MODEL_OPERATIONS.md and tools/ml/train-model.ps1.
-Training uses exported real labels and runs outside Chrome.
-
-ADVANCED BACKEND MODE
----------------------
-Run start-assistant.cmd only when you need optional local dashboard/server workflows.
-Core HH search/apply/learning surfaces do not require the backend.
-
-GITHUB UPDATE
--------------
-Do NOT copy this whole FULL directory into the source repository.
-Use Publish-Violetta-5.2.0.ps1.
+The bundled Windows backend is retained from 5.2.0. It was not rebuilt here.
+This is a release candidate, not a guarantee that every live HH form is bug-free.

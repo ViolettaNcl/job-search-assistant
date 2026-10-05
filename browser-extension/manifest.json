@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
-  "version": "5.2.0",
-  "description": "Violetta 5.2 Production Learning Loop: promoted-model runtime, monitoring/drift, semantic answer retrieval, engagement datasets, pre-submit diff, and calibrated ML operations.",
+  "version": "6.0.0",
+  "description": "Violetta 6.0 RC1: Job Center, encrypted backups, recovery checks, dataset quality, shadow models and safe GitHub source updates.",
   "permissions": [
     "activeTab",
     "storage",
@@ -130,5 +130,6 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "version_name": "6.0.0 RC1 — Product Center & Recovery"
 }

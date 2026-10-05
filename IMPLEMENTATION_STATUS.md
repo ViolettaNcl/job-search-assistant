@@ -1,64 +1,30 @@
-# Implementation Status · 5.2.0
+# Implementation status — 6.0.0 RC1
 
-## Implemented and regression-covered
+## Delivered code
 
-### Search / HH workflow
-- Exact vacancyId binding.
-- Full vacancy reader with hidden-tab and `api.hh.ru` fallback.
-- Calls / no-calls / unknown classification.
-- Batch Analysis with bounded concurrency.
-- Explainable base Fit Score and explicit Fit-vs-Calls UI.
-- Ready Queue, Save, Skip, Apply and persistent vacancy memory.
-- Cross-ID duplicate/repost advisory.
+- Existing 5.2 HH and model features retained.
+- Product Center UI, local weekly counts, paged applications and per-application timeline.
+- Dataset Quality Center and model table.
+- Explicit candidate Shadow Mode, subsequent-label comparison and previous-model rollback.
+- Password-protected .vja exports and encrypted local IndexedDB checkpoint store.
+- Restore allowlist, prototype/size checks, preview, user confirmation and pre-restore checkpoint.
+- Scoped questionnaire memory operations through the service worker.
+- Serialized event writes and latest-decision preference aggregation.
+- Office/calls/sales eligibility checks reused by the queue.
+- ROC-AUC tie fix, globally disjoint temporal partitions, provider-scoped duplicate validation.
+- Source-only update archive and guarded publisher.
 
-### Applications
-- Vacancy-specific cover letters.
-- Employer-already-viewed recovery.
-- Questionnaire classification/autofill.
-- Review-safe human fallback drafts.
-- Confirmed-answer memory and local semantic fallback retrieval.
-- Trusted user correction capture.
-- Pre-submit field-change summary and final review gate.
+## Verification levels
 
-### Personal learning
-- Structured LearningEvent store.
-- Apply/Save/Skip implicit labels and explicit Fit feedback.
-- Bounded preference signals.
-- Preference dataset and independent engagement dataset exports.
-- Learning backup/import/reset.
+See the generated Test Report for measured results. Browser DOM tests use mocked Chrome/crypto/IDB boundaries because native document navigation/extension loading is blocked in this sandbox. Native encryption is tested separately through Node Web Crypto. The IndexedDB implementation uses the browser API but its native lifecycle has not been verified here.
 
-### Model lifecycle
-- Preference logistic baseline.
-- Employer-engagement logistic baseline.
-- Dataset validation.
-- Temporal/stratified training pipeline.
-- Calibration and threshold tuning.
-- Held-out evaluation.
-- Model Registry schema v2 with separate preference/engagement active slots.
-- Candidate model import into extension.
-- Explicit real-label promotion gate.
-- Runtime inference for promoted models.
-- Prediction monitoring, calibration/drift summary and retraining proposal.
-- Synthetic/test-only model promotion rejection.
+## Not delivered / not claimed
 
-### Recruiter/interview
-- Recruiter message intent classification.
-- Vacancy-grounded interview-prep plan.
-- Local mock-answer structure feedback.
+- No guarantee of zero bugs or compatibility with every live HH DOM variation.
+- No second end-to-end live-validated provider.
+- No encryption of all active Chrome runtime data; encryption applies to backup artifacts only.
+- No fresh .NET binary compilation in this environment.
+- No trained personal production model without real labels.
+- No measurement of roadmap completion percentages.
 
-### Engineering
-- Repository hygiene checks.
-- Source-only publisher with hashed allowlist.
-- Documentation for learning/model operations.
-
-## Intentionally not claimed
-
-- No bundled “smart personal model” is claimed before enough real user labels exist.
-- No silent online retraining or automatic promotion.
-- No live production-quality metric is reported from synthetic fixtures.
-- HH is the primary validated provider; additional sites require live adapter validation.
-- Mock interview feedback evaluates answer structure, not human intelligence/fitness/competence.
-
-## What remains data-dependent
-
-The engineering loop is present. The remaining improvement is operational rather than another fake feature layer: collect real labelled decisions/outcomes, train candidate models, validate on held-out data, explicitly promote good models, observe post-promotion calibration/drift, and retrain only when evidence justifies it.
+The release is suitable for a user test and a source commit, not for an unqualified “all roadmap complete” claim.

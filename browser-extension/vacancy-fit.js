@@ -65,6 +65,7 @@
     const requiredYears=yearsRequirement(body);
     return {role,roleLabel:roleLabels[role]||role,technologies,remote,officeOnly,sales,senior,junior,englishRequired,requiredYears,calls:callAnalysis?.status||'unknown'};
   }
+  function isEligible(features={},input={}){const p=normalizePreferences(input);return (!p.avoidCalls||features.calls==='no-calls')&&(!p.avoidSales||!features.sales)&&(p.officeAllowed||!features.officeOnly);}
   function scoreVacancy(vacancy={},profile={},preferencesInput={},callAnalysis=null,relevanceAnalysis={}){
     const preferences=normalizePreferences(preferencesInput),candidate=profileSignals(profile),features=extractFeatures(vacancy,callAnalysis,relevanceAnalysis);
     let score=50;const reasons=[],risks=[];const matchedSkills=[],missingSkills=[];
@@ -99,13 +100,13 @@
     if(preferences.avoidSales&&features.sales)score=Math.min(score,35);
     score=Math.round(clamp(score));
     const decision=score>=88?'STRONG_MATCH':score>=preferences.minimumFitScore?'MATCH':score>=60?'REVIEW':'SKIP';
-    const ready=(features.calls==='no-calls'||!preferences.avoidCalls)&&!features.sales&&score>=preferences.minimumFitScore;
+    const ready=isEligible(features,preferences)&&score>=preferences.minimumFitScore;
     return {score,decision,ready,reasons:reasons.slice(0,6),risks:risks.slice(0,6),matchedSkills,missingSkills,features,preferencesVersion:1,algorithm:'rules-v1'};
   }
   function terminalApplication(state={}){state=state||{};const s=clean(state.status,80);return Boolean(state.completed||['Applied','Viewed','Recruiter Replied','HR Interview','Technical Interview','Test Assignment','Offer','Rejected','Closed'].includes(s));}
   function queueItems(records=[],preferencesInput={}){
     const preferences=normalizePreferences(preferencesInput);
-    return arr(records).filter(r=>r?.fit&&r.fit.score>=preferences.minimumFitScore&&r.fit.ready&&r.analysis?.status!=='calls'&&!terminalApplication(r.application)&&r.decision!=='SKIPPED').sort((a,b)=>Number(b.fit.score)-Number(a.fit.score)||String(a.vacancy?.title||'').localeCompare(String(b.vacancy?.title||'')));
+    return arr(records).filter(r=>r?.fit&&r.fit.score>=preferences.minimumFitScore&&r.fit.ready&&isEligible(r.fit.features||{calls:r.analysis?.status},preferences)&&!terminalApplication(r.application)&&r.decision!=='SKIPPED').sort((a,b)=>Number(b.fit.score)-Number(a.fit.score)||String(a.vacancy?.title||'').localeCompare(String(b.vacancy?.title||'')));
   }
-  return {DEFAULTS,normalizePreferences,canonicalSkill,profileSignals,extractFeatures,scoreVacancy,terminalApplication,queueItems};
+  return {isEligible,DEFAULTS,normalizePreferences,canonicalSkill,profileSignals,extractFeatures,scoreVacancy,terminalApplication,queueItems};
 });

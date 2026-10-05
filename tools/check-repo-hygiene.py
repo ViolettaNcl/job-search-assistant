@@ -25,13 +25,16 @@ FORBIDDEN_ROOTS = {
     "node_modules",
 }
 FORBIDDEN_SEGMENTS = {"bin", "obj", "node_modules", "test-results", "artifacts", "dist"}
-FORBIDDEN_SUFFIXES = {".dll", ".exe", ".pdb", ".zip", ".db", ".db-wal", ".db-shm", ".log"}
+FORBIDDEN_SUFFIXES = {".dll", ".exe", ".pdb", ".zip", ".db", ".db-wal", ".db-shm", ".log", ".vja", ".jsonl", ".pyc"}
 FORBIDDEN_NAMES = {"candidate.private.json", "appsettings.local.json", "user-settings.cmd"}
 RELEASE_DIR = re.compile(r"^Violetta-Apply-Assistant-", re.I)
 
 
 def normalize(path: str) -> PurePosixPath:
-    return PurePosixPath(path.replace("\\", "/").lstrip("./"))
+    value = path.replace("\\", "/")
+    while value.startswith("./"):
+        value = value[2:]
+    return PurePosixPath(value)
 
 
 def tracked_paths() -> list[str]:
@@ -53,6 +56,8 @@ def tracked_paths() -> list[str]:
 
 def reason(path: str) -> str | None:
     p = normalize(path)
+    if p.is_absolute() or ".." in p.parts:
+        return "unsafe path"
     if not p.parts:
         return None
     if RELEASE_DIR.match(p.parts[0]):

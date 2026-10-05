@@ -10,17 +10,17 @@ from common import load_jsonl
 
 def validate(rows, label_field):
     labelled=[r for r in rows if r.get(label_field) in (0,1)]
-    ids=[str(r.get('eventId') or r.get('vacancyId') or '') for r in labelled]
+    ids=[str(r.get('provider') or 'hh')+':'+str(r.get('vacancyId') or r.get('eventId') or '') for r in labelled]
     dup=len(ids)-len(set(ids))
     labels=Counter(int(r[label_field]) for r in labelled)
     times=[int(r.get('timestamp') or 0) for r in labelled if int(r.get('timestamp') or 0)>0]
     warnings=[]
     if len(labelled)<20:warnings.append('very-small-dataset')
-    if min(labels.values() or [0])<5:warnings.append('class-has-fewer-than-5-examples')
+    if min(labels.get(0,0),labels.get(1,0))<5:warnings.append('class-has-fewer-than-5-examples')
     if dup:warnings.append('duplicate-example-identifiers')
     if times and max(times)-min(times)<24*60*60*1000:warnings.append('labels-cover-less-than-24-hours')
     missing_features=sum(1 for r in labelled if not r.get('role') and not r.get('technologies'))
-    if missing_features>warnings.__len__() and labelled and missing_features/len(labelled)>.25:warnings.append('many-rows-missing-role-and-technologies')
+    if labelled and missing_features/len(labelled)>.25:warnings.append('many-rows-missing-role-and-technologies')
     return {'rows':len(rows),'labelled':len(labelled),'labels':dict(labels),'duplicateIds':dup,'missingFeatureRows':missing_features,'timeMin':min(times) if times else None,'timeMax':max(times) if times else None,'warnings':warnings,'ok':len(labelled)>=2 and len(labels)==2 and not dup}
 
 def main():

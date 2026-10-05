@@ -1,103 +1,26 @@
-# Architecture · 5.2.0 Production Learning Loop
+# Architecture — 6.0 RC1
 
-## Runtime flow
+The existing service worker, application store and HH content scripts are retained.
 
-```text
-Job-site DOM / HH API
-  ↓
-Site adapter + exact vacancy identity
-  ↓
-Full Vacancy Reader
-  ↓
-Deterministic safety analysis (Calls / Sales / factual constraints)
-  ↓
-Structured feature extraction
-  ↓
-Base explainable Fit Score
-  ↓
-Bounded personal signals from real feedback
-  ↓
-Optional explicitly-promoted preference model (bounded blend)
-  ↓
-Search UI / Ready Queue / Apply
-  ↓
-Application + Questionnaire + Pre-submit Diff
-  ↓
-Recruiter / Interview workflow
-  ↓
-Outcome Timeline + Learning Events
-  ↓
-Learning & Model Center
-  ↓
-Dataset export → offline ML pipeline → registry → explicit promotion
-  ↓
-Runtime monitoring / drift / retraining proposal
-```
+## Added modules
 
-## Extension modules
-
-### Vacancy/search intelligence
-
-- `hh-list-quick-apply*.js` — exact-card apply and full-vacancy preparation.
-- `vacancy-fit.js` — deterministic rules-v1 Fit Score.
-- `job-search-page-core.js` — feature extraction / ranking helpers.
-- `hh-list-intelligence.js` — Batch Analysis, filters, queue, Fit/Calls UI and feedback.
-- `duplicate-detector.js` — cross-ID repost advisory.
-
-### Learning and model runtime
-
-- `learning-core.js` — LearningEvent normalization, preference signals and dataset creation.
-- `model-runtime.js` — compatible feature hashing, calibrated probability and bounded Fit blend.
-- `model-monitor.js` — post-prediction metrics, calibration/drift summary and retraining proposal.
-- `semantic-index.js` — deterministic local semantic hash-vector retrieval.
-- `learning.html/js` — Learning & Model Center, datasets, registry import/promotion/disable.
-
-### Applications/questionnaires
-
-- `questionnaire-core.js` — form semantics.
-- `questionnaire-memory.js` — exact + semantic confirmed-answer retrieval.
-- `questionnaire-answer-engine.js` — evidence-first answers and safe fallbacks.
-- `questionnaire-content.js` — DOM autofill plus trusted user-correction capture.
-- `pre-submit-diff.js` — proposed field-change summary.
-- `final-review-popup.js` — review gate and diff rendering.
-
-### Recruiter/interview
-
-- `recruiter-intelligence.js` — message intent and vacancy-grounded preparation.
-- `interview-practice.js` — local answer-structure feedback.
-- `interview.html/js` — interview-prep and mock-practice surface.
-
-### Provider abstraction
-
-- `site-adapter-core.js` — formal adapter contract.
-- HH is the primary validated provider. Other providers must not be called live-supported until their adapters are verified against their current sites.
-
-## ML tools
-
-`tools/ml/` contains the offline lifecycle:
-
-- dataset validation;
-- preference and employer-engagement logistic baselines;
-- train/calibration/test splitting;
-- threshold and temperature calibration;
-- held-out evaluation;
-- model registry;
-- explicit promotion gate;
-- prediction monitoring and retraining recommendation.
-
-The browser does not execute Python training.
+`product-core.js`: pure backup schema validation/allowlist, restore plan, quality checks, read models and diagnostics.
+`product-crypto.js`: AES-256-GCM password-protected snapshots using PBKDF2-SHA256 and random salt/nonce.
+`product-store.js`: extension-origin IndexedDB, schema 1, encrypted checkpoint records. Not injected on job websites.
+`product-models.js`: canonical model digest, integrity checks and post-prediction shadow comparison.
+`product-background.js`: extension-page-only administrative routes for restore, shadow selection and model rollback.
+`product.html/js/css`: local dashboard; never clicks employer submit controls.
 
 ## Trust boundaries
 
-Candidate facts come only from confirmed profile/CV memory or explicit user edits. Learning events can affect ranking preference and answer retrieval but cannot create new factual biography. High-risk legal/work-authorization fields remain review-gated.
+Operational Chrome local storage remains the existing source of truth. New IndexedDB stores encrypted checkpoints only, so no destructive migration of the working history occurs. The content-script questionnaire gateway can request one answer or store one bounded answer; it cannot invoke product restore or model administration.
 
-## Safety separation
+The service worker serializes learning writes. Restored jobs are review-only; model active pointers and external AI consent are reset. Backend submission is not triggered by dashboard operations.
 
-Calls and Sales exclusions are deterministic hard gates. A promoted ML model is a ranking signal, not authority to bypass those gates or submit an application silently.
+## Models
 
-## Storage
+Training now uses global chronological boundaries, not per-class time partitions that can overlap. Missing temporal groups fail closed. Shadow predictions never blend into Fit. Comparison counts only labels later than the prediction. Model metrics are reported as observational, not causal or a job-offer guarantee.
 
-- vacancy/application/questionnaire state: local extension storage;
-- learning events/model registry: local extension storage;
-- exported datasets/model artifacts: user-selected local files;
-- repository: source/tests/docs only.
+## Storage and scale
+
+Application pages render 25 records at a time. The center reads local state on opening/manual refresh; it does not poll or crawl. Encrypted backups are limited to 32 MiB plaintext; files over the supported limits are rejected. The large operational stores have not all been migrated to IndexedDB; that remains a separate, testable migration project.
