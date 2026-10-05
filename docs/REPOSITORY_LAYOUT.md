@@ -1,25 +1,54 @@
-# Структура репозитория и поставки
+# Repository Layout · Структура репозитория
 
-## Публикуемые исходники
+The public repository is a source tree, not a release dump or a personal runtime directory.
 
 ```text
-.github/workflows/   CI и проверки
-browser-extension/  Manifest V3, интерфейс и браузерные модули
-docs/               Актуальная документация и демонстрационный скриншот
-scripts/            Проверка поставки, публикация, перенос приватных копий
-tests/              Node / Python / Chromium, фиктивные данные
-tools/              ML CLI и проверка гигиены
-src/                Прежние исходники backend, если уже есть в репозитории
+.github/                 CI workflows
+browser-extension/       Chrome Manifest V3 extension
+docs/                    product, engineering and operating documentation
+scripts/                 release / migration / operational scripts
+src/                     existing source services kept by the repository
+tests/                   Node / Python / Chromium suites and fixtures
+tools/                   hygiene, release and ML utilities
+ARCHITECTURE.md           canonical system architecture
+IMPLEMENTATION_STATUS.md  canonical 52-point status matrix
+SUPPORTED_SITES.md        provider validation status
+TESTING_GUIDE.md          canonical testing model
+README.md                 bilingual product entry point
 ```
 
-В этом обновлении C#-исходников нет; существующий `src/` publisher не удаляет и не заменяет выдуманным проектом.
+## Source vs delivery packages
 
-## FULL
+```mermaid
+flowchart LR
+    REPO[GitHub source tree] --> CODE[Source]
+    REPO --> DOCS[Docs]
+    REPO --> TESTS[Tests]
+    FULL[Personal FULL] --> EXT[extension/]
+    FULL --> BIN[retained runtime binaries]
+    FULL --> PRIV[private-data/]
+    STANDALONE[Standalone extension] --> EXT2[extension only]
+    GHU[GitHub update] --> ALLOW[allowlisted source/docs/tests]
+    PRIV -. never publish .-> REPO
+    BIN -. release/runtime only .-> REPO
+```
 
-`extension/`, `backend/`, `private-data/`, `docs/`, `tests/`, `tools/`, `scripts/`, launchers, publisher и SHA-manifest. Эта структура — персональная поставка, **не структура публичного репозитория**.
+## Files that must not be committed
 
-## Запрещено публиковать
+- `*.zip`, `*.exe`, `*.dll`, `*.pdb`;
+- databases and runtime logs;
+- `.env`, tokens, cookies, credentials and private keys;
+- CVs, private profiles, recruiter/application history and `.vja` backups;
+- personal learning datasets/model artifacts;
+- `node_modules/`, `bin/`, `obj/`, `test-results/`, `artifacts/`, `coverage/`;
+- nested packaged release folders.
 
-ZIP, EXE/DLL/PDB, базы, логи, JSONL с пользовательскими событиями, `.vja`, CV, private profile, tokens/cookies, `.env`, node_modules, bin/obj, test-results и вложенные папки релизов. Шрифтовые файлы не включаются в поставку.
+`source-sync-manifest.json` and repository hygiene tooling define the intended safe publication surface for the RC3 source update. The publisher must not delete unknown existing repository content blindly and must not use force-push as a routine publication mechanism.
 
-`source-sync-manifest.json` описывает строго разрешённое копирование и хеши исходников. GITHUB-UPDATE переносит только эти файлы. Старые ненужные файлы в уже существующем Git-репозитории не удаляются вслепую.
+## Personal FULL structure
+
+The FULL archive is intentionally different from the GitHub tree. It may include `extension/`, retained backend/runtime files, `private-data/`, scripts, tests, docs and release manifests. Treat it as a personal delivery artifact, not a Git source folder.
+
+## Русский
+
+Публичный GitHub должен содержать **исходники, документацию и тесты**, а не персональную поставку FULL. FULL может содержать `private-data/`, runtime binaries и локальные пользовательские файлы, поэтому его нельзя просто `git add .` в публичный репозиторий.

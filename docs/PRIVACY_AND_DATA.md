@@ -1,32 +1,93 @@
-# Приватность и данные
+# Privacy & Data · Приватность и данные
 
-## Что где находится
+**Release:** 6.0.0 RC3  
+**Principle:** public source and personal runtime are separate products with separate data boundaries.
 
-| Данные | Размещение в RC3 |
-| --- | --- |
-| Подтверждённый профиль, контакты, текущие CV | Рабочее хранилище профиля Chrome |
-| История, анкеты, переписки, learning events | Chrome storage, по прежним ключам |
-| Индекс истории и зашифрованные checkpoints | IndexedDB расширения |
-| Оригинальные личные файлы из RC2 | Только персональный FULL: `private-data/` |
-| Старая конфигурация Windows backend | Персональный FULL, не включается в GitHub-обновление |
-| SHA-256 и документация | Публичные артефакты без CV и личной истории |
+## Data classification
 
-Публичный seed пуст. Новая установка не получает биографию из программного кода. Прежний установленный профиль не заменяется пустым seed.
+| Class | Examples | Source of truth | Public repository? |
+|---|---|---|---|
+| **FACT** | language level, education, confirmed contact | verified CV/profile or explicit user confirmation | No personal values |
+| **PREFERENCE** | remote, calls, schedule, salary preference | explicit settings / confirmed preference | No personal values |
+| **WRITING STYLE** | preferred length, tone, greeting style | user edits / writing memory | No private examples by default |
+| **LEARNED BEHAVIOR** | save/skip/apply patterns | local learning events | No |
+| **MODEL PREDICTION** | candidate preference score | model runtime | Model code may be public; personal artifacts/data are not |
+| **VACANCY DATA** | provider snapshot, requirements, salary | job-site/API | Code/schema yes; personal browsing history no |
 
-## Пределы защиты
+## Storage map
 
-AES-GCM защищает экспортированные `.vja` и checkpoints. **Вся текущая память Chrome и папка LocalAppData не становятся зашифрованными.** Защищайте учётную запись Windows, браузерный профиль, резервные копии и устройство. FULL содержит личные сведения и не предназначен для публичного размещения.
+```mermaid
+flowchart TB
+    PROFILE[Confirmed profile / CV metadata] --> CH[(Chrome storage)]
+    APPS[Applications / questionnaire / messages / learning] --> CH
+    CH --> IDB[(IndexedDB mirrors / checkpoints)]
+    CH --> BACKUP[Encrypted .vja backup]
+    IDB --> BACKUP
+    FULL[Personal FULL package] --> PRIVATE[private-data/]
+    REPO[Public GitHub source] --> CODE[Source / docs / tests]
+    PRIVATE -. excluded .-> REPO
+    CH -. runtime only .-> REPO
+```
 
-Файловый vault создаётся только отдельным PowerShell-скриптом. Он выполняет копирование, не полную миграцию runtime. Браузер не получает произвольный доступ к `%LOCALAPPDATA%`.
+### Current RC3 placement
 
-Проверка расширения PDF и сигнатуры `%PDF-` в импортируемом CV — проверка формата, не антивирусная проверка файла.
+| Data | Location |
+|---|---|
+| Confirmed profile, contacts, current CV references | Browser working storage |
+| Vacancy/application/questionnaire/recruiter/learning state | Browser storage under existing product keys |
+| Selected indexed mirrors/checkpoints | IndexedDB `violetta-product` |
+| Portable backup | Password-protected `.vja` export |
+| Original personal files inherited from RC2 | Personal FULL under `private-data/` |
+| Public source update | Source/docs/tests only; no personal runtime package |
 
-## Внешняя обработка
+## What encryption covers
 
-Чтение вакансий использует разрешённые сайты и HH API. Передача выбранного контекста внешней модели требует её настройки и согласия. Учетные данные модели не должны попадать в issue, README или backup. Известные структурированные секреты исключаются из backup; произвольный текст может содержать персональные сведения, поэтому копия шифруется.
+Authenticated encryption protects the portable backup payload/checkpoints where implemented. It does **not** mean that:
 
-Диагностика публикует технические коды и агрегаты, не текст резюме/переписки. Перед пересылкой всё равно просмотрите файл самостоятельно.
+- all Chrome storage is encrypted at rest by Violetta;
+- `%LOCALAPPDATA%` copies are automatically encrypted;
+- the personal FULL archive is encrypted;
+- arbitrary text is guaranteed to be free of personal data before export.
 
-## Публикация и история Git
+Protect the Windows account, browser profile, device and backup password accordingly.
 
-GITHUB-UPDATE не включает CV, backend appsettings и личный профиль. Это не очищает более ранние коммиты вашего репозитория. Если личные данные уже публиковались, отдельно проверьте текущие отслеживаемые файлы и историю; при утечке ключей отзовите их у провайдера. Автоматического переписывания Git history нет.
+## External processing
+
+Vacancy reading uses allowed provider surfaces and the existing provider/API logic. If an external text/model provider is configured, only send context that the user explicitly intends to process. Do not place provider credentials in README, issues, backups or diagnostics.
+
+The RC3 documentation does **not** claim a production external embedding pipeline that sends CV/history to a third-party embedding service.
+
+## Backup & restore privacy
+
+Before sharing a backup or diagnostic artifact:
+
+1. confirm it is the intended file;
+2. keep the password out of the same communication channel where practical;
+3. inspect diagnostics for unexpected private text;
+4. never upload the personal FULL archive to a public repository or issue.
+
+Restore should validate schema, preview intended changes, create/use a checkpoint, pause automation and verify restored collections.
+
+## Git publication boundary
+
+The GitHub update path is designed to exclude personal CV/profile/runtime files and compiled/release artifacts. It does not automatically purge sensitive data that might already exist in previous Git history.
+
+If a credential was ever committed, revoke/rotate it independently of repository cleanup.
+
+---
+
+# Русский
+
+## Что считается персональными данными проекта
+
+К приватным данным относятся CV, контакты, подтверждённый профиль, ответы анкет, история откликов, переписки с рекрутерами, learning events, datasets, model artifacts, backups и секреты провайдеров.
+
+**Публичный репозиторий предназначен для исходников, тестов и документации — не для пользовательской истории.** Персональный FULL может содержать `private-data/`, поэтому его нельзя публиковать в GitHub.
+
+## Важная граница шифрования
+
+Зашифрованный `.vja` backup не означает, что вся рабочая Chrome-память, LocalAppData и FULL автоматически зашифрованы. Защищайте устройство, учётную запись Windows, Chrome profile и пароль backup.
+
+## Публикация в Git
+
+GITHUB-UPDATE/allowlist не должен включать CV, profile, runtime history, databases, logs, binaries, `.env`, tokens или backups. Но он не очищает старую Git history. Если секрет уже когда-то был опубликован, его нужно отдельно отозвать/сменить.

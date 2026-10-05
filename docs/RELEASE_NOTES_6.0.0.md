@@ -28,6 +28,13 @@ README переработан: навигация, реальный демонс
 
 Пакеты разделены на персональный FULL, standalone и исходное GitHub-обновление. Генерируются SHA-256 и строгий verifier. Publisher сохраняет существующие исходники, не выполняет force-push и не публикует приватную часть FULL.
 
+
+## Documentation refresh
+
+The RC3 documentation was reorganized into a bilingual, architecture-first presentation. The main README now includes English and Russian product views, an animated local workflow asset, GitHub-native Mermaid diagrams, explicit truth/safety and data-boundary models, automation modes, release gates and a concise documentation index.
+
+`ARCHITECTURE.md`, `SECURITY.md`, `TESTING_GUIDE.md`, privacy, feature and repository-layout documentation were expanded with system/data-flow diagrams and clearer distinctions between implemented, automated-tested, live-validated and production-ready states. Duplicate release-detail content remains linked from canonical reports rather than repeated in the README.
+
 ## Известные ограничения
 
 Нет живой приёмки HH/Habr, native extension-origin проверки и пересборки .NET. Полный filesystem vault runtime, native IndexedDB end-to-end, embeddings, Gradient Boosting, production personal training и все 52 требования в полном объёме не завершены. Конкретные границы перечислены в IMPLEMENTATION_STATUS, а выполненные команды — в test report.
