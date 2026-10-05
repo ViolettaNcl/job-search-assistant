@@ -1,56 +1,19 @@
-# ML Architecture · 5.2
+# ML-архитектура
 
-## Mechanisms are kept separate
+## Реализованный путь
 
-1. deterministic safety/ranking rules;
-2. bounded user-derived personal signals;
-3. LLM-assisted writing/semantic generation where configured;
-4. exact/semantic retrieval;
-5. trained ML models.
+`Реальные события → проверка датасета → временные train/calibration/test → logistic regression → калибровка → оценка → Candidate → Shadow → ручное решение`
 
-Only item 5 is called ML.
+Два отдельных target: `personal-vacancy-logreg` и `employer-engagement-logreg`. Локальный feature encoder — `hashed-v1`; inference совместим с JavaScript runtime расширения. Правила Fit работают и без моделей.
 
-## Model A — Personal Vacancy Preference
+Логистическая регрессия действительно обучает веса из меток. Правила, retrieval, поведенческие агрегаты и объяснения Fit не переименованы в ML. В RC3 не вложена новая персональная модель: реальные пользовательские метки для обучения не предоставлялись.
 
-Target: `P(user_would_apply | vacancy)`.
+## Готовность данных
 
-Baseline: logistic regression over structured and deterministic hashed features. The browser implements the same SHA-256-based feature hashing as the Python trainer, allowing imported model JSON to score vacancies consistently.
+Экспериментальный ориентир — 100 меток, предпочтительно 500+. Нужны оба класса, уникальные вакансии и содержательные признаки. Pipeline требует подтверждения происхождения меток через `--confirm-real-labels`; это заявление пользователя, а не независимая верификация. Явные synthetic/fixture/test-only записи запрещены в таком режиме.
 
-Runtime use is conservative: the promoted model contributes a bounded portion of Fit and never overrides hard Calls/Sales gates.
+`--test-only` и `--allow-small` нужны только для тестов; результаты не помечаются обученными на реальных данных. Автоматического продвижения по факту создания модели нет.
 
-## Model B — Employer Engagement
+## Открытые части
 
-Target: `P(meaningful_employer_engagement | application)`.
-
-It is trained from outcome labels and stays separate from preference Fit. Runtime output can be surfaced as an additional advisory signal.
-
-## End-to-end lifecycle
-
-```text
-real LearningEvents
-→ dataset export
-→ dataset validation
-→ stratified temporal train/calibration/test split
-→ train candidate baseline
-→ temperature + threshold calibration on calibration split
-→ one held-out test evaluation
-→ versioned candidate model + metrics
-→ model registry
-→ explicit promotion gate
-→ runtime inference
-→ later real labels
-→ monitoring / calibration / drift
-→ retraining proposal
-```
-
-## Model artifact
-
-A model JSON contains model type/version, dimension, weights/bias, threshold, calibration metadata, dataset/training metadata and evaluation metrics. Registry metadata includes SHA-256.
-
-## Promotion
-
-Promotion requires a real-label model and sufficient held-out validation evidence. A candidate cannot silently replace the active model. Preference and engagement have independent active slots.
-
-## Test-only training
-
-Synthetic fixtures are useful for testing pipeline mechanics only. `--test-only` outputs remain `trainedOnRealLabels=false`; promotion refuses them.
+Сравнение с обученным Gradient Boosting не выполнено. Реальные локальные embeddings не интегрированы. Оценка улучшения над правилами и живое Shadow-сравнение требуют собственного датасета и реальных решений пользователя. Без них нельзя обещать улучшение качества откликов.

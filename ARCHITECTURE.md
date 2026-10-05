@@ -1,54 +1,38 @@
-# Architecture · 6.0.0 RC2
+# Архитектура
 
-## Application path
+**Версия:** 6.0.0 RC3. Работа продолжается поверх RC2 без замены прикладных модулей.
 
-```text
-Job-site DOM / provider API
-  ↓
-Site adapter + exact vacancy identity
-  ↓
-Full vacancy reader
-  ↓
-Deterministic safety analysis + structured features
-  ↓
-Rules Fit + bounded personal signals + optional promoted preference model
-  ↓
-Queue / Apply preparation
-  ↓
-Direct apply OR dedicated questionnaire page
-  ↓
-Questionnaire classifier + confirmed memory + reviewable fallback drafts
-  ↓
-✦ Fill + pre-submit diff
-  ↓
-USER-CONTROLLED FINAL SUBMIT
-  ↓
-Outcome / Learning events
-```
+## Границы ответственности
 
-RC2 specifically recognizes dedicated HH questionnaire pages even when they do not expose a conventional `<form>` element.
+`content scripts → service worker → Chrome storage / IndexedDB`
 
-## Learning/model path
+Контент-скрипты читают разрешённую страницу, извлекают конкретную вакансию и работают с DOM. Фоновый обработчик связывает действие с вкладкой и вакансией, читает подтверждённый профиль, ведёт историю и проверяет право на финальную отправку. Административные операции доступны только страницам самого расширения.
 
-```text
-real user decisions
-→ LearningEvents
-→ de-duplicated preference dataset
-→ local browser trainer OR offline Python trainer
-→ chronological train/calibration/test
-→ held-out metrics
-→ candidate Model Registry entry
-→ Shadow Mode / explicit promotion
-→ bounded runtime inference
-→ later monitoring and retraining proposal
-```
+`product.html → product.js + product-os.js → существующие сервисы`
 
-Preference and employer-engagement targets remain separate. Hard safety/preferences such as Calls/Sales gates are not overridden by ML.
+Центр управления объединяет историю, очередь, аналитику, профиль, диагностику и резервные копии. `product-os.js` расширяет прежний центр, не заменяя анализ вакансий, написание писем или реестр моделей.
 
-## Migration and release trust
+## Основные модули
 
-`product-migrations.js` applies additive schema patches for older local state. Release publication is allowlisted and hash-checked; optional Git tag signing uses only the user's configured signing key.
+| Область | Модули |
+| --- | --- |
+| Полное чтение / Fit | `hh-list-intelligence`, `vacancy-fit`, `job-search-page-core`, адаптеры сайтов |
+| Подготовка отклика | `copilot-background`, `universal-content`, `site-apply-content`, `hh-list-quick-apply` |
+| Анкеты | `questionnaire-core`, `questionnaire-answer-engine`, `questionnaire-controls`, `questionnaire-memory`, `questionnaire-content` |
+| Глобальные ограничения | `automation-policy`, `submission-guard-content`, `production-background` |
+| Профиль | `candidate-truth`, `private-profile`, настройки подтверждённых фактов |
+| Хранение | `product-store`, `product-migrations`, прежние ключи Chrome storage |
+| Резервные копии | `product-core`, `product-crypto`, `product-background` |
+| Аналитика / обучение | `strategy-analytics`, `learning-core`, `model-runtime`, `product-models`, `tools/ml` |
 
-## Provider abstraction
+## Совместимость данных
 
-HH is primary. Habr Career is RC2 beta. New providers must implement the formal adapter contract and pass current live-flow validation before being called supported.
+Chrome storage остаётся основной совместимой рабочей памятью. IndexedDB `violetta-product`, версия 2, содержит checkpoints, метаданные и индексируемое зеркало отдельных коллекций. Индексы не заменяют исходные записи. При ошибке индекс помечается для перестроения; полная транзакционность между двумя хранилищами не заявляется.
+
+Постраничные списки используют курсоры. Обзор и часть legacy-сервисов всё ещё читают всю Chrome-память — полная масштабируемость тысяч записей требует отдельной проверки.
+
+## Внешние зависимости
+
+Сайты вакансий и HH API используются по прежней логике чтения. Внешний генератор текстов требует настройки и согласия. CV/история не отправляются в embeddings: такого внешнего слоя в RC3 нет.
+
+FULL сохраняет бинарный Windows backend из RC2. Он не является новой C#-сборкой. Расширение и старый backend имеют разные границы безопасности; их полное объединение — открытая задача.

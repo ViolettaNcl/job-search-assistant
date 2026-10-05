@@ -6,7 +6,7 @@ import hashlib, json, re, shutil, subprocess, tempfile, unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / 'source-sync-manifest.json'
-ALLOWED = re.compile(r'^(browser-extension/|tests/|docs/|tools/|scripts/|\.github/workflows/(?:ci|codeql|package-windows|site-apply-regression|candidate-memory-regression)\.yml$|README\.md$|ARCHITECTURE\.md$|IMPLEMENTATION_STATUS\.md$|SUPPORTED_SITES\.md$|TESTING_GUIDE\.md$|WHAT_CHANGED\.md$|START_HERE\.txt$|SECURITY\.md$|ROADMAP\.md$|start-assistant\.cmd$|STOP_ASSISTANT\.cmd$|BACKEND_DIAGNOSTICS\.cmd$|UPDATE_EXISTING\.cmd$|user-settings\.example\.cmd$)')
+ALLOWED = re.compile(r'^(browser-extension/|tests/|docs/|tools/|scripts/|\.github/workflows/(?:ci|codeql|package-windows|site-apply-regression|candidate-memory-regression)\.yml$|\.gitignore$|README\.md$|ARCHITECTURE\.md$|IMPLEMENTATION_STATUS\.md$|SUPPORTED_SITES\.md$|TESTING_GUIDE\.md$|WHAT_CHANGED\.md$|START_HERE\.txt$|SECURITY\.md$|ROADMAP\.md$|start-assistant\.cmd$|STOP_ASSISTANT\.cmd$|BACKEND_DIAGNOSTICS\.cmd$|UPDATE_EXISTING\.cmd$|user-settings\.example\.cmd$)')
 FORBIDDEN = re.compile(r'(?i)\.(dll|exe|pdb|zip|log|db|woff2?|ttf|otf)$|(^|/)node_modules/|test-results/|(^|/)\.env$|candidate\.private\.json$|appsettings\.local\.json$|(^|/)user-settings\.cmd$')
 
 def safe(root, relative):
@@ -63,8 +63,8 @@ class PublicationPlanTests(unittest.TestCase):
         self.assertIn('browser-extension/habr_career_beta.md', targets)
         self.assertIn('tests/browser_questionnaire_rc2.py', targets)
         self.assertIn('tests/browser_habr_rc2.py', targets)
-        self.assertIn('scripts/verify-violetta-6.0.0-rc2.ps1', targets)
-        self.assertIn('docs/release_notes_6.0.0_rc2.md', targets)
+        self.assertIn('scripts/verify-violetta-6.0.0.ps1', targets)
+        self.assertIn('docs/release_notes_6.0.0.md', targets)
         self.assertIn('browser-extension/model-runtime.js', targets)
         self.assertIn('browser-extension/model-monitor.js', targets)
         self.assertIn('browser-extension/semantic-index.js', targets)
@@ -104,7 +104,7 @@ class PublicationPlanTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'duplicate'): validate(self.data)
 
     def test_publisher_checks_exit_codes_and_never_force_resets(self):
-        script = (ROOT/'Publish-Violetta-6.0.0-RC2.ps1').read_text(encoding='utf-8-sig')
+        script = (ROOT/'Publish-Violetta-6.0.0.ps1').read_text(encoding='utf-8-sig')
         self.assertIn('$LASTEXITCODE', script)
         self.assertIn("@('diff','--cached','--quiet') -Accepted @(0,1)", script)
         self.assertIn("@('push','origin','HEAD:main')", script)

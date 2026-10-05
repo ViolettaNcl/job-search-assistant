@@ -1,21 +1,14 @@
-# Supported Sites · 6.0.0 RC2
+# Поддерживаемые сайты
 
-## HeadHunter / HH
+| Провайдер | Состояние RC3 | Проверенная граница |
+| --- | --- | --- |
+| HH / hh.ru | Основной провайдер; **NOT LIVE VALIDATED** для RC3 | Node + Chromium DOM-фикстуры, mock API / transport |
+| HeadHunter.kg | Совместимые HH-механизмы чтения/форм; без живой проверки | Legacy DOM-регрессия; глобальный Autopilot ограничен trusted origins |
+| Habr Career | **BETA — NOT LIVE VALIDATED** | Фикстуры адаптера, чтения и формы |
+| Внешние ATS / анкеты | EXPERIMENTAL, доступ на конкретный origin | Известные generic-формы, Fill в связанном контексте |
 
-Primary provider. Supported architecture includes search-card intelligence, exact vacancy reading, Calls analysis, Fit/queue, vacancy-specific application preparation, dedicated questionnaire Fill, memory and recruiter/application workflows.
+Состояние BETA не означает завершённый live-workflow. Изменения DOM, авторизации и особенностей аккаунта могут нарушить селекторы. Неизвестное управление или неуверенная привязка к вакансии должны вести к ручной проверке, не к угадыванию клика.
 
-Live DOM/API changes can still require selector maintenance, so a real-account smoke test remains part of release acceptance.
+В RC3 автоматическая отправка через новый worker gate разрешается только для точных HTTPS origins `https://hh.ru` и `https://career.habr.com`, при выполнении остальных ограничений. Другие origins не обходятся через похожее доменное имя.
 
-## HeadHunter.kg
-
-Shares the HH adapter family and remains covered by legacy application regression fixtures.
-
-## Habr Career — beta
-
-`https://career.habr.com/*` is enabled in RC2. The adapter recognizes vacancy pages, extracts vacancy identity/title/company/description and can render the assistant surface. The generic application/questionnaire infrastructure can be reused when the current authenticated flow exposes compatible fields.
-
-**Not yet claimed:** fully live-validated authenticated Habr apply, questionnaire and final submission flow. Final employer submission remains user-controlled.
-
-## Other providers
-
-The formal adapter contract exists, but no other site should be called supported until its current live flow is inspected and tested.
+Чек-лист живой приёмки: [LIVE_ACCEPTANCE_6.0.0.md](docs/LIVE_ACCEPTANCE_6.0.0.md).

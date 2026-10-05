@@ -31,6 +31,8 @@ class RepositoryHygieneTests(unittest.TestCase):
             'docs/.env',
             '.env',
             'private.vja',
+            'private-data/PRIVATE_IMPORT.vja-profile.json',
+            'browser-extension/assets/cv/candidate.pdf',
             'learning.jsonl',
             'browser-extension/candidate.private.json',
             'src/JobSearchAssistant/appsettings.local.json',
@@ -38,11 +40,10 @@ class RepositoryHygieneTests(unittest.TestCase):
         ]:
             self.assertIsNotNone(mod.reason(path), path)
 
-    def test_allows_source_layout_and_candidate_assets(self):
+    def test_allows_source_layout_and_public_assets(self):
         for path in [
             'browser-extension/manifest.json',
-            'browser-extension/assets/cv/Violetta_Nicolaou_CV.pdf',
-            'src/JobSearchAssistant/Program.cs',
+                        'src/JobSearchAssistant/Program.cs',
             'tests/browser_e2e.py',
             'docs/USER_GUIDE.md',
             '.github/workflows/ci.yml',

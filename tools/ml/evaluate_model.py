@@ -19,13 +19,44 @@ def auc(rows,m,label_field):
         rank_sum+=rank*sum(y for _,y in pairs[i:j]);i=j
     return (rank_sum-pos*(pos+1)/2)/(pos*neg)
 
+def ranking_metrics(pairs,ks=(5,10,20)):
+    """One global held-out ranking. Scores tied at a cutoff use stable input order.
+
+    PR-AUC uses stepwise average precision with equal-score groups, not
+    trapezoidal interpolation. Missing positive/negative classes are explicit.
+    """
+    pairs=sorted(pairs,key=lambda x:x[0],reverse=True)
+    n=len(pairs);positives=sum(y for _,y in pairs)
+    result={'rankingSamples':n,'prAuc':None,'averagePrecision':None,'ndcg':None,'mrr':None}
+    if not n:return result
+    # AP aggregates ties, matching the stepwise precision-recall convention.
+    i=0;tp=0;ap=0.0
+    while i<n:
+        j=i+1
+        while j<n and pairs[j][0]==pairs[i][0]:j+=1
+        new=sum(y for _,y in pairs[i:j]);tp+=new
+        if positives:ap+=(new/positives)*(tp/j)
+        i=j
+    if positives:
+        result['prAuc']=result['averagePrecision']=ap
+        result['ndcg']=sum(y/math.log2(i+2) for i,(_,y) in enumerate(pairs))/sum(1/math.log2(i+2) for i in range(positives))
+        result['mrr']=1/next(i+1 for i,(_,y) in enumerate(pairs) if y)
+    for k in ks:
+        effective=min(k,n);hits=sum(y for _,y in pairs[:effective])
+        result[f'precisionAt{k}']=hits/effective
+        result[f'recallAt{k}']=hits/positives if positives else None
+        ideal=sum(1/math.log2(i+2) for i in range(min(effective,positives)))
+        result[f'ndcgAt{k}']=sum(y/math.log2(i+2) for i,(_,y) in enumerate(pairs[:effective]))/ideal if ideal else None
+        result[f'effectiveK{k}']=effective
+    return result
+
 def metrics(rows,m,label_field):
     t=float(m.get('threshold',.5));tp=fp=tn=fn=0;brier=loss=0.0
     for r in rows:
         if r.get(label_field) not in (0,1):continue
         y=r[label_field];p=max(1e-9,min(1-1e-9,probability(m,r)));pred=p>=t;tp+=int(pred and y);fp+=int(pred and not y);tn+=int((not pred) and not y);fn+=int((not pred) and y);brier+=(p-y)**2;loss+=-(y*math.log(p)+(1-y)*math.log(1-p))
     precision=tp/max(1,tp+fp);recall=tp/max(1,tp+fn);f1=2*precision*recall/max(1e-12,precision+recall);n=tp+fp+tn+fn
-    return {'n':n,'precision':precision,'recall':recall,'f1':f1,'accuracy':(tp+tn)/max(1,n),'rocAuc':auc(rows,m,label_field),'brier':brier/max(1,n),'logLoss':loss/max(1,n),'threshold':t,'labelField':label_field}
+    return {**ranking_metrics([(probability(m,r),r[label_field]) for r in rows if r.get(label_field) in (0,1)]),'n':n,'precision':precision,'recall':recall,'f1':f1,'accuracy':(tp+tn)/max(1,n),'rocAuc':auc(rows,m,label_field),'brier':brier/max(1,n),'logLoss':loss/max(1,n),'threshold':t,'labelField':label_field}
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('model');ap.add_argument('dataset');ap.add_argument('--label-field',default='labelUserApply');ap.add_argument('--out');a=ap.parse_args();m=json.load(open(a.model,encoding='utf-8'));r=metrics(load_jsonl(a.dataset),m,a.label_field);print(json.dumps(r,indent=2));
     if a.out:open(a.out,'w',encoding='utf-8').write(json.dumps(r,indent=2))

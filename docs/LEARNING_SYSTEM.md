@@ -1,49 +1,23 @@
-# Personal Learning System · 5.2
+# Система обучения
 
-## Purpose
+## Разделение данных
 
-Learn from real user behavior while keeping factual candidate data immutable unless explicitly confirmed.
+**Факт** поступает из проверенного пользователем профиля, CV или явного подтверждения. **Предпочтение** — желаемый график/формат/тип вакансии. **Стиль письма** выводится из правок. **Поведение** — сохранённое действие. **Предсказание** — результат конкретной модели. **Данные вакансии** — сведения работодателя.
 
-## LearningEvent store
+Модель не создаёт факты о стаже, работодателях, образовании, гражданстве или коммерческом стеке. Пользовательская коррекция ответа сохраняется отдельно от автоматического черновика; юридический ответ не переносится автоматически.
 
-Local events may include:
+## Сигналы
 
-- vacancy identity and structured features;
-- rule/ML decision at the time;
-- Apply / Save / Skip / Fit feedback;
-- questionnaire original + corrected text;
-- application outcome changes;
-- interview-prep usage;
-- confidence/source metadata.
+Apply, Save, Skip, явная оценка Fit, изменения ответов и писем формируют learning events. Событие содержит контекст вакансии, источник и время. Не каждое действие является достоверной меткой предпочтения: Save может означать «изучить позже».
 
-## Preference labels
+Память письма использует пары исходный текст → пользовательская правка и retrieval примеров. Это не fine-tuning. Детерминированное семантическое сопоставление формулировок не является embeddings-моделью.
 
-Positive signals include Apply, Save and Fit accepted. Negative signals include Skip and Fit rejected.
+## Два независимых датасета
 
-Dataset generation keeps the **latest preference decision per vacancy** so repeated UI interactions do not create artificial duplicated labels.
+`labelUserApply` отвечает на вопрос о выборе пользователя. `labelEmployerEngagement` относится к реакции работодателя на уже сделанный отклик. Ответ, интервью, тестовое или оффер не используются как замена предпочтениям пользователя.
 
-## Engagement labels
+Дубликаты вакансий, повторные события, пропуски, баланс классов и временной диапазон проверяются при подготовке данных. Интерфейс показывает ограничения размера выборки. Синтетические QA-фикстуры никогда не объявляются доказательством качества персональной модели.
 
-Employer engagement is an independent target. Outcome events can create engagement labels from recruiter reply/interview/test/offer versus terminal rejection/closure. They are never mixed with user-preference labels.
+## Сохранение и ограничения
 
-## Questionnaire correction learning
-
-When an autofilled or drafted field is later changed by trusted user input, the extension records a `QUESTIONNAIRE_EDITED` event with original/corrected text, category and question context. Programmatic synthetic DOM events are not treated as user corrections.
-
-## Semantic answer memory
-
-Exact semantic keys remain the first lookup. For generic confirmed answers, a deterministic local hash-vector index can retrieve a similar prior question within the same category. Vacancy-specific answers are excluded from generic reuse.
-
-This is local retrieval, not a trained embedding model.
-
-## Active learning policy
-
-- high confidence: eligible safe automation;
-- medium confidence: suggestion/review;
-- low confidence: leave for user input.
-
-Legal, work-authorization, unconfirmed salary and other high-risk categories remain review-gated regardless of confidence.
-
-## Monitoring
-
-When an active preference model has enough later labels, the system can calculate prediction quality/calibration and compare early vs recent windows. It can recommend retraining, but it does not train/promote silently.
+Learning storage и прежние форматы событий сохранены. Часть legacy-истории имеет существующие ограничения размера; перенос всех коллекций в безразмерное файловое хранилище не выполнен. Экспортируйте данные регулярно. Порог готовности модели не отменяет проверку качества меток и временных утечек.

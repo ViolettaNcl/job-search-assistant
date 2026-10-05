@@ -65,3 +65,34 @@ __pycache__/
 /backups/
 /private-data/
 /github-source/
+
+# Local/private Violetta data
+private/
+profile/
+cv/
+memory/
+applications/
+questionnaires/
+learning/
+datasets/
+models/
+backups/
+logs/
+
+# Build/release/private output
+*.zip
+*.exe
+*.dll
+*.pdb
+*.db
+*.sqlite
+*.sqlite3
+*.log
+.env
+.env.*
+node_modules/
+bin/
+obj/
+test-results/
+artifacts/
+coverage/

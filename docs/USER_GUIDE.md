@@ -1,72 +1,49 @@
-# User Guide · 5.2
+# Руководство пользователя
 
-## Install
+## 1. Установка и обновление
 
-1. Extract the standalone extension or FULL bundle.
-2. Open `chrome://extensions`.
-3. Enable Developer mode.
-4. Load `extension/` from FULL, or the standalone extension folder.
-5. Reload existing HH tabs once after upgrade.
+Для браузерной работы backend не нужен. В FULL и standalone папка расширения называется `extension`; в GitHub — `browser-extension`. Открывайте `chrome://extensions` и загружайте именно эту папку, а не корень архива.
 
-## Search-page workflow
+**При обновлении сначала экспортируйте `.vja`.** Сохраните путь прежней папки расширения, замените её файлы и обновите существующую карточку. Не удаляйте расширение. Скопированная в другое место вторая установка может иметь отдельную память.
 
-### One vacancy
+Не переносите `private-data`, `backend` и весь FULL в GitHub. Для исходников используйте GITHUB-UPDATE или проверенный publisher.
 
-Use `Analysis` for a single exact vacancy.
+## 2. Личный профиль и CV
 
-Calls status is separate from Fit:
+Откройте центр управления → **Первый запуск**. При новой установке выберите `PRIVATE_IMPORT.vja-profile.json` из FULL, нажмите проверку и прочитайте показанные сведения. Устаревшие или неверные факты не подтверждайте. Поставьте отметку подтверждения, задайте пароль страховочной копии и выполните импорт.
 
-- `✓ Без звонков` — no required phone/voice duties detected in the full vacancy.
-- `✕ Есть звонки` — phone/voice duties detected.
-- `?` — full evidence unavailable/uncertain.
+Существующие CV не заменяются без отдельной отметки. После импорта автоматизация приостановлена. Контакты и факты можно изменить в **Профиль и настройки**. Импорт не проверяет достоверность диплома или трудоустройства во внешних реестрах: ответственность за подтверждение остаётся у пользователя.
 
-### Whole page
+Для размещения приватных копий в LocalAppData предусмотрен `scripts/Initialize-PrivateVault.ps1`. Он копирует файлы с проверкой хеша, сохраняет обе версии при конфликте и не удаляет оригинал. Он не переносит браузерную память автоматически.
 
-Use `⚡ Analyze page`. The extension processes unique rendered vacancy IDs with bounded concurrency, restores cached results and computes Fit.
+## 3. Предпочтения и режим
 
-Fit tooltip explains rules/personal/ML contributions. A promoted ML model never changes the Calls hard gate.
+Проверьте удалённость, звонки, график, языки, зарплатные ожидания и контакты. Незаполненное поле означает «неизвестно», а не разрешение угадать значение.
 
-## Queue and feedback
+Для приёмки выберите **Assist**. Autopilot требует отдельного согласия, выбранных категорий и ограничен уровнем Fit и рисками. Приостановка запрещает автоматическую отправку. Старый Windows-бэкенд не следует считать полностью управляемым новой политикой расширения; в поставляемом appsettings автоматическая отправка отключена.
 
-- **Apply** — starts the exact existing vacancy-specific apply flow.
-- **Save** — positive preference signal.
-- **Skip** — negative preference signal.
-- **✓ / ✕ next to Fit** — explicit feedback on ranking quality.
+## 4. Анализ вакансий
 
-## Questionnaire workflow
+Откройте HH, выполните Analysis одной вакансии и прочитайте причины Fit и риски. Затем используйте Batch на небольшом списке. Calls, No Calls и Unknown относятся к тексту вакансии, а не к обещанию работодателя.
 
-Confirmed facts are used first. Safe subjective fields can receive reviewable drafts. High-risk factual/legal fields remain review-gated.
+Save оставляет вакансию в памяти; Skip фиксирует решение пользователя. В **Поиск и история** доступны локальные результаты, а не новый поиск по всем сайтам. Кнопка «Открыть и проверить отклик» не отправляет резюме.
 
-If you edit an autofilled/drafted answer, the extension records the correction as a learning example. Confirmed generic answers can later be retrieved for semantically similar questions; vacancy-specific motivation answers remain isolated.
+## 5. Письмо и анкета
 
-## Pre-submit review
+Проверьте название должности, компанию, язык и выбранный CV. Для анкеты нажмите **✦ Fill**. После заполнения посмотрите каждое поле, особенно зарплату, опыт, график и выбор вариантов. Программа проверяет, что вставленное значение осталось в DOM; некоторые сайты могут изменить его позже.
 
-The final review can summarize proposed field changes, overwrite/review/blocked counts, CV and cover-letter state. Review unresolved fields before final submission.
+`✎ Draft — review` означает неподтверждённый черновик. `? Need data` означает отсутствие факта. Юридическое согласие и разрешение на работу требуют вашего решения. Не нажимайте Submit, пока не проверили обязательные поля, письмо и вложенный CV.
 
-## Learning & Model Center
+При переходе к следующему шагу повторите Fill при необходимости. После возврата в список проверьте сохранённый статус вакансии. На внешнем сайте память доступна только в разрешённом и связанном контексте; недоступная память не блокирует вставку известного контакта.
 
-Open **Learning** from the extension home page.
+## 6. Переписка и интервью
 
-You can:
+Откройте нужный диалог, получите черновик и проверьте, на какое последнее сообщение он отвечает. Вставка и отправка — разные действия. Follow-up из центра управления — предложение текста, а не автоматическое сообщение.
 
-- inspect event / preference-label / engagement-label counts;
-- export a full backup;
-- export preference or engagement JSONL datasets;
-- import a learning backup;
-- reset learning data;
-- import a candidate model JSON;
-- explicitly promote a valid real-label model;
-- disable active preference ML;
-- inspect model monitoring/drift/retraining information.
+Подготовка к интервью открывается из контекста вакансии. Ответы следует адаптировать под собственный подтверждённый опыт. Наличие оффера в истории не создаёт выдуманные промежуточные интервью.
 
-Importing a model does not activate it. Promotion is a separate action.
+## 7. Резервные копии и завершение работы
 
-## Training a model
+Периодически скачивайте `.vja` за пределы папки расширения. Локальный checkpoint исчезнет вместе с удалением расширения. Пароль не сохраняется для восстановления; забытый пароль восстановить нельзя.
 
-Training happens offline, not inside Chrome. See [MODEL_OPERATIONS.md](MODEL_OPERATIONS.md).
-
-Never treat synthetic test metrics as personal model quality.
-
-## Interview practice
-
-Interview Prep uses the exact vacancy plus confirmed profile evidence. Mock practice scores response structure/evidence grounding only. It does not invent experience or make claims about personal competence.
+До живой приёмки RC3 не используйте массовую автоматическую отправку. Чек-лист: [LIVE_ACCEPTANCE_6.0.0.md](LIVE_ACCEPTANCE_6.0.0.md).

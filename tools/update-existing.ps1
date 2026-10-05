@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 # Update in the SAME directory so an unpacked extension retains its path identity.
 [CmdletBinding()]
 param([string]$Destination)
@@ -29,7 +29,10 @@ try {
     $configPath = Join-Path $target 'backend\appsettings.json'
     $config = if (Test-Path -LiteralPath $configPath) { Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json } else { Get-Content -LiteralPath (Join-Path $source 'backend\appsettings.json') -Raw -Encoding UTF8 | ConvertFrom-Json }
     if ($null -eq $config.Security) { $config | Add-Member -NotePropertyName Security -NotePropertyValue ([pscustomobject]@{}) }
-    $config.Security | Add-Member -NotePropertyName EnableAutomaticSubmission -NotePropertyValue $true -Force
+    # Updating software is not consent to submit applications. Preserve an explicit prior choice.
+    if (-not $config.Security.PSObject.Properties['EnableAutomaticSubmission']) {
+      $config.Security | Add-Member -NotePropertyName EnableAutomaticSubmission -NotePropertyValue $false
+    }
     $backup = $target + '.backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
     if (Test-Path -LiteralPath $backup) { throw 'Backup folder already exists; wait one second and retry.' }
     Write-Host "Creating backup: $backup"

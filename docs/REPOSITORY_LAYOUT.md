@@ -1,57 +1,25 @@
-# Repository Layout
+# Структура репозитория и поставки
 
-GitHub repository является **source repository**. FULL ZIP — это release bundle и не должен целиком копироваться в Git.
-
-## Разрешённая верхнеуровневая структура
+## Публикуемые исходники
 
 ```text
-.github/             GitHub Actions
-browser-extension/   исходники Chrome extension
-src/                 .NET backend source
-docs/                документация и assets
-tests/               browser/source publication tests
-tools/               release/developer utilities
-scripts/             source-side Windows helpers
+.github/workflows/   CI и проверки
+browser-extension/  Manifest V3, интерфейс и браузерные модули
+docs/               Актуальная документация и демонстрационный скриншот
+scripts/            Проверка поставки, публикация, перенос приватных копий
+tests/              Node / Python / Chromium, фиктивные данные
+tools/              ML CLI и проверка гигиены
+src/                Прежние исходники backend, если уже есть в репозитории
 ```
 
-Корневые `.md`, `.cmd`, Docker/Vercel files являются частью source project.
+В этом обновлении C#-исходников нет; существующий `src/` publisher не удаляет и не заменяет выдуманным проектом.
 
-## Запрещённые release/runtime папки
+## FULL
 
-В source repository не должны появляться:
+`extension/`, `backend/`, `private-data/`, `docs/`, `tests/`, `tools/`, `scripts/`, launchers, publisher и SHA-manifest. Эта структура — персональная поставка, **не структура публичного репозитория**.
 
-```text
-Violetta-Apply-Assistant-*/
-backend/
-extension/
-github-source/
-test-results/
-artifacts/
-dist/
-node_modules/
-```
+## Запрещено публиковать
 
-`extension/` допустима внутри FULL bundle, но source equivalent в GitHub называется `browser-extension/`.
+ZIP, EXE/DLL/PDB, базы, логи, JSONL с пользовательскими событиями, `.vja`, CV, private profile, tokens/cookies, `.env`, node_modules, bin/obj, test-results и вложенные папки релизов. Шрифтовые файлы не включаются в поставку.
 
-## Запрещённые tracked artifacts
-
-- `*.dll`
-- `*.exe`
-- `*.pdb`
-- `*.zip`
-- `*.db`, `*.db-wal`, `*.db-shm`
-- `*.log`
-- `.env`
-- `candidate.private.json`
-- `appsettings.local.json`
-- `user-settings.cmd`
-
-## Автоматическая проверка
-
-```powershell
-python tools/check-repo-hygiene.py
-```
-
-Команда завершается с ненулевым кодом, если в Git tracked files обнаружен запрещённый путь.
-
-CI запускает эту проверку на push и pull request.
+`source-sync-manifest.json` описывает строго разрешённое копирование и хеши исходников. GITHUB-UPDATE переносит только эти файлы. Старые ненужные файлы в уже существующем Git-репозитории не удаляются вслепую.

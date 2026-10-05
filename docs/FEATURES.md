@@ -1,62 +1,27 @@
-# Feature Reference · 5.2
+# Возможности
 
-## Search and ranking
+## Поиск и отбор
 
-| Feature | Status | Notes |
-|---|---|---|
-| Exact HH vacancy identity | Ready | Uses exact `vacancyId` |
-| Full vacancy reader | Ready | DOM + hidden-tab retry + HH API fallback |
-| Single Analysis | Ready | Calls / no-calls / unknown |
-| Batch Analysis | Ready | Bounded concurrency |
-| Explainable rules Fit | Ready | Always available |
-| Personal signal adjustment | Ready | Bounded from real feedback |
-| Promoted preference ML | Ready when model promoted | Bounded contribution only |
-| Engagement ML | Ready when model promoted | Separate signal; not Fit |
-| Filters / Ready Queue | Ready | User-controlled |
-| Duplicate/repost advisory | Ready | Cross-ID similarity |
+Analysis и Batch работают с идентификатором вакансии. Сохраняются Fit, причины, риски и независимая классификация звонков. При невозможности получить полное описание система не должна подменять его выдуманным анализом. Повторное чтение использует прежний кэш и механизм фоновой вкладки / HH API.
 
-## Applications and forms
+В центре управления доступны поиск по локальной истории, очередь с ограничением 10/20/30 вакансий, Save, Skip, переход к вакансии и объяснение Fit. Действие открытия не означает отправку.
 
-| Feature | Status |
-|---|---|
-| Vacancy-specific cover letter | Ready |
-| Persistent application context | Ready |
-| Questionnaire classification/autofill | Ready |
-| Human fallback drafts | Ready / reviewable |
-| Exact confirmed-answer memory | Ready |
-| Semantic confirmed-answer retrieval | Ready; deterministic local vector index |
-| User correction learning | Ready |
-| Pre-submit diff | Ready |
-| Final submit safety gate | Ready |
+## Отклики и анкеты
 
-## Learning / ML
+Сохраняются профиль на момент подготовки, выбранный CV, письмо, ответы и журнал. Fill поддерживает текст, textarea, native select, сгруппированные radio, checkbox и ограниченный набор ARIA-контролов с точным совпадением. Произвольный кастомный компонент не гарантирован: неподдерживаемое поле остаётся на проверке.
 
-| Feature | Status |
-|---|---|
-| LearningEvent store | Ready |
-| Explicit/implicit preference labels | Ready |
-| Preference dataset export | Ready |
-| Engagement dataset export | Ready |
-| Offline preference model | Ready |
-| Offline engagement model | Ready |
-| Calibration / threshold tuning | Ready |
-| Model Registry v2 | Ready |
-| Import / explicit promotion / disable | Ready |
-| Runtime inference | Ready after promotion |
-| Prediction monitoring / drift | Ready after enough post-prediction labels |
-| Retraining proposal | Ready; advisory only |
-| Silent online retraining | Not implemented by design |
+Подтверждённые ответы отделены от автоматических черновиков. Память включает исходную формулировку, категорию, компанию, область применения, историю изменений и время использования. По умолчанию ответ вакансии не переносится другой компании.
 
-## Recruiter / interview
+Неизвестный опыт, стаж, язык, образование или правовой статус не заполняются придуманными значениями. Нейтральные ответы на субъективные вопросы помечаются для проверки. Зарплатный черновик не превращается в автоматически выбранную сумму.
 
-| Feature | Status |
-|---|---|
-| Recruiter chat context | Ready |
-| Intent classification | Ready |
-| Suggested replies | Ready; Send remains user-controlled |
-| Interview prep | Ready |
-| Mock-answer structure feedback | Ready |
+## Коммуникации и результаты
 
-## Providers
+Сохранены контекстные подсказки рекрутеру, варианты длины ответа, история правок и интервью-тренажёр. Follow-up строится по сохранённым срокам; сообщения не отправляются автоматически из центра управления.
 
-HH is the primary validated provider. The adapter contract exists for additional providers, but no site is labelled fully supported until its current live flow is validated.
+Аналитика сравнивает направления, CV и длину/группу письма по сохранённым откликам. Видны `n` и 95%-интервал доли реакций. При `n < 20` сильные рекомендации не формируются; даже большая выборка не доказывает причинный эффект CV или письма.
+
+## Сохранность и эксплуатация
+
+Защищённые `.vja`, предварительный просмотр восстановления, checkpoint до изменений, остановка автоматизации после restore/import, локальные диагностические коды и SHA-256 поставки. Реестр, Shadow Mode и ручной откат моделей сохранены.
+
+Полный статус и ограничения каждого пункта исходного задания находятся в [матрице реализации](../IMPLEMENTATION_STATUS.md). Наличие страницы или API не означает живую валидацию всех сценариев.

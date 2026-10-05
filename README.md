@@ -1,40 +1,81 @@
-# Violetta Apply Assistant 6.0.0 RC2
+<div align="center">
 
-Personal job-search operating system for vacancy analysis, application preparation, questionnaire filling, recruiter context, outcomes and evidence-driven personal learning.
+# Violetta Apply Assistant
 
-## Core workflow
+**Вакансии → объяснимый Fit → персональный отклик → история результата**
 
-1. Analyze visible vacancies in bulk.
-2. Keep **Fit** separate from **Calls** status.
-3. Queue/save/skip/apply using exact vacancy identity.
-4. Generate vacancy-specific cover letters.
-5. When HH redirects to a dedicated questionnaire, use **✦ Fill** beside the native response action.
-6. Review drafts/legal fields and submit only with the site's native final action.
-7. Record applications/outcomes and use real decisions as learning labels.
-8. Train/import candidate preference models only when enough real labels exist; compare in Shadow Mode before promotion.
+`6.0.0 RC3` · `Manifest V3` · `Local-first` · `HH + Habr BETA`
 
-## RC2 highlights
+[Начало работы](docs/USER_GUIDE.md) · [Возможности](docs/FEATURES.md) · [Приватность](docs/PRIVACY_AND_DATA.md) · [Проверки](docs/TEST_REPORT_6.0.0.md)
 
-- Standalone HH questionnaire detection without requiring a `<form>` tag.
-- Inline **✦ Fill** for the real redirect flow shown during user testing.
-- Safe realistic fallback drafts for role-specific questions while avoiding fabricated work/legal facts.
-- Local real-label logistic-regression trainer in Learning Center.
-- Additive 5.2 → 6.0 product migration.
-- Habr Career beta adapter surface.
-- Release hash verifier and optional signed Git tag.
+</div>
 
-## Product Center
+> **Статус выпуска: Release Candidate.** Это продолжение RC2, а не новый проект. Живая критическая цепочка HH и установленное расширение в пользовательском Chrome ещё не проверены. Сборка не объявлена Final Production.
 
-The 6.0 Product Center provides applications, queue/report views, dataset readiness, model/shadow controls, backup/restore and diagnostics.
+![Центр управления Violetta: навигация, статистика и безопасные режимы. Демонстрационные данные, не реальные результаты поиска.](docs/assets/control-center.png)
 
-## Important boundaries
+## Поиск работы с сохранением контекста
 
-- Final employer submission stays user-controlled on review-gated forms.
-- Automated fixtures do not prove a current authenticated provider flow; run the live acceptance checklist.
-- Personal ML quality depends on real labels. The project does not ship a fake pre-trained personal model.
-- Habr Career remains beta until its authenticated flow is live-validated.
-- Private Vault final hardening is deferred to the final pass as requested.
+Violetta читает вакансии, объясняет соответствие предпочтениям и помогает подготовить отклик под конкретную должность. Анализ звонков отделён от Fit. Подтверждённые сведения кандидата отделены от черновиков, пользовательских предпочтений и предсказаний моделей.
 
-## Repository publication
+| Рабочий этап | Что доступно |
+| :--- | :--- |
+| Найти подходящее | Analysis, Batch, Calls / No Calls / Unknown, Save / Skip, очередь |
+| Подготовить отклик | Привязка к вакансии, выбор CV, персональное письмо, Fill анкет |
+| Проверить ответы | Неизвестные факты остаются пустыми; субъективные черновики помечаются |
+| Продолжить общение | Контекстные ответы рекрутеру, сроки follow-up, подготовка к интервью |
+| Сохранить результат | История, журнал отклика, экспорт обучения, защищённые резервные копии |
 
-Use `Publish-Violetta-6.0.0-RC2.ps1`. It copies only allowlisted, SHA-256-verified source/docs/tests to `ViolettaNcl/job-search-assistant`, refuses dirty/diverged/incorrect repositories and never force-pushes. Use `-SignTag` only when Git signing is already configured on your machine.
+**Fit — не вероятность найма.** Локальные правила и семантический поиск не называются обученной ML-моделью. Реальные персональные модели в этот выпуск не вложены.
+
+## Начало работы
+
+### Обновление существующей установки
+
+Сначала скачайте резервную копию `.vja` из центра управления. Обновляйте **ту же папку**, из которой Chrome загрузил расширение, и нажмите **«Обновить»** на его карточке в `chrome://extensions`. Не удаляйте старую карточку и не устанавливайте вторую копию: это может создать другую область хранения.
+
+В FULL расширение находится в `extension/`; в исходном репозитории — в `browser-extension/`. После обновления проверьте режим **Assist**, профиль, CV и одну анкету до включения массовых действий.
+
+### Новая установка
+
+Распакуйте standalone-архив, откройте `chrome://extensions`, включите режим разработчика и выберите **«Загрузить распакованное расширение»** → папку `extension`. Затем откройте центр управления из меню расширения.
+
+В публичном расширении нет встроенного личного CV или заполненной биографии. В FULL доступен приватный файл `private-data/PRIVATE_IMPORT.vja-profile.json`: импортируйте его через **«Первый запуск»**, проверьте факты и подтвердите импорт. Для сохранения страховочной копии потребуется пароль не короче 12 символов.
+
+## Управление автоматическими действиями
+
+| Режим | Поведение |
+| :--- | :--- |
+| **Manual** | Явные команды пользователя; штатная отправка на сайте остаётся ручной |
+| **Assist** | Подготовка и заполнение; финальную отправку подтверждает пользователь |
+| **Autopilot** | Явное согласие, разрешённые категории, Fit не ниже 90 и дневной лимит |
+
+Юридические вопросы, неизвестные обязательные факты, CAPTCHA, запрос оплаты, идентификации или неожиданной загрузки файла останавливают автоматическую отправку. Эти защиты не являются сертификацией всех вариантов интерфейса сайтов. До живой проверки используйте Assist.
+
+<details>
+<summary><strong>Какой архив выбрать</strong></summary>
+
+**FULL** — персональная локальная поставка: расширение, исходные JS/Python-модули, документация, исходный Windows runtime и приватные файлы. **Не публикуйте FULL.**
+
+**STANDALONE-EXTENSION** — расширение без Windows-бэкенда и личных данных. Подходит для установки в браузер; профиль импортируется отдельно.
+
+**GITHUB-UPDATE** — проверяемая карта обновления исходников без EXE/DLL, CV, приватных профилей и пользовательской истории. Публикация выполняется отдельным скриптом, без force-push. Скрипт не удаляет личные данные из старых коммитов репозитория.
+
+</details>
+
+<details>
+<summary><strong>Ограничения этого кандидата на выпуск</strong></summary>
+
+Habr Career остаётся BETA. Chromium-проверки используют DOM-фикстуры и подменённые Chrome API, а не авторизованный аккаунт HH. Полный перенос рабочей памяти в файловый vault, обученный Gradient Boosting, реальные embeddings и полная автоматическая приёмка не заявлены.
+
+Из RC2 сохранён готовый Windows-бэкенд. Его C#-исходников в предоставленном архиве нет, поэтому .NET не пересобирался и не тестировался. Новая глобальная политика реализована в расширении; полный аудит всех старых backend-путей не выполнен.
+
+</details>
+
+## Документация
+
+[Архитектура](ARCHITECTURE.md) · [Статус 52 требований](IMPLEMENTATION_STATUS.md) · [Анкеты и работа с профилем](docs/USER_GUIDE.md) · [Backup / Restore](docs/BACKUP_AND_RESTORE.md) · [Миграция](docs/MIGRATION_5.2_TO_6.0.md)
+
+[Learning](docs/LEARNING_SYSTEM.md) · [ML-архитектура](docs/ML_ARCHITECTURE.md) · [Оценка моделей](docs/MODEL_EVALUATION.md) · [Эксплуатация моделей](docs/MODEL_OPERATIONS.md) · [Поддерживаемые сайты](SUPPORTED_SITES.md)
+
+[Диагностика](docs/DIAGNOSTICS.md) · [Устранение проблем](docs/TROUBLESHOOTING.md) · [Структура репозитория](docs/REPOSITORY_LAYOUT.md) · [Проверки релиза](TESTING_GUIDE.md) · [Release notes](docs/RELEASE_NOTES_6.0.0.md)

@@ -1,20 +1,25 @@
-# Testing Guide · 6.0.0 RC2
+# Проверки
 
-## Automated suites
+Актуальные числа и ограничения: [отчёт 6.0.0](docs/TEST_REPORT_6.0.0.md).
 
-- `node --test extension/*.test.js`
-- `python -m unittest discover -s tests -p 'test_*.py'`
-- `python tests/browser_e2e.py`
-- focused Chromium fixtures: HH reader, memory, questionnaire, batch, learning, Product Center, RC2 standalone questionnaire and Habr beta.
-- JavaScript syntax (`node --check`), Python compile and workflow-YAML parse checks.
+В FULL используйте `extension`; в исходниках — `browser-extension`.
 
-## Live acceptance
+```bash
+node --test extension/*.test.js
+node tests/product_worker_600.cjs
+node tests/worker_authorization_rc3.cjs
+python -m unittest discover -s tests -p 'test_*.py' -v
+python tests/browser_os_rc3.py
+python tests/browser_e2e.py
+python tools/check-repo-hygiene.py
+```
 
-Automated fixtures mock Chrome/HTTP/authentication boundaries. Before calling RC2 final, follow `docs/LIVE_ACCEPTANCE_6.0_RC2.md` in the user's authenticated HH browser, especially the dedicated questionnaire redirect shown during real testing.
+Для Chromium-фикстур нужны Python Playwright и установленный Chromium. Остальные браузерные сценарии находятся в `tests/browser_*.py`, fallback — в `tests/hh_read_fallback_3910.py`. В исходном репозитории workflow предоставляет нужные зависимости; наличие workflow не означает его успешный remote run.
 
-## Safety expectations
+## Границы тестов
 
-- Fill may write confirmed answers or clearly reviewable drafts.
-- Fill must not click the employer's final submit action.
-- Legal/work-authorization/consent facts remain review-gated.
-- Real-label ML training must refuse insufficient/one-class data and must not auto-promote the trained candidate.
+Node-тесты выполняют assertions над реальным JS, в том числе WebCrypto. Worker-bridge выполняет сервисный код с подменёнными Chrome API / HTTP. Chromium использует настоящий DOM, но без авторизации на реальных сайтах и без установленного extension origin. Legacy `browser_e2e.py` отдельно подменяет разрешение финальной отправки для проверки прежних селекторов; настоящая политика проверяется `worker_authorization_rc3.cjs`.
+
+Нельзя складывать Node, Python и DOM-проверки в одно число независимых end-to-end сценариев. Статический syntax/YAML check тоже не заменяет функциональный тест.
+
+Native IndexedDB, живой HH/Habr, Windows publisher и .NET имеют самостоятельные статусы. Отсутствие инструмента не равно PASS. Ручной чек-лист: [LIVE_ACCEPTANCE_6.0.0.md](docs/LIVE_ACCEPTANCE_6.0.0.md).

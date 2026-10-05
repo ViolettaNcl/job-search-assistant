@@ -33,7 +33,7 @@ class MlOps(unittest.TestCase):
                     y=0 if i<95 else 1
                     row={'eventId':str(i),'timestamp':1_700_000_000_000+i*1000,'vacancyId':str(i),'title':'Role','company':'X','role':'support','remote':True,'calls':'no-calls','sales':False,'senior':False,'junior':False,'requiredYears':1,'technologies':['sql'],'labelUserApply':y}
                     f.write(json.dumps(row)+'\n')
-            p=subprocess.run([sys.executable,str(ML/'train_pipeline.py'),str(ds),'--target','preference','--out-dir',str(out),'--min-labels','100'],cwd=ML,capture_output=True,text=True)
+            p=subprocess.run([sys.executable,str(ML/'train_pipeline.py'),str(ds),'--target','preference','--out-dir',str(out),'--min-labels','100','--confirm-real-labels'],cwd=ML,capture_output=True,text=True)
             self.assertNotEqual(p.returncode,0)
             self.assertIn('at least 10 examples in each class',p.stdout+p.stderr)
 

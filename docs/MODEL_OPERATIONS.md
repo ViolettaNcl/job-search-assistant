@@ -1,56 +1,27 @@
-# Model Operations · 5.2
+# Эксплуатация моделей
 
-This guide describes the safe operational loop for real personal models.
+## Обучение
 
-## 1. Collect real labels
-
-Use the extension normally. Preference labels come from Apply/Save/Skip/Fit feedback. Engagement labels come later from real outcome changes.
-
-Do not manufacture labels simply to reach a sample count.
-
-## 2. Export dataset
-
-Learning & Model Center can export:
-
-- preference JSONL;
-- engagement JSONL;
-- full learning backup JSON.
-
-Keep exports local if they contain personal context.
-
-## 3. Train the preference baseline
-
-Example:
+Сначала экспортируйте и проверьте данные в Learning Center. Пример для самостоятельно проверенного реального датасета:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools/ml/train-model.ps1 `
-  -Dataset .\violetta-preference-dataset.jsonl `
-  -Target preference `
-  -OutputDir .\artifacts\preference-v1
+python tools/ml/train_pipeline.py "C:\Private\preference.jsonl" `
+  --target preference --out-dir "C:\Private\models\candidate" `
+  --confirm-real-labels
 ```
 
-For engagement use `-Target engagement` with the engagement dataset.
+Для engagement используется `--target engagement` и отдельный размеченный датасет. Не сохраняйте результаты обучения, JSONL, CV и registry с пользовательской историей в публичный репозиторий.
 
-## 4. Pipeline stages
+Параметр `--confirm-real-labels` подтверждает происхождение меток, но не их достаточность или качество. Pipeline проверяет размер, классы и раздельные временные выборки. Без реального обучения готовая модель в поставке отсутствует.
 
-`train_pipeline.py` validates the dataset, creates train/calibration/test subsets, trains, tunes temperature/threshold, evaluates on held-out data and registers a candidate artifact.
+## Импорт и Shadow
 
-## 5. Test-only mode
+Импортируйте модель в Learning Center. Проверьте target, feature schema, SHA-256, размер выборки и метрики. В Models назначьте кандидата для Shadow. Теневая модель не меняет текущий Fit и не отправляет отклики.
 
-Use Python `--test-only` only to verify mechanics. Such artifacts are marked non-real and cannot pass promotion.
+Сравнивайте предсказания с решениями, сделанными после предсказания. Пересечение обучающих вакансий с тестом делает выводы недостоверными. Не используйте engagement в качестве preference.
 
-## 6. Import candidate into extension
+## Продвижение и откат
 
-Open Learning & Model Center → Model Registry → import the candidate model JSON. Import does not activate it.
+Promote — отдельная явная операция. Наличие кандидата не означает его готовности к production. Legacy-реестр использует статусы `candidate`, `active`, `superseded`; словарь полностью не унифицирован с Candidate/Shadow/Production/Retired из задания.
 
-## 7. Promote explicitly
-
-Select a candidate and press Promote. The local gate verifies real-label metadata and minimum quality evidence. Preference and engagement models are promoted independently.
-
-## 8. Monitor
-
-After promotion and later real decisions, inspect monitoring metrics and drift. A retraining proposal means “consider training a new candidate,” not “replace the model automatically.”
-
-## 9. Disable / rollback
-
-Disable preference ML from the Learning Center at any time. Rules + personal signals remain available. Keeping model activation optional makes the system usable even when a model degrades or insufficient labels exist.
+Rollback доступен к сохранённой предыдущей версии того же target. Если её нет, отключите ML: детерминированный Fit продолжит работать. После restore модели остаются отключёнными до проверки. Приватные ключи подписи в поставку не входят.

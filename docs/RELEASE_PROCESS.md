@@ -1,11 +1,34 @@
-# Safe publication of 6.0 RC2
+# Процесс выпуска
 
-1. Test Standalone while preserving the existing extension ID/history.
-2. Unzip GITHUB-UPDATE outside the Git repository.
-3. Run its `Publish-Violetta-6.0.0-RC2.ps1` with -RepoPath. Use -DryRun to inspect; -Push creates a local commit and publishes after checks.
-4. The script requires the exact repository origin and clean main. It fast-forwards only, checks file hashes, keeps an external backup and refuses conflicting source edits. It never resets/stashes history, force-pushes, or copies whole FULL folders.
-5. Version in manifest becomes 6.0.0; version_name marks RC2. Backend csproj release metadata may be updated, but the included runtime binary is retained from 5.2 distribution, not freshly rebuilt here.
+## Критерий Production
 
-Do not use robocopy /E to publish FULL. No git init in a release package. Do not add .vja, datasets, logs, ZIP or DLL files. Previous personal files in Git history are not removed by this delta.
+Automated tests PASS **и** критический пользовательский smoke-test HH. Поскольку живая приёмка не выполнена, эта поставка — **6.0.0 RC3**, хотя имена архивов используют запрошенное `6.0.0`. `manifest.version_name` и документация содержат RC3.
 
-GitHub push is not executed by the release builder. Windows PowerShell should be tested first with -DryRun.
+Не отмечайте Habr как VALIDATED по DOM-фикстурам. Не объявляйте .NET PASS при отсутствии исходников или до assertions.
+
+## Проверка файлов
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\VERIFY_RELEASE.ps1 `
+  -PackagePath ".\Violetta-Apply-Assistant-6.0.0-FULL.zip"
+```
+
+Verifier проверяет пути ZIP, дубликаты, каждую строку manifest, SHA-256 файлов и наличие лишних файлов. Проверять нужно неизменённую распакованную поставку: запуск backend может создать дополнительные файлы.
+
+SHA-256 подтверждает целостность, но не личность автора. Подписанные Git tags возможны только с отдельно настроенным ключом; приватного ключа в пакетах нет. Windows PowerShell-скрипты этой средой не выполнялись — их статус указан отдельно в отчёте.
+
+## Обновление GitHub
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Publish-Violetta-6.0.0.ps1 `
+  -RepoPath "C:\Users\1\Downloads\job-search-assistant" `
+  -PackagePath ".\Violetta-Apply-Assistant-6.0.0-GITHUB-UPDATE.zip" -DryRun
+```
+
+После просмотра плана повторите без `-DryRun`. `-Push` — отдельное разрешение на отправку. Publisher проверяет origin `ViolettaNcl/job-search-assistant`, ветку main, чистую рабочую папку, baseline и хеши. Не использует force-push, reset или clean. Несовпадение локальных правок останавливает копирование.
+
+Данный выпуск не выполняет push за пользователя. Проверки Git выполняются только в временном локальном репозитории с локальным bare remote.
+
+## Артефакты
+
+FULL, STANDALONE-EXTENSION, GITHUB-UPDATE, publisher, verifier, внешний SHA-256 список, test report и release notes. Персональный FULL не является файлом для GitHub Releases.

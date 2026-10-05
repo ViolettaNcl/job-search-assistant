@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 FORBIDDEN_ROOTS = {
     "backend",
+    "private-data",
     "extension",
     "github-source",
     "test-results",
@@ -25,7 +26,7 @@ FORBIDDEN_ROOTS = {
     "node_modules",
 }
 FORBIDDEN_SEGMENTS = {"bin", "obj", "node_modules", "test-results", "artifacts", "dist"}
-FORBIDDEN_SUFFIXES = {".dll", ".exe", ".pdb", ".zip", ".db", ".db-wal", ".db-shm", ".log", ".vja", ".jsonl", ".pyc"}
+FORBIDDEN_SUFFIXES = {".dll", ".exe", ".pdb", ".zip", ".db", ".db-wal", ".db-shm", ".log", ".vja", ".jsonl", ".pyc", ".ttf", ".otf", ".woff", ".woff2"}
 FORBIDDEN_NAMES = {"candidate.private.json", "appsettings.local.json", "user-settings.cmd"}
 RELEASE_DIR = re.compile(r"^Violetta-Apply-Assistant-", re.I)
 
@@ -51,7 +52,9 @@ def tracked_paths() -> list[str]:
         data = json.loads(manifest.read_text(encoding="utf-8"))
         return [str(row["target"]) for row in data.get("files", [])]
 
-    raise RuntimeError("Run this checker from a Git clone or a FULL bundle containing source-sync-manifest.json")
+    if (ROOT / "browser-extension" / "manifest.json").exists():
+        return [p.relative_to(ROOT).as_posix() for p in ROOT.rglob("*") if p.is_file() and "__pycache__" not in p.parts]
+    raise RuntimeError("Run from source clone or hash-checked release bundle")
 
 
 def reason(path: str) -> str | None:
@@ -72,6 +75,8 @@ def reason(path: str) -> str | None:
     if name == ".env" or (name.startswith(".env.") and name != ".env.example"):
         return "environment secret/config"
     lower = str(p).lower()
+    if lower.startswith("browser-extension/assets/cv/"):
+        return "private CV must not be published"
     if any(lower.endswith(suffix) for suffix in FORBIDDEN_SUFFIXES):
         return "runtime/build artifact"
     return None

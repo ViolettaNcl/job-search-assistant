@@ -1,37 +1,19 @@
-# Model Evaluation · 5.2
+# Оценка моделей
 
-## Split discipline
+## Классификация
 
-Training, calibration and final test roles are separated. Threshold/temperature tuning uses the calibration subset; final reported test metrics come from held-out rows not used for fitting/tuning.
+`evaluate_model.py` считает Precision, Recall, F1, Accuracy, ROC-AUC, Brier score и Log loss. Порог и label field включаются в отчёт. ROC-AUC не определён при отсутствии одного из классов; это не нулевая точность.
 
-The pipeline prefers a stratified temporal split so later examples are not casually leaked into training.
+## Ranking в RC3
 
-## Metrics
+Добавлены Precision@K, Recall@K, NDCG@K для K=5/10/20, общий NDCG и reciprocal rank первой положительной вакансии (`mrr`). Здесь одна общая held-out выборка; `mrr` не является усреднением по независимым пользовательским поисковым запросам.
 
-Preference and engagement models track, when defined:
+`prAuc` реализован как **stepwise average precision** с объединением одинаковых scores, не трапецеидальная площадь. Если положительных объектов нет, AP/NDCG/reciprocal rank возвращаются как неопределённые значения. Для короткой выборки указывается `effectiveK`; precision считается по фактически доступным элементам. На границе K одинаковые scores сохраняют порядок входных строк.
 
-- sample size and class balance;
-- accuracy;
-- precision;
-- recall;
-- F1;
-- Brier score;
-- log loss;
-- ROC-AUC when both classes exist.
+## Методология
 
-Runtime monitoring additionally tracks expected calibration error (ECE) and recent-vs-early rate drift.
+Основной pipeline разделяет данные хронологически на train, calibration и test без пересечения временных групп. Калибровка порога и финальная оценка не должны использовать одну выборку. Оба класса нужны в каждой части.
 
-## Promotion gate
+Статистические unit-тесты подтверждают формулы, а не качество персональной модели. Сравнение с правилами, более сложным алгоритмом и реальным Shadow-результатом пока не является завершённым экспериментом этого выпуска.
 
-A candidate must:
-
-- be marked trained on real labels;
-- have sufficient held-out sample size;
-- meet the configured F1 floor;
-- not regress against the active same-target model under the configured metric gate.
-
-Promotion is explicit.
-
-## Interpretation
-
-Metrics on tiny samples are unstable. The product should display sample size and avoid claiming model quality before enough real labels exist.
+CV/письма сравниваются по наблюдательным данным. Размер выборки и интервал доли реакций видны в UI, но не устраняют различия компаний, должностей, времени и качества вакансий.

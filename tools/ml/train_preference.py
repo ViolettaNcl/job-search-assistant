@@ -5,6 +5,7 @@ This tool refuses small datasets by default. Synthetic data may be used only by 
 from __future__ import annotations
 import argparse, json, math, random, time
 from pathlib import Path
+from provenance import require_real_labels
 from common import DIM, features, load_jsonl, predict
 
 def validate(rows, min_labels=20):
@@ -46,8 +47,8 @@ def metrics(rows,w,threshold=.5):
     return {'n':len(rows),'precision':precision,'recall':recall,'f1':f1,'accuracy':(tp+tn)/max(1,len(rows)),'logLoss':loss/max(1,len(rows)),'tp':tp,'fp':fp,'tn':tn,'fn':fn}
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('dataset');ap.add_argument('--out',required=True);ap.add_argument('--min-labels',type=int,default=100);ap.add_argument('--allow-small',action='store_true');args=ap.parse_args()
-    rows=validate(load_jsonl(args.dataset),2 if args.allow_small else args.min_labels);train_rows,val_rows=split(rows);w=train(train_rows);m=metrics(val_rows,w)
-    model={'schemaVersion':1,'modelType':'personal-vacancy-logreg','modelVersion':f'preference-{int(time.time())}','featureEncoder':'hashed-v1','dimension':DIM,'weights':w,'threshold':.5,'trainedAt':int(time.time()*1000),'trainingLabels':len(rows),'trainedOnRealLabels':not args.allow_small,'validation':m,'status':'candidate'}
+    ap=argparse.ArgumentParser();ap.add_argument('dataset');ap.add_argument('--out',required=True);ap.add_argument('--min-labels',type=int,default=100);ap.add_argument('--allow-small',action='store_true');ap.add_argument('--confirm-real-labels',action='store_true');args=ap.parse_args()
+    rows=validate(load_jsonl(args.dataset),2 if args.allow_small else args.min_labels);real_labels=require_real_labels(rows,args.confirm_real_labels,args.allow_small);train_rows,val_rows=split(rows);w=train(train_rows);m=metrics(val_rows,w)
+    model={'schemaVersion':1,'modelType':'personal-vacancy-logreg','modelVersion':f'preference-{int(time.time())}','featureEncoder':'hashed-v1','dimension':DIM,'weights':w,'threshold':.5,'trainedAt':int(time.time()*1000),'trainingLabels':len(rows),'trainedOnRealLabels':real_labels,'labelProvenance':'user-attested' if real_labels else 'test-only','validation':m,'status':'candidate'}
     Path(args.out).write_text(json.dumps(model,ensure_ascii=False,indent=2),encoding='utf-8');print(json.dumps({'model':args.out,'validation':m,'labels':len(rows)},ensure_ascii=False))
 if __name__=='__main__':main()

@@ -1,13 +1,32 @@
-# Privacy and data — 6.0 RC2
+# Приватность и данные
 
-Runtime data remain local unless the user enables an external AI provider. The Product Center itself makes no network requests for analytics or telemetry.
+## Что где находится
 
-Backup exports and IndexedDB checkpoints are encrypted. Active Chrome storage is not encrypted by this release. Do not describe the product as providing a fully encrypted external working vault.
+| Данные | Размещение в RC3 |
+| --- | --- |
+| Подтверждённый профиль, контакты, текущие CV | Рабочее хранилище профиля Chrome |
+| История, анкеты, переписки, learning events | Chrome storage, по прежним ключам |
+| Индекс истории и зашифрованные checkpoints | IndexedDB расширения |
+| Оригинальные личные файлы из RC2 | Только персональный FULL: `private-data/` |
+| Старая конфигурация Windows backend | Персональный FULL, не включается в GitHub-обновление |
+| SHA-256 и документация | Публичные артефакты без CV и личной истории |
 
-The personalized FULL/Standalone distribution retains candidate seed and CV assets from 5.2.0 for compatibility. Do not upload the FULL directory or .vja/.jsonl files into a repository.
+Публичный seed пуст. Новая установка не получает биографию из программного кода. Прежний установленный профиль не заменяется пустым seed.
 
-GITHUB-UPDATE is a delta: only changed source files/docs/tests; it excludes unchanged candidate-seed.js, profile-defaults.js, CV PDFs and candidate-source/requirements documents. This does not remove earlier personal data already tracked in the repository or history. Repository visibility remains the owner's responsibility.
+## Пределы защиты
 
-The updater adds ignore rules for backup/dataset/runtime artifacts and verifies intended paths. Hygiene is not a content-level secret scanner.
+AES-GCM защищает экспортированные `.vja` и checkpoints. **Вся текущая память Chrome и папка LocalAppData не становятся зашифрованными.** Защищайте учётную запись Windows, браузерный профиль, резервные копии и устройство. FULL содержит личные сведения и не предназначен для публичного размещения.
 
-No production model is bundled or silently trained. User-created artifacts and datasets can encode behavioral information and should be treated as private.
+Файловый vault создаётся только отдельным PowerShell-скриптом. Он выполняет копирование, не полную миграцию runtime. Браузер не получает произвольный доступ к `%LOCALAPPDATA%`.
+
+Проверка расширения PDF и сигнатуры `%PDF-` в импортируемом CV — проверка формата, не антивирусная проверка файла.
+
+## Внешняя обработка
+
+Чтение вакансий использует разрешённые сайты и HH API. Передача выбранного контекста внешней модели требует её настройки и согласия. Учетные данные модели не должны попадать в issue, README или backup. Известные структурированные секреты исключаются из backup; произвольный текст может содержать персональные сведения, поэтому копия шифруется.
+
+Диагностика публикует технические коды и агрегаты, не текст резюме/переписки. Перед пересылкой всё равно просмотрите файл самостоятельно.
+
+## Публикация и история Git
+
+GITHUB-UPDATE не включает CV, backend appsettings и личный профиль. Это не очищает более ранние коммиты вашего репозитория. Если личные данные уже публиковались, отдельно проверьте текущие отслеживаемые файлы и историю; при утечке ключей отзовите их у провайдера. Автоматического переписывания Git history нет.
