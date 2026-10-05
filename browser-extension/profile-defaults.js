@@ -9,7 +9,7 @@ globalThis.vjaProfileDefaults = {
     "telegram": "@Violet111",
     "phone": ""
   },
-  "location": "Volgograd, Russia",
+  "location": "Volzhsky, Russia",
   "github": "https://github.com/ViolettaNcl",
   "portfolio": "https://violetta-cv.vercel.app/",
   "linkedin": "",

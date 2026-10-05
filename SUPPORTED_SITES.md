@@ -1,34 +1,21 @@
-# Supported Sites · 5.2.0
+# Supported Sites · 6.0.0 RC2
 
-## HeadHunter family — primary validated provider
+## HeadHunter / HH
 
-Declared core hosts:
+Primary provider. Supported architecture includes search-card intelligence, exact vacancy reading, Calls analysis, Fit/queue, vacancy-specific application preparation, dedicated questionnaire Fill, memory and recruiter/application workflows.
 
-- `hh.ru`
-- `*.hh.ru`
-- `headhunter.kg`
-- `*.headhunter.kg`
-- `api.hh.ru` for exact-vacancy fallback reads
+Live DOM/API changes can still require selector maintenance, so a real-account smoke test remains part of release acceptance.
 
-### Current HH surfaces
+## HeadHunter.kg
 
-| Surface | Support |
-|---|---|
-| Search/list | Analysis, Batch Analysis, Fit + Calls, filters, Ready Queue, feedback |
-| Direct vacancy | Exact vacancy context and apply helpers |
-| Application questionnaire | Autofill, memory, correction capture, review gate, pre-submit diff |
-| Recruiter chat | Contextual draft assistant / intent intelligence |
-| Interview workflow | Vacancy-grounded prep and local mock-answer structure review |
-| Local dashboard | Optional advanced backend mode |
+Shares the HH adapter family and remains covered by legacy application regression fixtures.
 
-## Multi-site architecture
+## Habr Career — beta
 
-`site-adapter-core.js` defines a provider contract for future adapters. Some legacy generic selectors may work on other sites, but 5.2 does **not** label another provider fully supported until its current live search/apply/questionnaire/chat flows are validated and regression-covered.
+`https://career.habr.com/*` is enabled in RC2. The adapter recognizes vacancy pages, extracts vacancy identity/title/company/description and can render the assistant surface. The generic application/questionnaire infrastructure can be reused when the current authenticated flow exposes compatible fields.
 
-## External employer forms
+**Not yet claimed:** fully live-validated authenticated Habr apply, questionnaire and final submission flow. Final employer submission remains user-controlled.
 
-Support is conservative and depends on granted Chrome host access plus accessible semantic controls. CAPTCHA, MFA, inaccessible cross-origin iframes and custom canvas/shadow controls may require manual action.
+## Other providers
 
-## Permission model
-
-Chrome site access can be configured by the user. The extension cannot bypass `On click` or denied host access. Grant persistent site access only to providers/forms you want the assistant to inspect.
+The formal adapter contract exists, but no other site should be called supported until its current live flow is inspected and tested.

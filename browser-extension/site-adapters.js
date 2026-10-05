@@ -13,7 +13,7 @@
     teamtailor:{title:['h1'],description:['[data-controller="careersite--job-description"]','.body-block']},
     ashby:{title:['[class*="jobPostingHeader"] h1','h1'],description:['[class*="jobDescription"]','[data-testid="job-description"]']},
     workable:{title:['[data-ui="job-title"]'],description:['[data-ui="job-description"]']},
-    habr:{title:['.vacancy-title__text','h1'],company:['.company_name'],description:['.vacancy-description']},
+    habr:{title:['.vacancy-title__text','h1'],company:['.company_name','[class*=company] a'],description:['.vacancy-description','[class*=vacancy-description]','main'],jobLink:'a[href*="/vacancies/"]'},
     superjob:{title:['h1'],description:['[itemprop="description"]']},
     geekjob:{title:['h1'],description:['.job-description']},
     bamboohr:{title:['[class*="JobOpening"] h1','h1'],description:['[class*="jobDescription"]']},
@@ -190,7 +190,23 @@
         const hhDialog=provider==='hh'&&el.matches('[role="dialog"]')&&/отклик|резюме|сопровод|ваканси/i.test(own);
         return semantic||strong||hhDialog;
       });
-      return candidates.filter(el=>!candidates.some(other=>other!==el&&el.contains(other)))[0]||null;
+      const nested=candidates.filter(el=>!candidates.some(other=>other!==el&&el.contains(other)))[0]||null;if(nested)return nested;
+      // HH sometimes renders a dedicated questionnaire page without a semantic <form>.
+      // Detect it from the page heading/route plus multiple visible editable fields,
+      // then return the smallest stable container that owns those fields.
+      if(provider==='hh'){
+        const pageText=text(doc.body,5000),route=String(new URL(url).pathname+new URL(url).search);
+        const fields=formFields(doc.body);
+        const questionnaireHint=/отклик\s+на\s+ваканси|ответьте\s+на\s+вопрос|application\s+question|screening\s+question/i.test(pageText)||/(?:vacancy_response|application|questionnaire|screening)/i.test(route);
+        const textFields=fields.filter(x=>x.tagName==='TEXTAREA'||x.isContentEditable||(x.tagName==='INPUT'&&['text','email','tel','number','search','url'].includes(x.type||'text')));
+        const submit=all('button,input[type=submit]',doc).filter(visible).find(el=>/откликнуться|отправить|продолжить|apply|submit/i.test(text(el,180)||el.value||''));
+        if(questionnaireHint&&textFields.length>=2&&submit){
+          let scope=null,node=textFields[0]?.parentElement;
+          while(node){if(textFields.every(f=>node.contains(f))&&node.contains(submit)){scope=node;break;}if(node===doc.body)break;node=node.parentElement;}
+          return scope||doc.querySelector('main')||doc.body;
+        }
+      }
+      return null;
     }
     function detectPageType(){
       const parsed=new URL(url),path=parsed.pathname;

@@ -1,57 +1,40 @@
-# Violetta Apply Assistant
+# Violetta Apply Assistant 6.0.0 RC2
 
-**6.0.0 RC1 — Product Center & Recovery** · тестовая сборка для проверки перед публикацией.
+Personal job-search operating system for vacancy analysis, application preparation, questionnaire filling, recruiter context, outcomes and evidence-driven personal learning.
 
-Помощник для поиска работы: анализ полных вакансий HH, отдельная проверка звонков, объяснимый Fit Score, очередь, индивидуальные письма, анкеты и локальная память. Этот релиз продолжает 5.2.0, не создаёт второй backend и не меняет историю Git.
+## Core workflow
 
-## Быстрый старт
+1. Analyze visible vacancies in bulk.
+2. Keep **Fit** separate from **Calls** status.
+3. Queue/save/skip/apply using exact vacancy identity.
+4. Generate vacancy-specific cover letters.
+5. When HH redirects to a dedicated questionnaire, use **✦ Fill** beside the native response action.
+6. Review drafts/legal fields and submit only with the site's native final action.
+7. Record applications/outcomes and use real decisions as learning labels.
+8. Train/import candidate preference models only when enough real labels exist; compare in Shadow Mode before promotion.
 
-Для проверки используйте распакованную папку `extension` из FULL или папку `Violetta-Apply-Assistant-6.0.0-RC1-EXTENSION` из Standalone. В Chrome выберите папку с `manifest.json`.
+## RC2 highlights
 
-**Не удаляйте существующее расширение без копии данных.** Чтобы сохранить идентификатор и память, обновляйте файлы в той же установленной папке и нажмите «Обновить» на `chrome://extensions`. Не держите две активные установки одновременно.
+- Standalone HH questionnaire detection without requiring a `<form>` tag.
+- Inline **✦ Fill** for the real redirect flow shown during user testing.
+- Safe realistic fallback drafts for role-specific questions while avoiding fabricated work/legal facts.
+- Local real-label logistic-regression trainer in Learning Center.
+- Additive 5.2 → 6.0 product migration.
+- Habr Career beta adapter surface.
+- Release hash verifier and optional signed Git tag.
 
-Откройте popup → **Центр управления · 6.0 RC1**. Существующие Apply, Analysis и анкеты остаются на страницах HH.
+## Product Center
 
-## В центре управления
+The 6.0 Product Center provides applications, queue/report views, dataset readiness, model/shadow controls, backup/restore and diagnostics.
 
-| Раздел | Назначение |
-|---|---|
-| Обзор | Локальные счётчики и отчёт за последние 7 дней |
-| Отклики и журнал | Поиск, страницы по 25 записей, события конкретного отклика |
-| Подходящие вакансии | Сохранённые результаты с отдельными Fit и статусом звонков |
-| Качество данных | Баланс классов, дубликаты, отсутствие признаков и временных меток |
-| Модели и Shadow | Сравнение метрик, теневые предсказания без влияния на Fit, откат |
-| Резервные копии | Файлы `.vja` с паролем, encrypted checkpoints в IndexedDB, проверка перед восстановлением |
-| Диагностика | Техническая сводка без текста CV, контактов, вопросов и вакансий |
-| Первый запуск | Проверка наличия профиля, фактов, CV и предпочтений |
+## Important boundaries
 
-## Что исправлено в процессе
+- Final employer submission stays user-controlled on review-gated forms.
+- Automated fixtures do not prove a current authenticated provider flow; run the live acceptance checklist.
+- Personal ML quality depends on real labels. The project does not ship a fake pre-trained personal model.
+- Habr Career remains beta until its authenticated flow is live-validated.
+- Private Vault final hardening is deferred to the final pass as requested.
 
-Параллельная запись learning events теперь сериализуется. Повторное Apply не увеличивает персональный вес бесконечно. Идентичные ID разных провайдеров разделяются. Офисные ограничения, звонки и настройки sales применяются при формировании очереди. Состояние Closed не используется как доказанный отказ работодателя.
+## Repository publication
 
-Исправлены вычисление ROC-AUC при равных вероятностях и глобальное временное разделение train/calibration/test. Заменять содержимое уже импортированной модели под тем же номером версии нельзя. Импортированная модель получает SHA-256.
-
-Ответы анкет сохраняются через ограниченный канал фоновой службы, в том числе при `TRUSTED_CONTEXTS` для локального хранилища.
-
-## Безопасность данных
-
-`.vja` и checkpoints защищены паролем. Рабочая память Chrome не объявляется полностью зашифрованной. Backup не включает session storage, API-провайдеров, cookies, pending-send команды или неизвестные ключи. Свободный текст может содержать личные сведения.
-
-После восстановления задания ставятся на ручную проверку, модели отключаются, согласие на внешнюю AI-обработку сбрасывается. Ничего не отправляется работодателям. Checkpoint на этом же компьютере не заменяет внешний файл backup.
-
-FULL/Standalone сохраняют ваши прежние CV и персональный seed из 5.2.0. **Не публикуйте FULL целиком.** `GITHUB-UPDATE.zip` содержит только изменённые исходники, тесты и документацию; неизменённые CV и candidate-seed туда не включены. Это не удаляет персональные сведения из прежних коммитов.
-
-## Проверки и границы
-
-См. `TEST_REPORT.md` в дистрибутиве. Node tests и worker tests выполняются с описанными границами, browser fixtures не являются проверкой всех форм живого HH. Сборка RC1 не сопровождается обещанием «без багов» или утверждением, что весь многопровайдерный roadmap завершён.
-
-Второй полноценно проверенный job provider, внешнее шифрование всей рабочей базы и обученная на ваших данных модель в этом релизе не заявлены. Бинарный Windows backend сохранён из дистрибутива 5.2.0, заново здесь не компилировался.
-
-## Документация
-
-- `docs/PRODUCT_CENTER.md` — использование новых разделов.
-- `docs/BACKUP_AND_RECOVERY.md` — экспорт, проверка и восстановление.
-- `docs/RELEASE_PROCESS.md` — безопасный source-only commit.
-- `docs/PRIVACY_AND_DATA.md` — конкретные границы защиты.
-- `TESTING_GUIDE.md` — воспроизводимые команды.
-- `IMPLEMENTATION_STATUS.md` — реализованное и оставшееся.
+Use `Publish-Violetta-6.0.0-RC2.ps1`. It copies only allowlisted, SHA-256-verified source/docs/tests to `ViolettaNcl/job-search-assistant`, refuses dirty/diverged/incorrect repositories and never force-pushes. Use `-SignTag` only when Git signing is already configured on your machine.

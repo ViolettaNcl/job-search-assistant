@@ -1,4 +1,4 @@
-importScripts("product-core.js", "product-models.js", "questionnaire-memory.js");
+importScripts("product-core.js", "product-models.js", "product-migrations.js", "questionnaire-memory.js");
 importScripts("candidate-seed.js", "candidate-truth.js", "relevance-engine.js", "vacancy-fit.js", "learning-core.js", "model-runtime.js", "model-monitor.js", "semantic-index.js", "duplicate-detector.js", "recruiter-intelligence.js", "site-adapter-core.js", "outcome-analytics-v2.js", "context-reply.js", "writing-provider.js");
 importScripts("copilot-core.js", "hh-list-quick-apply-core.js", "profile-defaults.js", "quick-replies.js", "bundled-cv.js", "followup-intelligence.js", "application-analytics.js", "application-state-machine.js");
 importScripts("browser-autopilot.js", "hh-discovery-navigation.js", "hh-discovery-background.js", "application-executor.js", "dashboard-apply-background.js");
@@ -12,6 +12,8 @@ async function restrictLocalStorageAccess() {
     console.warn("Violetta Apply Assistant: could not restrict local storage access", error);
   }
 }
+
+async function runProductMigration(){try{const all=await chrome.storage.local.get(null),m=globalThis.vjaProductMigrations?.plan?.(all);if(m?.changed)await chrome.storage.local.set(m.patch);}catch(error){console.warn('Violetta Apply Assistant: migration failed',error);}}
 
 async function normalizeLocalApiBase() {
   try {
@@ -29,11 +31,14 @@ async function normalizeLocalApiBase() {
 chrome.runtime.onInstalled.addListener(() => {
   void restrictLocalStorageAccess();
   void normalizeLocalApiBase();
+void runProductMigration();
+  void runProductMigration();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   void restrictLocalStorageAccess();
   void normalizeLocalApiBase();
+  void runProductMigration();
 });
 
 void restrictLocalStorageAccess();

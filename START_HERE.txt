@@ -1,11 +1,13 @@
-VIOLETTA 6.0.0 RC1 — TEST BUILD
+VIOLETTA 6.0.0 RC2 — TEST BUILD
 
-1. Test the extension/ folder. Manifest version: 6.0.0 (RC1 in version_name).
-2. Do not uninstall the existing extension before exporting its data.
-3. Popup -> Product Center / Центр управления.
-4. Verify Analysis, Apply, questionnaire and Back before GitHub publication.
-5. Use the separate GITHUB-UPDATE package / publisher; do not copy FULL into Git.
-6. Read TEST_REPORT.md and docs/BACKUP_AND_RECOVERY.md.
+1. Test the extension/ folder. Manifest version: 6.0.0 (RC2 in version_name).
+2. Dedicated HH questionnaire pages now get an inline ✦ Fill beside the native response button.
+3. Fill prepares answers but never clicks the employer submit button.
+4. Learning Center can train a real local logistic model only after enough real labels exist.
+5. career.habr.com is enabled as a beta second provider for vacancy reading/assistant surfaces; logged-in apply is not claimed production-validated.
+6. Export/backup before testing. Do not uninstall the existing extension first.
+7. Use the publisher for GitHub; do not copy FULL into the repository.
+8. Optional: publish with -SignTag if Git signing is configured.
 
-The bundled Windows backend is retained from 5.2.0. It was not rebuilt here.
-This is a release candidate, not a guarantee that every live HH form is bug-free.
+The Windows backend is retained from 5.2.0 and is not rebuilt in this RC.
+Live HH account acceptance still requires your smoke test.

@@ -6,15 +6,18 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
   const categories=[
-    'SALARY','EXPERIENCE','PROJECTS','TECH_STACK','PROGRAMMING_LANGUAGE','ENGLISH_LEVEL','OTHER_LANGUAGE','EDUCATION','LOCATION','REMOTE_WORK','RELOCATION','SCHEDULE','AVAILABILITY','START_DATE','CONTACT','TELEGRAM','EMAIL','PHONE','COVER_LETTER','WHY_COMPANY','WHY_ROLE','MOTIVATION','ACHIEVEMENTS','SUPPORT_EXPERIENCE','CUSTOMER_SERVICE','DATABASES','API','CRM','LINUX','WINDOWS','NETWORKING','AI','OTHER_TECHNICAL','LEGAL','WORK_AUTHORIZATION','CONSENT','UNKNOWN'
+    'SALARY','DOMAIN_EXPERIENCE','CHAT_SALES','CHAT_VOLUME','EXPERIENCE','PROJECTS','TECH_STACK','PROGRAMMING_LANGUAGE','ENGLISH_LEVEL','OTHER_LANGUAGE','EDUCATION','LOCATION','REMOTE_WORK','RELOCATION','SCHEDULE','AVAILABILITY','START_DATE','CONTACT','TELEGRAM','EMAIL','PHONE','COVER_LETTER','WHY_COMPANY','WHY_ROLE','MOTIVATION','ACHIEVEMENTS','SUPPORT_EXPERIENCE','CUSTOMER_SERVICE','DATABASES','API','CRM','LINUX','WINDOWS','NETWORKING','AI','OTHER_TECHNICAL','LEGAL','WORK_AUTHORIZATION','CONSENT','UNKNOWN'
   ];
   function clean(value){return String(value||'').replace(/\s+/g,' ').trim();}
   function normalize(value){return clean(value).toLocaleLowerCase('ru-RU').replace(/ё/g,'е').replace(/[«»“”"'`]/g,'').replace(/[^a-zа-я0-9#+.\-/ ]+/gi,' ').replace(/\s+/g,' ').trim();}
-  function language(value){const s=String(value||'');const ru=(s.match(/[а-яё]/gi)||[]).length,en=(s.match(/[a-z]/gi)||[]).length;return ru>=en?'ru':'en';}
+  function language(value){const s=String(value||'');const ru=(s.match(/[а-яё]/gi)||[]).length,en=(s.match(/[a-z]/gi)||[]).length;if(ru>=4&&ru>=Math.ceil(en*0.35))return 'ru';return ru>=en?'ru':'en';}
   function classify(question,field={}){
     const s=normalize([question,field.label,field.name,field.placeholder].filter(Boolean).join(' '));
     const type=String(field.type||'').toLowerCase();
     if(/зарплат|оклад|доход|вилк|salary|compensation|expected pay|rate\b|оплат/i.test(s))return 'SALARY';
+    if(/gambling|betting|гембл|беттинг|букмек|казино|ставк.*спорт/i.test(s))return 'DOMAIN_EXPERIENCE';
+    if(/(?:продаж|sales).{0,35}(?:чат|переписк)|(?:чат|переписк).{0,35}(?:продаж|sales)/i.test(s))return 'CHAT_SALES';
+    if(/сколько.{0,45}(?:чат|тикет|обращен)|(?:чат|тикет|обращен).{0,45}(?:смен|день|обработ)/i.test(s))return 'CHAT_VOLUME';
     if(/соглас|privacy|персональн.*данн|terms|услови.*политик|legal|подтверждаю|agree|accept.*terms|обработк.*данн/i.test(s))return 'CONSENT';
     if(/гражданств|разрешен.*работ|разрешён.*работ|work authori[sz]|work permit|visa|sponsor/i.test(s))return 'WORK_AUTHORIZATION';
     if(/дата.*выход|когда.*(?:приступ|начать)|start date|notice period|available.*start/i.test(s))return 'START_DATE';

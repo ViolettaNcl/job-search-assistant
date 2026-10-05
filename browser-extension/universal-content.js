@@ -183,10 +183,23 @@
     const a=current();if(effectivePageType(a)!=='JOB_DESCRIPTION')return;
     try{const vacancy=a.extractVacancy();if(!vacancy?.title)return;const r=await request('vacancy-status',{vacancy});if(!r?.ok)return;if(r.applied){applyMeta=r.application;applyState='DUPLICATE';}else if(!working&&['DUPLICATE','CONFIRMED'].includes(applyState)){applyState='IDLE';}renderBar();}catch{}
   }
+
+  function ensureInlineQuestionnaireFill(){
+    const adapter=current(),scope=adapter.detectApplicationForm();
+    document.querySelectorAll('[data-vja-root="inline-questionnaire-fill"]').forEach(x=>{if(!scope||!scope.contains(x))x.remove();});
+    if(!scope)return;
+    if(scope.querySelector('[data-vja-root="inline-questionnaire-fill"]'))return;
+    const native=[...scope.querySelectorAll('button,input[type="submit"],a')].find(el=>{const label=C.clean(el.innerText||el.value||el.textContent);return /^(?:откликнуться|продолжить|отправить|apply|submit)$/i.test(label);});
+    if(!native)return;
+    const btn=document.createElement('button');btn.type='button';btn.dataset.vjaRoot='inline-questionnaire-fill';btn.textContent='✦ Fill';btn.title='Заполнить вопросы по этой вакансии. Отправка останется под вашим контролем.';
+    btn.style.cssText='margin:0 8px;padding:9px 16px;border:1px solid #7c3aed;border-radius:8px;background:#7c3aed;color:#fff;font:600 13px/1.2 system-ui,sans-serif;cursor:pointer;vertical-align:middle;';
+    btn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();void prepare({open:true});});
+    native.insertAdjacentElement('beforebegin',btn);
+  }
   function renderBar(){
     const adapter=current(),type=effectivePageType(adapter);bar?.remove();bar=null;
     if(type==='RECRUITER_CHAT'||!['JOB_DESCRIPTION','APPLICATION_FORM'].includes(type))return;
-    if(type==='APPLICATION_FORM')bar=U.bar([{label:'✦ Fill',primary:true,onClick:()=>void prepare({open:true})},{label:'⋯',onClick:()=>void request('open-options')}]);
+    if(type==='APPLICATION_FORM'){bar=U.bar([{label:'✦ Fill',primary:true,onClick:()=>void prepare({open:true})},{label:'⋯',onClick:()=>void request('open-options')}]);ensureInlineQuestionnaireFill();}
     else bar=U.bar([{label:applyLabel(),primary:true,onClick:()=>void autoApply()},{label:'⋯',onClick:()=>void request('open-options')}]);
     toast?.place?.();
   }

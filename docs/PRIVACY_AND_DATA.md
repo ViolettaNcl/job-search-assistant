@@ -1,4 +1,4 @@
-# Privacy and data — 6.0 RC1
+# Privacy and data — 6.0 RC2
 
 Runtime data remain local unless the user enables an external AI provider. The Product Center itself makes no network requests for analytics or telemetry.
 

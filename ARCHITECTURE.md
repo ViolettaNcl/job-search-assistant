@@ -1,26 +1,54 @@
-# Architecture — 6.0 RC1
+# Architecture · 6.0.0 RC2
 
-The existing service worker, application store and HH content scripts are retained.
+## Application path
 
-## Added modules
+```text
+Job-site DOM / provider API
+  ↓
+Site adapter + exact vacancy identity
+  ↓
+Full vacancy reader
+  ↓
+Deterministic safety analysis + structured features
+  ↓
+Rules Fit + bounded personal signals + optional promoted preference model
+  ↓
+Queue / Apply preparation
+  ↓
+Direct apply OR dedicated questionnaire page
+  ↓
+Questionnaire classifier + confirmed memory + reviewable fallback drafts
+  ↓
+✦ Fill + pre-submit diff
+  ↓
+USER-CONTROLLED FINAL SUBMIT
+  ↓
+Outcome / Learning events
+```
 
-`product-core.js`: pure backup schema validation/allowlist, restore plan, quality checks, read models and diagnostics.
-`product-crypto.js`: AES-256-GCM password-protected snapshots using PBKDF2-SHA256 and random salt/nonce.
-`product-store.js`: extension-origin IndexedDB, schema 1, encrypted checkpoint records. Not injected on job websites.
-`product-models.js`: canonical model digest, integrity checks and post-prediction shadow comparison.
-`product-background.js`: extension-page-only administrative routes for restore, shadow selection and model rollback.
-`product.html/js/css`: local dashboard; never clicks employer submit controls.
+RC2 specifically recognizes dedicated HH questionnaire pages even when they do not expose a conventional `<form>` element.
 
-## Trust boundaries
+## Learning/model path
 
-Operational Chrome local storage remains the existing source of truth. New IndexedDB stores encrypted checkpoints only, so no destructive migration of the working history occurs. The content-script questionnaire gateway can request one answer or store one bounded answer; it cannot invoke product restore or model administration.
+```text
+real user decisions
+→ LearningEvents
+→ de-duplicated preference dataset
+→ local browser trainer OR offline Python trainer
+→ chronological train/calibration/test
+→ held-out metrics
+→ candidate Model Registry entry
+→ Shadow Mode / explicit promotion
+→ bounded runtime inference
+→ later monitoring and retraining proposal
+```
 
-The service worker serializes learning writes. Restored jobs are review-only; model active pointers and external AI consent are reset. Backend submission is not triggered by dashboard operations.
+Preference and employer-engagement targets remain separate. Hard safety/preferences such as Calls/Sales gates are not overridden by ML.
 
-## Models
+## Migration and release trust
 
-Training now uses global chronological boundaries, not per-class time partitions that can overlap. Missing temporal groups fail closed. Shadow predictions never blend into Fit. Comparison counts only labels later than the prediction. Model metrics are reported as observational, not causal or a job-offer guarantee.
+`product-migrations.js` applies additive schema patches for older local state. Release publication is allowlisted and hash-checked; optional Git tag signing uses only the user's configured signing key.
 
-## Storage and scale
+## Provider abstraction
 
-Application pages render 25 records at a time. The center reads local state on opening/manual refresh; it does not poll or crawl. Encrypted backups are limited to 32 MiB plaintext; files over the supported limits are rejected. The large operational stores have not all been migrated to IndexedDB; that remains a separate, testable migration project.
+HH is primary. Habr Career is RC2 beta. New providers must implement the formal adapter contract and pass current live-flow validation before being called supported.

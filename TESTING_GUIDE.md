@@ -1,21 +1,20 @@
-# Testing — 6.0 RC1
+# Testing Guide · 6.0.0 RC2
 
-In source clone, extension path is browser-extension; in FULL it is extension.
+## Automated suites
 
-```sh
-node --test browser-extension/*.test.js
-node tests/product_worker_600.cjs
-python -m unittest discover -s tests -p 'test_*.py' -v
-python tests/browser_product_600.py
-python tests/browser_memory_399.py
-python tests/browser_questionnaire_3912.py
-python tests/browser_batch_400.py
-python tests/hh_read_fallback_3910.py
-python tests/browser_learning_520.py
-python tests/browser_e2e.py
-python tools/check-repo-hygiene.py
-```
+- `node --test extension/*.test.js`
+- `python -m unittest discover -s tests -p 'test_*.py'`
+- `python tests/browser_e2e.py`
+- focused Chromium fixtures: HH reader, memory, questionnaire, batch, learning, Product Center, RC2 standalone questionnaire and Habr beta.
+- JavaScript syntax (`node --check`), Python compile and workflow-YAML parse checks.
 
-Browser tests require Playwright and Chromium. Product browser tests use explicit Chrome/IDB/crypto boundary mocks. Native WebCrypto encrypt/decrypt/tamper behavior is covered separately in Node. Worker integration uses actual background JS with mocked Chrome/HTTP, not live HH.
+## Live acceptance
 
-The Test Report lists exactly which commands completed and which failed/timed out. A timeout is not reported as a clean pass. No .NET rebuild or Windows PowerShell execution is implied by Python publication-plan tests.
+Automated fixtures mock Chrome/HTTP/authentication boundaries. Before calling RC2 final, follow `docs/LIVE_ACCEPTANCE_6.0_RC2.md` in the user's authenticated HH browser, especially the dedicated questionnaire redirect shown during real testing.
+
+## Safety expectations
+
+- Fill may write confirmed answers or clearly reviewable drafts.
+- Fill must not click the employer's final submit action.
+- Legal/work-authorization/consent facts remain review-gated.
+- Real-label ML training must refuse insufficient/one-class data and must not auto-promote the trained candidate.

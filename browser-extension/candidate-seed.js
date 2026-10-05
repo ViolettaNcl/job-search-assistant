@@ -5,7 +5,7 @@
   "fullName": "Violetta Nicolaou",
   "firstName": "Violetta",
   "lastName": "Nicolaou",
-  "location": "Volgograd, Russia",
+  "location": "Volzhsky, Russia",
   "contacts": {
     "email": "violettanicolaou@gmail.com",
     "telegram": "@Violet111",

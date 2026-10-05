@@ -58,6 +58,13 @@ class PublicationPlanTests(unittest.TestCase):
         self.assertIn('browser-extension/job-search-page-core.js', targets)
         self.assertIn('browser-extension/hh-list-intelligence.js', targets)
         self.assertIn('tests/browser_batch_400.py', targets)
+        self.assertIn('browser-extension/browser-trainer.js', targets)
+        self.assertIn('browser-extension/product-migrations.js', targets)
+        self.assertIn('browser-extension/habr_career_beta.md', targets)
+        self.assertIn('tests/browser_questionnaire_rc2.py', targets)
+        self.assertIn('tests/browser_habr_rc2.py', targets)
+        self.assertIn('scripts/verify-violetta-6.0.0-rc2.ps1', targets)
+        self.assertIn('docs/release_notes_6.0.0_rc2.md', targets)
         self.assertIn('browser-extension/model-runtime.js', targets)
         self.assertIn('browser-extension/model-monitor.js', targets)
         self.assertIn('browser-extension/semantic-index.js', targets)
@@ -97,7 +104,7 @@ class PublicationPlanTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'duplicate'): validate(self.data)
 
     def test_publisher_checks_exit_codes_and_never_force_resets(self):
-        script = (ROOT/'Publish-Violetta-6.0.0-RC1.ps1').read_text(encoding='utf-8-sig')
+        script = (ROOT/'Publish-Violetta-6.0.0-RC2.ps1').read_text(encoding='utf-8-sig')
         self.assertIn('$LASTEXITCODE', script)
         self.assertIn("@('diff','--cached','--quiet') -Accepted @(0,1)", script)
         self.assertIn("@('push','origin','HEAD:main')", script)

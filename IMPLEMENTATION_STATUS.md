@@ -1,30 +1,38 @@
-# Implementation status — 6.0.0 RC1
+# Implementation Status · 6.0.0 RC2
 
-## Delivered code
+## Implemented and regression-covered
 
-- Existing 5.2 HH and model features retained.
-- Product Center UI, local weekly counts, paged applications and per-application timeline.
-- Dataset Quality Center and model table.
-- Explicit candidate Shadow Mode, subsequent-label comparison and previous-model rollback.
-- Password-protected .vja exports and encrypted local IndexedDB checkpoint store.
-- Restore allowlist, prototype/size checks, preview, user confirmation and pre-restore checkpoint.
-- Scoped questionnaire memory operations through the service worker.
-- Serialized event writes and latest-decision preference aggregation.
-- Office/calls/sales eligibility checks reused by the queue.
-- ROC-AUC tie fix, globally disjoint temporal partitions, provider-scoped duplicate validation.
-- Source-only update archive and guarded publisher.
+### HH search and application
+- Exact vacancy-ID binding, full-vacancy reader and `api.hh.ru` fallback.
+- Calls / no-calls / unknown classification.
+- Batch Analysis, explainable Fit, Ready Queue, Save/Skip/Apply and persistent vacancy memory.
+- Vacancy-specific cover letters and already-viewed recovery.
+- Dedicated HH questionnaire-page detection even when no semantic `<form>` exists.
+- Inline **✦ Fill** next to the native response action; Fill does not press final submit.
+- Questionnaire classification, confirmed-answer memory, semantic fallback retrieval, user-correction capture and pre-submit review.
 
-## Verification levels
+### Personal learning / ML
+- Structured LearningEvent store and deduplicated preference labels.
+- Separate preference and employer-engagement targets.
+- Offline Python train/calibration/test pipeline and model registry.
+- Browser runtime inference, monitoring/drift, Shadow Mode, rollback/disable.
+- **RC2:** real-label browser-side logistic trainer that creates a candidate model from the user's own labels. It does not auto-promote.
 
-See the generated Test Report for measured results. Browser DOM tests use mocked Chrome/crypto/IDB boundaries because native document navigation/extension loading is blocked in this sandbox. Native encryption is tested separately through Node Web Crypto. The IndexedDB implementation uses the browser API but its native lifecycle has not been verified here.
+### Productization
+- Unified Product Center and diagnostics.
+- Password-protected backup/restore with preview.
+- 5.2 → 6.0 product-schema migration foundation.
+- Release file hashes, verification script and optional signed Git release tag.
 
-## Not delivered / not claimed
+### Providers
+- HH: primary validated provider architecture and extensive automated/live-user workflow history.
+- Habr Career: **beta** public-vacancy adapter/assistant surface; authenticated apply still requires live acceptance.
 
-- No guarantee of zero bugs or compatibility with every live HH DOM variation.
-- No second end-to-end live-validated provider.
-- No encryption of all active Chrome runtime data; encryption applies to backup artifacts only.
-- No fresh .NET binary compilation in this environment.
-- No trained personal production model without real labels.
-- No measurement of roadmap completion percentages.
+## Intentionally not claimed
 
-The release is suitable for a user test and a source commit, not for an unqualified “all roadmap complete” claim.
+- No promise of zero defects.
+- Automated browser fixtures do not equal a live authenticated HH/Habr acceptance test.
+- No personal ML model is claimed high-quality before enough real user labels/outcomes exist.
+- No fabricated work history/legal facts are inserted merely to fill a questionnaire.
+- Habr Career is not labelled fully supported until authenticated apply/questionnaire paths pass live smoke testing.
+- Private Vault finalization is deferred to the final hardening pass as requested.

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
   "version": "6.0.0",
-  "description": "Violetta 6.0 RC1: Job Center, encrypted backups, recovery checks, dataset quality, shadow models and safe GitHub source updates.",
+  "description": "Violetta 6.0 RC2: standalone questionnaire Fill, local real-label ML training, Habr Career beta, migrations and release verification.",
   "permissions": [
     "activeTab",
     "storage",
@@ -20,7 +20,8 @@
     "https://*.hh.ru/*",
     "https://api.hh.ru/*",
     "https://headhunter.kg/*",
-    "https://*.headhunter.kg/*"
+    "https://*.headhunter.kg/*",
+    "https://career.habr.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -52,7 +53,8 @@
         "https://*.hh.ru/*",
         "https://api.hh.ru/*",
         "https://headhunter.kg/*",
-        "https://*.headhunter.kg/*"
+        "https://*.headhunter.kg/*",
+        "https://career.habr.com/*"
       ],
       "all_frames": true,
       "js": [
@@ -131,5 +133,5 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "version_name": "6.0.0 RC1 — Product Center & Recovery"
+  "version_name": "6.0.0 RC2 — Questionnaire Fill & Real-label ML"
 }

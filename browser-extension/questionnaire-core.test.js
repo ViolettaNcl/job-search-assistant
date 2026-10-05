@@ -10,3 +10,5 @@ test('vacancy-specific questions get vacancy-specific semantic keys',()=>assert.
 test('generic English memory key is stable across vacancies',()=>assert.equal(Q.semanticKey('ENGLISH_LEVEL','Уровень английского?','100'),Q.semanticKey('ENGLISH_LEVEL','Какой у вас уровень английского?','200')));
 
 test('suggested state is visibly marked as a draft',()=>assert.match(Q.stateLabel('suggested'),/Черновик/));
+
+test('mixed Russian/English vacancy questions keep Russian answer language',()=>assert.equal(Q.language('Есть ли у вас опыт в сфере Gambling / Betting?'),'ru'));
