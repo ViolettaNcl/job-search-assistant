@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 globalThis.vjaQuestionnaireCore=require('./questionnaire-core.js');
 const E=require('./questionnaire-answer-engine.js');
 function profile(extra={}){return {
- fullName:'Violetta Nicolaou',firstName:'Violetta',lastName:'Nicolaou',location:'Volzhsky, Russia',contacts:{email:'violettanicolaou@gmail.com',telegram:'@Violet111',phone:''},
+ fullName:'Demo Candidate',firstName:'Demo',lastName:'Candidate',location:'Example City',contacts:{email:'candidate@example.invalid',telegram:'@ExampleCandidate',phone:''},
  facts:[
   {id:'project-dental',kind:'project',status:'CONFIRMED',roles:['developer','technical_support'],topics:['dotnet','sql','api','crm'],text:'В DentalClinic для реального заказчика разработала платформу с онлайн-записью, личным кабинетом, CRM и админ-панелью на ASP.NET Core и SQL Server.',textRu:'В DentalClinic для реального заказчика разработала платформу с онлайн-записью, личным кабинетом, CRM и админ-панелью на ASP.NET Core и SQL Server.'},
   {id:'project-route',kind:'project',status:'CONFIRMED',roles:['developer','technical_support'],topics:['php','javascript','testing'],text:'В Smart Route Planner разработала PWA на PHP и JavaScript с маршрутизацией OSRM и автоматизированными тестами.',textRu:'В Smart Route Planner разработала PWA на PHP и JavaScript с маршрутизацией OSRM и автоматизированными тестами.'},
@@ -26,4 +26,4 @@ test('support experience is grounded in support facts',()=>{const r=E.decide({qu
 
 test('numeric salary field still stays unresolved when no amount is confirmed',()=>{const r=E.decide({question:'Ожидаемая зарплата',field:{type:'number'},profile:profile(),context:ctx});assert.equal(r.action,'review');assert.equal(r.category,'SALARY');});
 test('unknown free-text question gets a neutral draft without invented facts',()=>{const r=E.decide({question:'Расскажите что-нибудь ещё, что считаете важным',field:{type:'textarea'},profile:profile(),context:ctx});assert.equal(r.action,'fill');assert.equal(r.source,'human-fallback');assert.equal(r.requiresReview,true);assert.match(r.value,/интервью|interview/i);});
-test('missing technical evidence can use a reviewable human draft',()=>{const r=E.decide({question:'Есть ли опыт с Kubernetes?',field:{type:'textarea'},profile:{...profile(),facts:profile().facts.filter(f=>f.kind!=='skill'&&f.kind!=='task')},context:ctx});assert.equal(r.action,'fill');assert.equal(r.requiresReview,true);assert.equal(r.source,'human-fallback');});
+test('missing technical evidence is not invented',()=>{const d=E.decide({question:'Расскажите о вашем опыте с Kubernetes',profile:{facts:[]},context:{role:'developer'}});assert.equal(d.action,'review');assert.ok(!d.value);});

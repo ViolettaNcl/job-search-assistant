@@ -78,11 +78,18 @@ function vjaHhCoverLetterAction() {
 }
 
 function vjaHhCoverLetterSubmitAction(container = document) {
-  const scope = container && container !== document ? container : document;
-  const candidates = [...scope.querySelectorAll('button, input[type="submit"], input[type="button"], [role="button"]')]
-    .filter(vjaSiteVisible)
-    .map(el => ({ el, label: vjaSiteText(el).slice(0, 160) }));
-  return window.vjaSiteApply?.chooseHhCoverLetterSubmit?.(candidates) || { found: false, ambiguous: false, count: 0 };
+  const scopes=[];let node=container&&container!==document?container:null;
+  for(let depth=0;node&&depth<6;depth++,node=node.parentElement){if(!scopes.includes(node))scopes.push(node);if(node.matches?.('[role="dialog"],dialog,[class*="overlay" i],[data-qa*="modal" i]'))break;}
+  if(!scopes.length)scopes.push(document);
+  for(const scope of scopes){
+    const candidates=[...scope.querySelectorAll('button, input[type="submit"], input[type="button"], [role="button"]')]
+      .filter(vjaSiteVisible).map(el=>({el,label:vjaSiteText(el).slice(0,160)}));
+    const choice=window.vjaSiteApply?.chooseHhCoverLetterSubmit?.(candidates)||{found:false,ambiguous:false,count:0};
+    if(choice.found||choice.ambiguous)return choice;
+  }
+  const globalCandidates=[...document.querySelectorAll('button, input[type="submit"], input[type="button"], [role="button"]')]
+    .filter(vjaSiteVisible).map(el=>({el,label:vjaSiteText(el).slice(0,160)}));
+  return window.vjaSiteApply?.chooseHhCoverLetterSubmit?.(globalCandidates)||{found:false,ambiguous:false,count:0};
 }
 
 async function vjaSiteWaitForHhCoverLetterSubmit(container = document, timeoutMs = 5000) {
@@ -250,14 +257,86 @@ async function vjaSiteWaitForCoverLetterField(timeoutMs = 9000) {
   return { found: false, container: vjaSiteApplicationContainer(), field: null };
 }
 
-async function vjaSiteWaitForCoverLetterSubmission(field, timeoutMs = 6000) {
-  if (!field) return false;
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    if (!document.contains(field) || !vjaSiteVisible(field)) return true;
-    await vjaSiteWait(250);
+function vjaSiteCoverLetterSuccessVisible(field=null,preferredScope=null) {
+  const scope=(preferredScope&&preferredScope!==document?preferredScope:null)||field?.closest?.('[role="dialog"],dialog,[class*="overlay" i],[data-qa*="modal" i]')||null;
+  if(!scope)return false;
+  return /(?:сопроводительное\s+)?письм[оа].{0,35}(?:отправлен|добавлен|приложен)|cover\s+letter.{0,35}(?:sent|submitted|attached)/i.test(vjaSiteText(scope));
+}
+function vjaSiteCloseCoverLetterUi(field=null) {
+  const scope=field?.closest?.('[role="dialog"],dialog,[class*="overlay" i],[data-qa*="modal" i]')||document;
+  const buttons=[...scope.querySelectorAll('button,input[type="button"],[role="button"]')].filter(vjaSiteVisible);
+  const close=buttons.find(el=>/^(?:закрыть|close)$/i.test(vjaSiteText(el)));
+  if(close){close.click();return true;}return false;
+}
+function vjaSiteCurrentCoverLetterUi(field=null,scope=document){
+  const containers=[];
+  const push=node=>{if(node&&!containers.includes(node))containers.push(node);};
+  push(vjaSiteApplicationContainer());
+  push(field?.closest?.('[role="dialog"],dialog,[class*="overlay" i],[data-qa*="modal" i]'));
+  if(scope&&scope!==document)push(scope);
+  for(const container of containers){
+    if(!container?.isConnected||!vjaSiteVisible(container))continue;
+    const current=vjaSiteCoverLetterField(container);
+    if(current&&vjaSiteVisible(current))return {container,field:current};
   }
-  return !document.contains(field) || !vjaSiteVisible(field);
+  const globalField=vjaSiteCoverLetterField(document);
+  if(globalField&&vjaSiteVisible(globalField))return {container:globalField.closest?.('[role="dialog"],dialog,[class*="overlay" i],[data-qa*="modal" i]')||document,field:globalField};
+  const fallback=containers.find(container=>container?.isConnected&&vjaSiteVisible(container))||null;
+  return {container:fallback,field:null};
+}
+function vjaSiteCoverLetterSubmissionState(field=null,scope=document){
+  const ui=vjaSiteCurrentCoverLetterUi(field,scope);
+  const containerOpen=Boolean(ui.container&&ui.container!==document&&ui.container.isConnected&&vjaSiteVisible(ui.container));
+  const fieldOpen=Boolean(ui.field&&ui.field.isConnected&&vjaSiteVisible(ui.field));
+  // A vacancy/search page may already contain “cover letter sent” for another
+  // response. Count success only inside the current modal after its editor is
+  // gone, or when the current modal itself has closed.
+  const success=Boolean(containerOpen&&!fieldOpen&&vjaSiteCoverLetterSuccessVisible(null,ui.container));
+  return {confirmed:Boolean(success||(!containerOpen&&!fieldOpen)),success,containerOpen,fieldOpen,...ui};
+}
+async function vjaSiteWaitForCoverLetterSettlement(field, scope=document, timeoutMs = 6000) {
+  const started = Date.now();let state=vjaSiteCoverLetterSubmissionState(field,scope);
+  while (Date.now() - started < timeoutMs) {
+    state=vjaSiteCoverLetterSubmissionState(state.field||field,state.container||scope);
+    if(state.success){vjaSiteCloseCoverLetterUi(state.field||field);await vjaSiteWait(120);return {...state,confirmed:true};}
+    if(state.confirmed)return state;
+    await vjaSiteWait(220);
+  }
+  return vjaSiteCoverLetterSubmissionState(state.field||field,state.container||scope);
+}
+async function vjaSiteWaitForCoverLetterSubmission(field, timeoutMs = 6000, scope=document) {
+  if (!field) return false;
+  return Boolean((await vjaSiteWaitForCoverLetterSettlement(field,scope,timeoutMs)).confirmed);
+}
+async function vjaSiteSubmitHhCoverLetterWithRetry({field,scope=document,coverLetter='',initialChoice=null,maxAttempts=6}={}){
+  let currentField=field,currentScope=scope,lastReason='hh-cover-letter-modal-still-open',attempts=0,choice=initialChoice;
+  for(let attempt=1;attempt<=maxAttempts;attempt++){
+    attempts=attempt;
+    const before=vjaSiteCoverLetterSubmissionState(currentField,currentScope);
+    currentField=before.field||currentField;currentScope=before.container||currentScope;
+    if(before.confirmed)return {...before,attempts};
+    if(currentField&&vjaSiteVisible(currentField)&&String(coverLetter||'').trim()&&vjaSiteFieldValue(currentField)!==String(coverLetter||'').trim()){
+      const restored=await vjaSiteSetTextVerified(currentField,coverLetter);
+      if(!restored)return {...before,confirmed:false,attempts,reason:'cover-letter-not-persisted-before-retry'};
+    }
+    if(!(choice?.found))choice=await vjaSiteWaitForHhCoverLetterSubmit(currentScope||document,attempt===1?5000:3500);
+    if(!choice?.found){
+      const settled=await vjaSiteWaitForCoverLetterSettlement(currentField,currentScope,900);
+      currentField=settled.field||currentField;currentScope=settled.container||currentScope;
+      if(settled.confirmed)return {...settled,attempts};
+      lastReason=choice?.ambiguous?'hh-cover-letter-submit-ambiguous':'hh-cover-letter-submit-not-found';
+      choice=null;if(attempt<maxAttempts)await vjaSiteWait(350+attempt*180);continue;
+    }
+    choice.candidate.el.scrollIntoView?.({behavior:'smooth',block:'center'});choice.candidate.el.focus?.();choice.candidate.el.click();
+    choice=null;
+    const settled=await vjaSiteWaitForCoverLetterSettlement(currentField,currentScope,attempt===1?2800:3600);
+    currentField=settled.field||currentField;currentScope=settled.container||currentScope;
+    if(settled.confirmed)return {...settled,attempts};
+    lastReason='hh-cover-letter-modal-still-open';
+    if(attempt<maxAttempts)await vjaSiteWait(420+attempt*220);
+  }
+  const finalState=await vjaSiteWaitForCoverLetterSettlement(currentField,currentScope,1800);
+  return {...finalState,attempts,reason:finalState.confirmed?'':lastReason};
 }
 
 function vjaSiteHasExplicitCoverLetterField() {
@@ -328,9 +407,11 @@ async function vjaHhSelectResume(container = document, plan = {}) {
   if (!candidate.metadata?.selected) {
     candidate.wrapper?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
     if (candidate.el instanceof HTMLInputElement) {
+
       candidate.el.click();
       candidate.el.dispatchEvent(new Event('change', { bubbles: true }));
     } else {
+
       (candidate.wrapper || candidate.el).click();
     }
     await vjaSiteWait(180);
@@ -395,6 +476,7 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
     if (existingLetterAction.found) {
       startActionSubmitted = true;
       existingLetterAction.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if(!globalThis.vjaSubmissionGuard||!await globalThis.vjaSubmissionGuard.allow(plan))return {submitted:false,status:'needs-review',reason:'global-policy-review-required'};
       existingLetterAction.candidate.el.click();
       const letterUi = await vjaSiteWaitForCoverLetterField();
       container = letterUi.container;
@@ -423,6 +505,7 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
     startChoice.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     plan = {...plan,startClicked:true};
     await vjaSiteStorageSet('vjaPendingSiteApply', plan);
+    if(!globalThis.vjaSubmissionGuard||!await globalThis.vjaSubmissionGuard.allow(plan))return {submitted:false,status:'needs-review',reason:'global-policy-review-required'};
     startChoice.candidate.el.click();
     applicationUiFound = await vjaSiteWaitForApplicationUi(9000, { acceptReceipt: true });
 
@@ -457,6 +540,7 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
         return result;
       }
       letterAction.candidate.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if(!globalThis.vjaSubmissionGuard||!await globalThis.vjaSubmissionGuard.allow(plan))return {submitted:false,status:'needs-review',reason:'global-policy-review-required'};
       letterAction.candidate.el.click();
       const letterUi = await vjaSiteWaitForCoverLetterField();
       container = letterUi.container;
@@ -501,14 +585,13 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
       await vjaSiteStoreResult(plan, result);
       return result;
     }
-    const receiptBeforeLetter = vjaSiteReceipt();
-    letterSubmit.candidate.el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-    letterSubmit.candidate.el.click();
-    const letterStepCompleted = await vjaSiteWaitForCoverLetterSubmission(coverField, 8000);
+    if(!globalThis.vjaSubmissionGuard||!await globalThis.vjaSubmissionGuard.allow(plan))return {submitted:false,status:'needs-review',reason:'global-policy-review-required'};
+    const submission=await vjaSiteSubmitHhCoverLetterWithRetry({field:coverField,scope,coverLetter,initialChoice:letterSubmit,maxAttempts:6});
+    const letterStepCompleted=Boolean(submission.confirmed);
     const receipt = vjaSiteReceipt();
     const result = letterStepCompleted
-      ? { submitted: true, status: 'confirmed', receipt, coverLetterFilled: true, resumeSubmitted: true, startActionSubmitted: true, letterStepCompleted: true, resumeLabel: plan.resumeLabel || 'HH account resume' }
-      : { submitted: false, status: 'clicked-unverified', receipt, coverLetterFilled: true, resumeSubmitted: true, startActionSubmitted: true, letterStepCompleted: false, reason: 'Cover-letter Send was clicked, but the modal did not close.' };
+      ? { submitted: true, status: 'confirmed', receipt, coverLetterFilled: true, resumeSubmitted: true, startActionSubmitted: true, letterStepCompleted: true, submitAttempts: submission.attempts, resumeLabel: plan.resumeLabel || 'HH account resume' }
+      : { submitted: false, status: 'clicked-unverified', receipt, coverLetterFilled: true, resumeSubmitted: true, startActionSubmitted: true, letterStepCompleted: false, submitAttempts: submission.attempts, reason: submission.reason || 'Cover-letter Send was retried, but the modal did not close.' };
     await vjaSiteStoreResult(plan, result);
     return result;
   }
@@ -572,6 +655,7 @@ async function vjaRunSiteApply(plan = {}, options = {}) {
     return result;
   }
 
+  if(!globalThis.vjaSubmissionGuard||!await globalThis.vjaSubmissionGuard.allow(plan))return {submitted:false,status:'needs-review',reason:'global-policy-review-required'};
   const pending = {
     ...plan,
     finalClicked: true,

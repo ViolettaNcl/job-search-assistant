@@ -65,7 +65,7 @@ const blocked = readiness.build(
     { token: "a", action: "review", reason: "Choose salary." },
     { token: "b", action: "blocked", reason: "Sensitive field." }
   ] },
-  { recommendedName: "Violetta-English.pdf" }
+  { recommendedName: "Demo-English.pdf" }
 );
 assert.equal(blocked.state, "blocked");
 assert.equal(blocked.blockedCount, 1);

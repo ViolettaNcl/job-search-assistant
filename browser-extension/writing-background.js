@@ -9,7 +9,7 @@ async function cpCompleteVacancy(input,sender,{embedded=false}={}){
       v=(await cpAcquireHhVacancy(v,sender,{fast:Boolean(embedded)})).vacancy;
     }else v=await cpReadVacancy(v.url,sender,{fast:Boolean(embedded)});
   }
-  if(!['full-dom','full-structured','full-fetch'].includes(v.descriptionCoverage)||String(v.description||'').trim().length<30||v.descriptionTruncated)throw new Error('Полное описание вакансии не прочитано. Сопроводительное письмо не отправлено: повторите попытку.');
+  if(!['full-dom','full-structured','full-fetch'].includes(v.descriptionCoverage)||String(v.description||'').trim().length<30||v.descriptionTruncated)throw new Error('Полное описание вакансии не прочитано. Сопроводительное письмо не подготовлено: повторите попытку.');
   if(!cpCore.sameVacancy(v,input))throw new Error('Открылась другая вакансия. Подготовка остановлена.');
   return v;
 }
@@ -28,6 +28,7 @@ async function cpCreateLetter(profile,v){
     const ai=await globalThis.vjaWritingProvider.complete(prompt,{repair:result?.validation?.errors});
     if(!ai.available)break;
     if(prompt.factAliasMap)ai.factIds=(ai.factIds||[]).map(id=>prompt.factAliasMap[id]||id);
+    ai.text=R.personalizeCover(ai.text,profile,lang);
     const validation=R.verify(ai.text,profile,{vacancy:v,kind:'cover',factIds:ai.factIds,allowedFacts:prompt.allowedFacts});
     if(ai.factIds.some(id=>!prompt.allowedFacts.some(f=>f.id===id)))validation.errors.push('evidence-outside-selection');
     if(R.language(ai.text)!==lang)validation.errors.push('wrong-language');
@@ -37,6 +38,9 @@ async function cpCreateLetter(profile,v){
    }
   }catch(e){providerError=e.message;}
   if(!result?.ok){const rejected=result?.validation?.errors||[];result=R.localCover(profile,v,lang);result.providerWarning=providerError||rejected.join(', ');}
+  result.text=R.personalizeCover(result.text,profile,lang);
+  result.validation=R.verify(result.text,profile,{vacancy:v,kind:'cover',factIds:result.factIds||[],allowedFacts:result.selection?.evidence||selection.evidence});
+  result.ok=result.validation.ok;
   if(!result.ok)throw new Error('Письмо не прошло проверку: '+(result.validation?.errors||result.errors||[]).join(', '));
   return {...result,audit:{version:'5.2.0',createdAt:Date.now(),profileRevision:T.revision(profile),vacancyHash:selection.analysis.descriptionHash,coverage:v.descriptionCoverage,source:result.source,factIds:result.factIds,facts:selection.allRanked.filter(x=>result.factIds.includes(x.fact.id)).map(x=>({id:x.fact.id,sourceId:x.fact.sourceId,reason:x.reason})),requirementMap:selection.requirementMap,excluded:selection.excluded,validation:result.validation,providerWarning:result.providerWarning||''}};
  })();

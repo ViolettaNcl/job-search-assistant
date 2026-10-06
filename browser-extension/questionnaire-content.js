@@ -4,7 +4,7 @@
   if(root.vjaQuestionnaireContent)return;
   const Q=root.vjaQuestionnaireCore,A=root.vjaSiteAdapters;
   const watchers=new WeakMap(),corrections=new WeakMap();
-  const fieldValue=el=>String(el?.isContentEditable?el.textContent:el?.value??'').replace(/\s+/g,' ').trim();
+  const fieldValue=el=>String(root.vjaChoiceControls?.value(el)??(el?.isContentEditable?el.textContent:el?.value??'')).replace(/\s+/g,' ').trim();
   function statusHost(el){
     let host=el?.parentElement?.querySelector?.(':scope > [data-vja-root="questionnaire-status"]');
     if(host)return host;host=document.createElement('span');host.dataset.vjaRoot='questionnaire-status';host.style.cssText='display:inline-flex;margin:4px 0 2px 6px;font:600 11px/1.2 system-ui,sans-serif;border-radius:999px;padding:3px 7px;vertical-align:middle;max-width:230px;white-space:normal;';
@@ -23,7 +23,7 @@
     else if(state==='review')host.style.cssText+='background:#fff8e7;color:#7a5914;border:1px solid #ecd18d;';
     else host.style.cssText+='background:#f4f5f8;color:#626b7b;border:1px solid #d8dce5;';
     if(meta.semanticKey)el.dataset.vjaQuestionnaireSemantic=meta.semanticKey;if(meta.category)el.dataset.vjaQuestionnaireCategory=meta.category;if(state==='filled'){el.dataset.vjaQuestionnaireAutofilled='1';delete el.dataset.vjaQuestionnaireSuggested;}else if(state==='suggested'){el.dataset.vjaQuestionnaireSuggested='1';delete el.dataset.vjaQuestionnaireAutofilled;}
-    if(['filled','suggested'].includes(state))trackCorrection(el,{...meta,question:meta.question||Q.questionText?.(el,A)||''});
+    if(['filled','suggested','review','unknown'].includes(state)&&!['LEGAL','CONSENT','WORK_AUTHORIZATION'].includes(meta.category)&&el.type!=='file')trackCorrection(el,{...meta,question:meta.question||Q.questionText?.(el,A)||''});
   }
   function signature(scope){
     const fields=A.formFields(scope);return fields.map((el,i)=>{const f=A.descriptor(el,i),q=Q.questionText(el,A);return Q.hash([f.type,f.required,q].join('|'));}).join(':');

@@ -15,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
+        if: hashFiles('src/JobSearchAssistant/JobSearchAssistant.csproj') != ''
         with:
           dotnet-version: '10.0.x'
       - uses: actions/setup-node@v4
@@ -25,10 +26,13 @@ jobs:
         run: python tools/check-repo-hygiene.py
 
       - name: Restore backend
+        if: hashFiles('src/JobSearchAssistant/JobSearchAssistant.csproj') != ''
         run: dotnet restore src/JobSearchAssistant/JobSearchAssistant.csproj
       - name: Build backend
+        if: hashFiles('src/JobSearchAssistant/JobSearchAssistant.csproj') != ''
         run: dotnet build src/JobSearchAssistant/JobSearchAssistant.csproj -c Release --no-restore
       - name: Test backend
+        if: hashFiles('tests/JobSearchAssistant.Tests/JobSearchAssistant.Tests.csproj') != ''
         run: dotnet test tests/JobSearchAssistant.Tests/JobSearchAssistant.Tests.csproj -c Release
 
       - name: Syntax-check extension JavaScript
@@ -48,8 +52,9 @@ jobs:
           node - <<'NODE'
           const fs=require('fs');
           const manifest=JSON.parse(fs.readFileSync('browser-extension/manifest.json','utf8'));
-          const project=fs.readFileSync('src/JobSearchAssistant/JobSearchAssistant.csproj','utf8');
-          const backendVersion=project.match(/<Version>([^<]+)<\/Version>/)?.[1] || 'unknown';
+          const path='src/JobSearchAssistant/JobSearchAssistant.csproj';
+          const project=fs.existsSync(path)?fs.readFileSync(path,'utf8'):'';
+          const backendVersion=project.match(/<Version>([^<]+)<\/Version>/)?.[1] || 'NOT RUN: backend source not in this checkout';
           if(!/^\d+\.\d+\.\d+$/.test(manifest.version)) throw new Error(`Invalid extension version: ${manifest.version}`);
           console.log(`Extension release: ${manifest.version}; compatible backend source release: ${backendVersion}`);
           NODE
@@ -58,3 +63,8 @@ jobs:
         run: node tests/product_worker_600.cjs
       - name: Product ML regression
         run: python -m unittest discover -s tests -p 'test_product_ml.py' -v
+
+      - name: RC3 real worker authorization gate
+        run: node tests/worker_authorization_rc3.cjs
+      - name: All Python unit tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v

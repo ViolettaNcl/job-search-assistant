@@ -16,6 +16,6 @@
 
 Records — зеркало payload с индексами collection, vacancyId, company, title, createdAt, analyzedAt, appliedAt, updatedAt, status, fitScore, outcome, source, canonicalFingerprint и compound collectionUpdated.
 
-Идентификатор вакансии и canonicalFingerprint имеют разные роли. Совпадение числового ID на HH и Habr само по себе не означает одинаковую вакансию. Полная семантическая cross-site identity ещё не завершена.
+Идентификатор вакансии и canonicalFingerprint имеют разные роли. Совпадение числового ID на HH, Habr и Avito само по себе не означает одинаковую вакансию. Для Avito ключи памяти используют форму `avito:<itemId>`. Полная семантическая cross-site identity ещё не завершена.
 
 Unknown поля legacy-объектов не удаляются миграцией. Время фиксируется числовыми timestamps; аналитика отсутствующих событий не должна создавать несуществующие действия.

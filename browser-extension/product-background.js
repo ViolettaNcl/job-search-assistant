@@ -21,10 +21,29 @@ async function cpRollbackModel(kind){
  const flags=(await chrome.storage.local.get(cpFeatureFlagsKey))[cpFeatureFlagsKey]||{};await chrome.storage.local.set({[cpModelRegistryKey]:reg,[cpFeatureFlagsKey]:{...flags,...(kind==='preference'?{mlRanking:true}:{})}});return reg;
 }
 async function cpRestoreProduct(data){
- await cpLearningWriteQueue;return applicationStateChange(async()=>{
- const current=await chrome.storage.local.get(null);
- const busy=Object.entries(current).some(([k,v])=>k.startsWith('vjaApplicationJob:')&&v?.tabId&&!v.completed&&!v.review);
- if(busy)throw new Error('Сначала завершите или остановите текущие отклики.');
- const plan=globalThis.vjaProductCore.restorePlan(data,current);await chrome.storage.local.set(plan.patch);cpInit=null;return {restored:plan.keyCount,paused:true};
+ await cpLearningWriteQueue;
+ return applicationStateChange(async()=>{
+   const current=await chrome.storage.local.get(null),syncCurrent=await chrome.storage.sync.get(null);
+   const busy=Object.entries(current).some(([k,v])=>k.startsWith('vjaApplicationJob:')&&v?.tabId&&!v.completed&&!v.review);
+   if(busy)throw new Error('Сначала завершите или остановите текущие отклики.');
+   const plan=globalThis.vjaProductCore.restorePlan(data,current);
+   const migration=globalThis.vjaProductMigrations.plan({...current,...plan.patch});
+   Object.assign(plan.patch,migration.patch);
+   try{
+     await chrome.storage.local.set(plan.patch);
+     await chrome.storage.sync.set(plan.syncPatch);
+     const actual=await chrome.storage.local.get(Object.keys(plan.patch)),syncActual=await chrome.storage.sync.get(Object.keys(plan.syncPatch));
+     for(const [k,v] of Object.entries(plan.syncPatch))if(JSON.stringify(syncActual[k])!==JSON.stringify(v))throw new Error('Sync restore verification failed.');
+     for(const [k,v] of Object.entries(plan.patch))if(JSON.stringify(actual[k])!==JSON.stringify(v))throw new Error('Restore verification failed.');
+     if(globalThis.indexedDB)await globalThis.vjaProductStore.mirror(actual);
+     cpInit=null;return {restored:plan.keyCount,paused:true,verified:true};
+   }catch(error){
+     const newKeys=Object.keys(plan.patch).filter(k=>!(k in current));
+     await chrome.storage.local.set(current);if(newKeys.length)await chrome.storage.local.remove(newKeys);
+     await chrome.storage.sync.set(syncCurrent);
+     const syncNew=Object.keys(plan.syncPatch).filter(k=>!(k in syncCurrent));if(syncNew.length)await chrome.storage.sync.remove(syncNew);
+     await chrome.storage.local.set({vjaIndexRetryRequired:true});
+     cpInit=null;throw new Error('Восстановление отменено; предыдущая память возвращена. Индекс будет перестроен.');
+   }
  });
 }

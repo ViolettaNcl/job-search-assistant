@@ -26,6 +26,7 @@ node tests/worker_authorization_rc3.cjs
 python -m unittest discover -s tests -p 'test_*.py' -v
 python tests/browser_os_rc3.py
 python tests/browser_e2e.py
+python tests/browser_avito_beta.py
 python tools/check-repo-hygiene.py
 ```
 
@@ -43,7 +44,7 @@ Chromium fixtures require Python Playwright and Chromium. Additional browser sui
 
 ## RC3 exact automated results
 
-The current report records **367/367 Node**, **34/34 Python**, **102/102 browser assertions**, **21/21 Control Center assertions**, **15/15 worker authorization assertions**, plus syntax/compile/workflow/hygiene checks. These numbers describe different suites and must not be summed into a single “E2E test count”.
+The current provider build records **388/388 Node**, **34/34 Python**, **16/16 Avito Chromium fixture assertions**, plus **19/19 worker authorization assertions** and focused HH retry scenarios. Both Chromium retry fixtures keep the current modal open for two native Send clicks, close it on the third, and include an unrelated stale “cover letter sent” label to verify vacancy-scoped confirmation. Earlier RC3 controlled-browser suites remain documented separately; the authenticated live HH flow is still not validated. These numbers describe different suites and must not be summed into a single “E2E test count”.
 
 ## Release gate
 
@@ -56,7 +57,7 @@ flowchart LR
     C -->|yes| FINAL[Eligible for Final Production review]
 ```
 
-Windows publisher/verifier, native IndexedDB, .NET rebuild and Habr live application flow keep independent statuses. Missing tooling or missing source is **NOT RUN**, never PASS.
+Windows publisher/verifier, native IndexedDB, .NET rebuild, Habr live application flow and authenticated Avito one-click chat send keep independent statuses. Missing tooling or missing source is **NOT RUN**, never PASS.
 
 ---
 

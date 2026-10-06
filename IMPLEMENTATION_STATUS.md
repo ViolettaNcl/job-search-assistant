@@ -22,7 +22,7 @@
 | 16 | Letter performance | **Частично** | Группы/длина/edited-данные. Полная классификация четырёх style groups не завершена. |
 | 17 | Weekly report | **Сохранено / частично** | Локальный недельный отчёт прежнего центра, не весь HH-аккаунт. |
 | 18 | Duplicate detector 2.0 | **Частично** | Исправлены empty similarity и cross-provider ID. Полная семантика responsibilities/skills/salary не завершена. |
-| 19 | Second provider | **BETA** | Habr adapter и фикстуры; NOT LIVE VALIDATED. |
+| 19 | Second provider | **BETA** | Habr adapter и фикстуры; NOT LIVE VALIDATED. Дополнительно добавлен Avito Vacancies BETA для анализа и explicit one-click exact-chat fill/send одного сообщения; NOT LIVE VALIDATED. |
 | 20 | Canonical identity | **Частично** | Source/ID и детерминированный fingerprint; полная cross-site дедупликация не завершена. |
 | 21 | Real personal ML | **Частично** | Существующий logistic trainer, provenance gate и метрики. Нет нового real-data обучения / Gradient Boosting. |
 | 22 | Engagement model | **Частично** | Отдельный target и pipeline сохранены. Качество на реальных outcomes не измерено. |
@@ -45,7 +45,7 @@
 | 39 | Accessibility / UX | **Частично** | Focus/labels/reduced-motion/mobile DOM checks. Полный screen-reader audit не выполнен. |
 | 40 | Performance | **Частично** | Курсоры, debounce, прежний bounded concurrency/cache. Legacy get(null) остаётся; stress-test не выполнен. |
 | 41 | Automation safety | **Частично** | Новая глобальная политика и worker gate, 15 отдельных тестов. Полный old-backend audit не выполнен. |
-| 42 | Live acceptance | **Не выполнено** | Все живые HH/Habr пункты NOT LIVE VALIDATED. |
+| 42 | Live acceptance | **Не выполнено** | Все живые HH/Habr/Avito пункты NOT LIVE VALIDATED. |
 | 43 | Release signing | **Частично** | SHA-256 manifest и verifier. Криптографической подписи релиза нет; optional signed tag с внешним ключом. |
 | 44 | Repository safety | **Реализовано для новой поставки** | Source allowlist, private/runtime exclusion, hashes. Старая Git history и неизвестные файлы не очищены. |
 | 45 | CI / test matrix | **Частично** | Выполненные группы и точные числа — test report. .NET/PowerShell/live не PASS. |

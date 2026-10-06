@@ -9,7 +9,7 @@
     {id:'email',label:'Email',text:'Конечно: {{email}}'},
     {id:'interview_time',label:'Интервью / время',text:'Спасибо за приглашение! Мне интересно продолжить. Подскажите, пожалуйста, доступные дату, время, часовой пояс и формат собеседования — я сверю и подтвержу.'}
   ];
-  const defaultPersonalReply={id:'default-feedback-ru',label:'Спасибо, буду ждать',language:'ru',text:'Здравствуйте! Спасибо за ответ. Буду ждать обратной связи.\n\nЕсли будет возможность, пожалуйста, напишите мне здесь в чате, в Telegram @Violet111 или на почту violettanicolaou@gmail.com. По обычному телефонному звонку могу не успеть ответить.'};
+  const defaultPersonalReply={id:'default-feedback-ru',label:'Спасибо, буду ждать',language:'ru',text:'Здравствуйте! Спасибо за ответ. Буду ждать обратной связи.\n\nЕсли будет возможность, пожалуйста, напишите мне здесь в чате. По обычному телефонному звонку могу не успеть ответить.'};
   function intent(s=''){
     if(/telegram|телеграм/i.test(s)&&/пришл|отправ|укаж|какой|send|share|what/i.test(s))return 'REQUEST_TELEGRAM';
     if(/email|e-mail|почт/i.test(s)&&/пришл|отправ|укаж|какой|send|share|what/i.test(s))return 'REQUEST_EMAIL';

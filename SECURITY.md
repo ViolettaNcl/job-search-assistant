@@ -1,57 +1,91 @@
-# Security and Privacy
+# Security · Безопасность
 
-## Scope
+**Release:** 6.0.0 RC3  
+**Security posture:** local-first, review-gated automation, explicit trust boundaries. This document is an engineering security model, not a security certification.
 
-Violetta Apply Assistant is a browser automation tool that reads job pages and may store candidate context locally. Its security model is therefore based on least privilege, explicit site permissions and source/release separation.
+## Threat model
 
-## Chrome permissions
+The project treats the following as high-impact failure classes:
 
-The extension uses permissions required for:
+- accidental publication of CV/profile/history/secrets;
+- cross-vacancy or cross-company leakage of answers;
+- fabricated personal/professional facts;
+- unsafe automatic submission on an unexpected page/origin;
+- destructive restore/migration behavior;
+- secret/token leakage through diagnostics, logs or backups;
+- treating an unvalidated provider/control as safe merely because a selector matched.
 
-- storage;
-- tab/background vacancy reading;
-- script injection on supported hosts;
-- HH navigation handling;
-- optional access to additional employer forms.
+## Trust boundaries
 
-Host access is explicitly declared for HH/HeadHunter and HH API. Optional broad host access should be granted only when needed for external forms.
+```mermaid
+flowchart LR
+    USER[User-controlled facts/preferences] --> EXT[Extension]
+    SITE[Job-site DOM/API] --> EXT
+    EXT --> POLICY[Automation policy gate]
+    EXT --> LOCAL[(Local browser storage)]
+    LOCAL --> ENC[Encrypted backup export]
+    EXT -. optional configured text service .-> EXTERNAL[External AI provider]
 
-## Candidate data
-
-Candidate profile, CV assets and answer memory may contain personal information. Keep that in mind before making a repository public.
-
-The current personalized release package can contain candidate-specific assets and learning/model exports can encode behavioral preferences. Treat those artifacts as private unless intentionally shared. 5.2 does not claim encrypted-vault storage.
-
-See [docs/PRIVACY_AND_DATA.md](docs/PRIVACY_AND_DATA.md).
-
-## Secrets and local files
-
-The source publisher and hygiene checker reject or ignore common private/runtime files:
-
-- `.env`;
-- `candidate.private.json`;
-- `appsettings.local.json`;
-- `user-settings.cmd`;
-- databases;
-- logs;
-- binaries/build outputs.
-
-Never commit API keys or credentials directly into JavaScript, JSON, CMD or Markdown files.
-
-## Submission safety
-
-Questionnaire autofill distinguishes confirmed evidence from reviewable drafts. Unknown legal/work-authorization facts are intentionally not fabricated. Final submission remains blocked/user-controlled when review is required.
-
-## Repository hygiene
-
-Before push:
-
-```powershell
-python tools/check-repo-hygiene.py
+    PRIVATE[CV / profile / history / secrets] -. must not enter .-> PUBLIC[Public repository]
+    POLICY -->|allow| ACTION[Native site action]
+    POLICY -->|deny / uncertain| REVIEW[Manual review]
 ```
 
-CI repeats this check to prevent accidental commits of FULL/runtime folders.
+## Security controls in RC3
 
-## Reporting
+| Control | Purpose | Boundary |
+|---|---|---|
+| Manual / Assist / Autopilot modes | Prevent unintended automation | Autopilot still depends on page/provider confidence |
+| Worker authorization checks | Re-check mode, opt-in, origin, Fit and risk conditions | Does not prove every legacy backend path was audited |
+| Fact/draft separation | Prevent fabricated candidate history | Depends on correct source labeling and user confirmation |
+| Vacancy/company answer scope | Reduce cross-context leakage | User-marked reusable answers may intentionally cross scope |
+| Review gates | Stop on legal/unknown/high-risk fields | Unsupported UI may require manual completion |
+| Backup encryption | Protect portable `.vja` exports | Does not encrypt all Chrome runtime storage or the FULL package |
+| Diagnostics redaction | Reduce secret/private-text exposure | User should still review exported diagnostics before sharing |
+| Repository allowlist/hygiene | Keep private/binary runtime out of Git source update | Does not rewrite old Git history automatically |
 
-If the project is shared with other users, security issues should be reported privately before publishing exploit details or personal data.
+## Stop conditions
+
+Automation should stop and require manual review for:
+
+- CAPTCHA or anti-bot verification;
+- payment requests;
+- identity verification / passport flows;
+- unknown required factual fields;
+- legal/work-authorization questions without confirmed data;
+- unexpected file upload requests;
+- suspicious/untrusted external origins;
+- ambiguous controls where a safe target cannot be identified.
+
+Do not bypass provider protection mechanisms.
+
+## Secrets and private data
+
+Never publish or attach to a public issue:
+
+- CVs or private profiles;
+- `.vja` backups;
+- tokens, cookies, API keys or credentials;
+- recruiter conversations or application history;
+- raw learning datasets/model artifacts tied to personal history;
+- the personal FULL package.
+
+If a secret was committed previously, removing it from the current tree is not enough: rotate/revoke it at the provider and clean history separately if required.
+
+## Cryptographic scope
+
+SHA-256 release manifests provide **integrity checking**, not author identity. Encrypted backup payloads use authenticated encryption; this protection does not automatically extend to browser storage, LocalAppData copies or the unencrypted private files in FULL.
+
+## Legacy Windows backend boundary
+
+The Windows runtime carried forward from RC2 was not rebuilt from C# sources in this pass because those sources were not present in the supplied baseline. The extension's RC3 worker policy must therefore not be interpreted as a complete security audit of every legacy backend execution path.
+
+---
+
+# Кратко по-русски
+
+RC3 проектируется по принципу **fail safe**: если неизвестен обязательный факт, не определён безопасный control, появился CAPTCHA/оплата/идентификация/юридический вопрос или origin вызывает сомнение, автоматизация должна остановиться.
+
+Публичный GitHub не предназначен для CV, профиля, истории откликов, переписок, `.vja`, токенов и FULL-поставки. SHA-256 проверяет целостность, но не является цифровой подписью автора. Шифрование backup не означает, что вся Chrome-память или FULL автоматически зашифрованы.
+
+До живой приёмки критического HH workflow рекомендуется режим **Assist**.

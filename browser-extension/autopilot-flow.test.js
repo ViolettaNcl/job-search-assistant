@@ -1,7 +1,7 @@
 // Exercise the real background orchestration with isolated Chrome/HTTP fixtures.
 const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 async function scenario({queued=false,pauseAfterImport=false,pending=false,letter=true,enabledAtRun=true,roles=['Junior C# Developer','Junior .NET Developer']}={}) {
-  const data={},trace=[],queue=queued?[{vacancyId:'one',title:'Junior C# Developer',url:'https://hh.ru/vacancy/1',matchScore:90,eligibilityStatus:'Eligible',remote:true,description:'C# ASP.NET Core SQL Server REST API Docker remote'}]:[];
+  const data={vjaAutomationPolicyV1:{mode:'autopilot',explicitOptIn:true,paused:false,approvedCategories:['developer'],dailyLimit:20}},trace=[],queue=queued?[{vacancyId:'one',title:'Junior C# Developer',url:'https://hh.ru/vacancy/1',matchScore:90,eligibilityStatus:'Eligible',remote:true,description:'C# ASP.NET Core SQL Server REST API Docker remote'}]:[];
   let enabled=false,nextTab=0;const tabs=new Map();
   const status=()=>({allowed:true,autoApplyEnabled:enabled,remainingToday:5,autoApplyMinimumScore:50,browserSearchQueries:['Junior C#'],automationMode:'browser-extension'});
   const local={get:async k=>typeof k==='string'?{[k]:data[k]}:{...data},set:async v=>Object.assign(data,v),remove:async k=>[].concat(k).forEach(x=>delete data[x]),setAccessLevel:async()=>{}};
@@ -13,6 +13,7 @@ async function scenario({queued=false,pauseAfterImport=false,pending=false,lette
       if(m.type==='vjaSiteApplyReady')return {ready:true};
       assert(m.plan.coverLetter.length>40,'each vacancy must receive a prepared local letter');assert(!/Crowne|Front Desk|Receptionist/i.test(m.plan.coverLetter));trace.push('role:'+m.plan.jobTitle);trace.push('letter:'+m.plan.coverLetter);trace.push('submit:'+m.plan.trackedId);return pending?{status:'submitted-needs-letter'}:{status:'confirmed',submitted:true,coverLetterFilled:letter};}
   }}};
+  data.vjaCandidateTruthProfile=JSON.parse(fs.readFileSync(require('node:path').join(__dirname,'../tests/fixtures/candidate-seed.fixture.json'),'utf8'));
   vm.createContext(context);context.importScripts=(...paths)=>paths.forEach(p=>vm.runInContext(fs.readFileSync(__dirname+'/'+p,'utf8'),context));
   context.fetch=async(url,options)=>{let value={};if(url.endsWith('/status')&&!options?.method)value=status();
     else if(url.includes('/api/application-queue?')){assert(url.includes('automaticOnly=true'));value=queue;}

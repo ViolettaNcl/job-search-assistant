@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Violetta Apply Assistant",
   "version": "6.0.0",
-  "description": "Violetta 6.0 RC2: standalone questionnaire Fill, local real-label ML training, Habr Career beta, migrations and release verification.",
+  "description": "Анализ HH и Avito-вакансий, Calls/Fit, индивидуальные письма по подтверждённым данным CV. Avito BETA: отправка одного сообщения после явного нажатия «Письмо».",
   "permissions": [
     "activeTab",
     "storage",
@@ -21,7 +21,9 @@
     "https://api.hh.ru/*",
     "https://headhunter.kg/*",
     "https://*.headhunter.kg/*",
-    "https://career.habr.com/*"
+    "https://career.habr.com/*",
+    "https://avito.ru/*",
+    "https://*.avito.ru/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -63,6 +65,7 @@
         "ats-controls.js",
         "field-verification.js",
         "chat-reader.js",
+        "questionnaire-controls.js",
         "site-adapters.js",
         "copilot-ui.js",
         "content.js",
@@ -75,6 +78,7 @@
         "submission-receipt.js",
         "submission-receipt-content.js",
         "site-apply.js",
+        "submission-guard-content.js",
         "site-apply-content.js",
         "hh-list-quick-apply-core.js",
         "hh-list-quick-apply.js",
@@ -92,6 +96,21 @@
         "recruiter-chat.js",
         "quick-replies.js",
         "recruiter-chat-content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://avito.ru/*",
+        "https://*.avito.ru/*"
+      ],
+      "all_frames": false,
+      "js": [
+        "copilot-core.js",
+        "ats-structured.js",
+        "site-adapters.js",
+        "avito-vacancies-core.js",
+        "avito-vacancies.js"
       ],
       "run_at": "document_idle"
     }
@@ -133,5 +152,6 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "version_name": "6.0.0 RC2 — Questionnaire Fill & Real-label ML"
+  "version_name": "6.0.0 RC3 Avito One-Click Message BETA",
+  "web_accessible_resources": []
 }

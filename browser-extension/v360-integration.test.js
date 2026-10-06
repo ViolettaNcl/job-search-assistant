@@ -20,12 +20,7 @@ test('main Apply routes job descriptions directly to auto-apply without opening 
   assert.match(read('copilot-background.js'),/fileData:prepared\.cvFile\|\|null/);
 });
 
-test('bundled Russian and English CV PDFs ship with extension',()=>{
-  for(const file of ['assets/cv/Violetta_Nicolaou_CV_RU.pdf','assets/cv/Violetta_Nicolaou_CV_EN.pdf']){
-    const full=path.join(root,file);assert.ok(fs.existsSync(full),file);const b=fs.readFileSync(full);assert.equal(b.subarray(0,5).toString(),'%PDF-');
-  }
-  assert.match(read('bundled-cv.js'),/cvVaultRu/);assert.match(read('bundled-cv.js'),/cvVaultEn/);
-});
+test('public extension ships an empty profile and no private PDFs',()=>{assert.equal(require('./candidate-seed.js').emptySeed,true);assert.equal(fs.existsSync(path.join(root,'assets/cv')),false);assert.match(read('bundled-cv.js'),/needsImport/);});
 
 test('chat pencil stays context-local and no vacancy chooser is rendered',()=>{
   const chat=read('recruiter-chat-content.js');
@@ -38,8 +33,8 @@ test('quick replies are Russian-only and ship requested default reply',()=>{
   const q=read('quick-replies.js');
   assert.match(q,/feedback_default/);assert.match(q,/Спасибо, буду ждать/);
   assert.match(q,/Здравствуйте! Спасибо за ответ\. Буду ждать обратной связи/);
-  assert.match(q,/@Violet111/);
-  assert.match(q,/violettanicolaou@gmail\.com/);
+  assert.match(q,/\{\{telegram\}\}/);
+  assert.match(q,/\{\{email\}\}/);
   assert.match(q,/slice\(0,5\)/);assert.doesNotMatch(q,/test_assignment|test_deadline|next_stage/);
 });
 
@@ -81,11 +76,11 @@ test('3.8.0 launcher exposes backend diagnostics and uses the exact loopback hos
   assert.match(stop,/JobSearchAssistant/);
 });
 
-test('3.8.0 fresh backend config permits user-started autopilot and names bundled CVs correctly',()=>{
+test('3.8.0 fresh backend config disables automatic submission and names bundled CVs correctly',()=>{
   const file=path.join(root,'../backend/appsettings.json');if(!fs.existsSync(file))return;const cfg=JSON.parse(fs.readFileSync(file,'utf8'));
-  assert.equal(cfg.Security.EnableAutomaticSubmission,true);
-  assert.equal(cfg.Candidate.EnglishCvFileName,'Violetta_Nicolaou_CV_EN.pdf');
-  assert.equal(cfg.Candidate.RussianCvFileName,'Violetta_Nicolaou_CV_RU.pdf');
+  assert.equal(cfg.Security.EnableAutomaticSubmission,false);
+  assert.match(cfg.Candidate.EnglishCvFileName,/_EN\.pdf$/);
+  assert.match(cfg.Candidate.RussianCvFileName,/_RU\.pdf$/);
 });
 
 test('runtime API defaults use 127.0.0.1 rather than localhost',()=>{
@@ -248,7 +243,8 @@ test('3.9.10 submits the dedicated HH cover-letter modal instead of generic fina
   const content=read('site-apply-content.js'),core=read('site-apply.js');
   assert.match(content,/vjaHhCoverLetterSubmitAction/);
   assert.match(content,/hh-cover-letter-submit-not-found/);
-  assert.match(content,/letterSubmit\.candidate\.el\.click/);
+  assert.match(content,/vjaSiteSubmitHhCoverLetterWithRetry/);
+  assert.match(content,/submitAttempts:\s*submission\.attempts/);
   assert.match(core,/chooseHhCoverLetterSubmit/);
 });
 

@@ -29,7 +29,7 @@
   function applyLabel(){return root.vjaApplicationState?.label?.(applyState)||({CONFIRMED:'✓ Отклик отправлен',DUPLICATE:'✓ Уже откликнулись',FAILED:'! Повторить',REVIEW_REQUIRED:'! Нужна проверка'}[applyState]||'✦ Apply');}
   function setApplyState(state,message='',kind='neutral'){applyState=state;renderBar();closeToast();if(message){toast=U.toast(message,bar?.box,kind,state==='CONFIRMED'||state==='DUPLICATE'?5500:0);}}
   function show(title='Подготовка отклика'){close();panel=U.panel(title);return panel;}
-  function inputValue(el){return el.isContentEditable?el.textContent:el.value;}
+  function inputValue(el){return root.vjaChoiceControls?.value(el)??(el.isContentEditable?el.textContent:el.value);}
   function pageContextText(){return C.clip([document.title,A.text(document.body,18000)].filter(Boolean).join('\n'),20000);}
   function mark(el,reason){el.setAttribute('data-vja-needs-review',reason);el.style.outline='2px solid #c29438';el.style.outlineOffset='2px';}
   function clearMark(el){if(el.hasAttribute('data-vja-needs-review')){el.removeAttribute('data-vja-needs-review');el.style.outline='';el.style.outlineOffset='';}}
@@ -40,6 +40,7 @@
     const vacancy=data.application?.vacancy||data.context?.vacancy||{},vacancyKey=C.vacancyKey(vacancy)||vacancy.vacancyId||vacancy.url||'';
     const addReview=(f,reason,extra={})=>{const k=extra.semanticKey||f?.token||`${f?.label||''}:${reason}`;if(reviewKeys.has(k))return;reviewKeys.add(k);review++;unresolved.push({label:C.clip(f?.label||'',180),reason:C.clip(reason||'Нужна проверка',220),category:extra.category||'UNKNOWN',semanticKey:extra.semanticKey||'',required:Boolean(f?.required)});};
     async function setValue(el,f,value,{allowReviewDraft=false}={}){
+      const choice=await root.vjaChoiceControls?.set(el,value);if(choice!==null&&choice!==undefined)return choice;
       let ok=false;
       if(f.type==='select'){
         const values=[...el.options].filter(o=>o.value&&[o.value,o.textContent].some(v=>C.clean(v).toLowerCase()===C.clean(value).toLowerCase()));
@@ -60,7 +61,7 @@
         filledFields.push({semanticKey,category,label:C.clip(f.label,180),source:suggested?'existing-human-fallback':autoFilled?'existing-auto-fill':'existing-user-value',required:Boolean(f.required),answer:f.type==='file'?'':C.clip(existing,1200),evidenceIds:[]});
         if(f.type==='file')cvUploaded=true;if(category==='COVER_LETTER'||/cover.?letter|сопровод/i.test(f.label))coverLetterFilled=true;
         if(suggested){const reason='Черновик создан без подтверждённого факта — проверьте перед отправкой.';addReview(f,reason,{category,semanticKey});mark(el,reason);QC?.decorate?.(el,'suggested',{category,semanticKey,reason});return;}
-        if(existing&&!autoFilled&&['text','textarea','email','tel','number'].includes(String(f.type||'').toLowerCase())&&(!Q?.isDecisionCategory?.(category)||category==='SALARY')&&QM?.remember){await QM.remember({semanticKey,normalizedQuestion:Q.normalize(question),answer:existing,source:'user-entered-form',confidence:1,userConfirmed:true,vacancyKey:Q.isVacancySpecific(category)?vacancyKey:'',category,evidenceIds:[]});}
+        if(existing&&!autoFilled&&['text','textarea','email','tel','number'].includes(String(f.type||'').toLowerCase())&&(!Q?.isDecisionCategory?.(category)||category==='SALARY')&&QM?.remember){try{await QM.remember({semanticKey,normalizedQuestion:Q.normalize(question),answer:existing,source:'unverified-existing-form',confidence:.5,userConfirmed:false,vacancyKey,company:vacancy.company||'',originalWording:question,category,evidenceIds:[]});}catch{/* Preserve the user's existing field value. */}}
         return;
       }
       try{
@@ -69,9 +70,10 @@
           const result=typeof vjaUploadCv==='function'?vjaUploadCv(data.cvFile,el):{success:false};
           if(result.success){cvUploaded=true;filled++;filledFields.push({semanticKey,category,label:C.clip(f.label,180),source:'selected-cv',required:Boolean(f.required)});QC?.decorate?.(el,'filled',{category,semanticKey,reason:'Выбрано сохранённое CV'});}else{addReview(f,'Файл не прикреплён',{category,semanticKey});mark(el,'Файл не прикреплён');QC?.decorate?.(el,'review',{category,semanticKey,reason:'Файл не прикреплён'});}return;
         }
-        const memoryEntry=QM?.get?await QM.get(semanticKey,{vacancyKey,vacancySpecific:Boolean(Q?.isVacancySpecific?.(category)),question}):null;
+        // A denied/unavailable optional memory must not block confirmed-profile filling.
+        let memoryEntry=null;try{memoryEntry=QM?.get?await QM.get(semanticKey,{vacancyKey,vacancySpecific:Boolean(Q?.isVacancySpecific?.(category)),question}):null;}catch{/* No cross-origin memory; profile decisions remain gated by the prepared application. */}
         let d=QE?.decide?.({question,field:f,profile:data.profile,context:{coverLetter:data.coverLetter,role:data.role,vacancy,vacancyKey},memoryEntry})||null;
-        if(!d||d.category==='UNKNOWN'){
+        if(!d||(d.category==='UNKNOWN'&&/^(?:first.?name|last.?name|full.?name|имя|фамилия|фио)(?:\s|$)/i.test(f.label))){
           const fallback=C.fieldDecision(f,data.profile,{coverLetter:data.coverLetter,role:data.role});
           if(fallback.action==='fill')d={...fallback,category,semanticKey,source:'confirmed-profile',confidence:.9,requiresReview:false};
           else if(!d)d={...fallback,category,semanticKey,source:'confirmed-profile',confidence:0};
@@ -89,7 +91,7 @@
             const reason='Черновик создан без подтверждённого факта — проверьте перед отправкой.';addReview(f,reason,{category,semanticKey});mark(el,reason);QC?.decorate?.(el,'suggested',{category,semanticKey,reason});
           }else{
             QC?.decorate?.(el,'filled',{category,semanticKey,reason:d.reason||'Подтверждённые данные'});
-            if(QM?.remember)await QM.remember({semanticKey,normalizedQuestion:Q.normalize(question),answer:value,source:d.source||'confirmed-profile',confidence:Number(d.confidence||.9),userConfirmed:false,vacancyKey:Q.isVacancySpecific(category)?vacancyKey:'',category,evidenceIds:entry.evidenceIds});
+            if(QM?.remember){try{await QM.remember({semanticKey,normalizedQuestion:Q.normalize(question),answer:value,source:d.source||'confirmed-profile',confidence:Number(d.confidence||.9),userConfirmed:false,vacancyKey,company:vacancy.company||'',originalWording:question,category,evidenceIds:entry.evidenceIds});}catch{entry.memorySaved=false;}}
           }
         }else{addReview(f,'Значение не сохранилось',{category,semanticKey});mark(el,'Значение не сохранилось');QC?.decorate?.(el,'review',{category,semanticKey,reason:'Значение не сохранилось'});}
       }catch(e){addReview(f,'Не удалось заполнить',{category,semanticKey});if(el.isConnected){mark(el,'Не удалось заполнить');QC?.decorate?.(el,'review',{category,semanticKey,reason:e?.message||'Не удалось заполнить'});}}
@@ -111,8 +113,8 @@
       next.click();await wait(300);void prepare({open:false,autoContinue:false});
     }));
     p.body.append(actions);p.place();
-    QC?.observeForm?.(scope,()=>{setTimeout(()=>{if(!working&&current().detectApplicationForm())void prepare({open:false,autoContinue:false,autoDepth});},80);});
-    if(autoContinue&&!review&&next&&autoDepth<4&&next.isConnected&&C.safeNavigation(navigationMeta(next))){
+    QC?.observeForm?.(scope,()=>{setTimeout(()=>{if(!working&&data.automation?.mode!=='manual'&&current().detectApplicationForm())void prepare({open:false,autoContinue:false,autoDepth});},80);});
+    if(autoContinue&&data.automation?.mode!=='manual'&&!review&&next&&autoDepth<4&&next.isConnected&&C.safeNavigation(navigationMeta(next))){
       status.textContent=`✓ Заполнено полей: ${filled}. Перехожу к следующему безопасному шагу…`;
       next.click();setTimeout(()=>{if(current().detectApplicationForm())void prepare({open:false,autoContinue:true,autoDepth:autoDepth+1});},420);return {...result,advanced:true};
     }
@@ -161,7 +163,7 @@
       setTimeout(()=>{if(working&&applyState==='ANALYZING')setApplyState('CV_SELECTED','Выбираю подходящее CV и готовлю сопроводительное письмо…');},180);
       setTimeout(()=>{if(working&&['ANALYZING','CV_SELECTED'].includes(applyState))setApplyState('LETTER_READY','Сопроводительное письмо готовится под эту вакансию…');},520);
       setTimeout(()=>{if(working&&!['CONFIRMED','DUPLICATE','REVIEW_REQUIRED','FAILED'].includes(applyState))setApplyState('SUBMITTING','Заполняю форму и отправляю отклик в этой же вкладке…');},900);
-      const result=await request('auto-apply',{vacancy});
+      const result=await request('auto-apply',{vacancy,userInitiated:true,intent:'vacancy-page-apply-letter'});
       if(result?.ok===false)throw new Error(result.error||'Не удалось запустить отклик.');
       applyMeta=result?.application||null;
       if(result?.duplicate){setApplyState('DUPLICATE',result.message||'На эту вакансию уже был отправлен отклик.','ok');return {submitted:false,status:'duplicate'};}

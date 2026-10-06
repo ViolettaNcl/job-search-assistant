@@ -4,7 +4,7 @@
 
 Automated tests PASS **и** критический пользовательский smoke-test HH. Поскольку живая приёмка не выполнена, эта поставка — **6.0.0 RC3**, хотя имена архивов используют запрошенное `6.0.0`. `manifest.version_name` и документация содержат RC3.
 
-Не отмечайте Habr как VALIDATED по DOM-фикстурам. Не объявляйте .NET PASS при отсутствии исходников или до assertions.
+Не отмечайте Habr или Avito как VALIDATED по DOM-фикстурам. Avito one-click message sending остаётся BETA: одно явное действие, exact-chat verification, bounded retry и fail-closed stops; это не заменяет авторизованную live-проверку. Не объявляйте .NET PASS при отсутствии исходников или до assertions.
 
 ## Проверка файлов
 

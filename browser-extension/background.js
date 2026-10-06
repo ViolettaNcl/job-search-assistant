@@ -1,3 +1,6 @@
+importScripts('private-profile.js');
+try { importScripts('private-bootstrap.local.js'); } catch (_) { /* Optional personal bootstrap exists only in the private FULL package. */ }
+importScripts("product-store.js", "structured-log.js", "automation-policy.js");
 importScripts("product-core.js", "product-models.js", "product-migrations.js", "questionnaire-memory.js");
 importScripts("candidate-seed.js", "candidate-truth.js", "relevance-engine.js", "vacancy-fit.js", "learning-core.js", "model-runtime.js", "model-monitor.js", "semantic-index.js", "duplicate-detector.js", "recruiter-intelligence.js", "site-adapter-core.js", "outcome-analytics-v2.js", "context-reply.js", "writing-provider.js");
 importScripts("copilot-core.js", "hh-list-quick-apply-core.js", "profile-defaults.js", "quick-replies.js", "bundled-cv.js", "followup-intelligence.js", "application-analytics.js", "application-state-machine.js");
@@ -13,7 +16,7 @@ async function restrictLocalStorageAccess() {
   }
 }
 
-async function runProductMigration(){try{const all=await chrome.storage.local.get(null),m=globalThis.vjaProductMigrations?.plan?.(all);if(m?.changed)await chrome.storage.local.set(m.patch);}catch(error){console.warn('Violetta Apply Assistant: migration failed',error);}}
+async function runProductMigration(){try{const all=await chrome.storage.local.get(null),m=globalThis.vjaProductMigrations?.plan?.(all);if(m?.changed){await chrome.storage.local.set(m.patch);globalThis.vjaProductMigrations.validate(all,await chrome.storage.local.get(null));}}catch(error){console.warn('Violetta Apply Assistant: migration failed',error);}}
 
 async function normalizeLocalApiBase() {
   try {
@@ -31,7 +34,6 @@ async function normalizeLocalApiBase() {
 chrome.runtime.onInstalled.addListener(() => {
   void restrictLocalStorageAccess();
   void normalizeLocalApiBase();
-void runProductMigration();
   void runProductMigration();
 });
 
@@ -285,6 +287,7 @@ async function browserAutopilotApplyNext(api) {
 }
 
 async function runBrowserAutopilot() {
+  const savedPolicy=(await chrome.storage.local.get('vjaAutomationPolicyV1')).vjaAutomationPolicyV1||{};if(savedPolicy.mode!=='autopilot'||savedPolicy.explicitOptIn!==true||savedPolicy.paused===true)return;
   if (browserAutopilotRunning) return;
   browserAutopilotRunning = true;
   let api = "";
@@ -396,3 +399,5 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
 importScripts("writing-background.js", "copilot-background.js");
 
 importScripts("product-background.js");
+
+importScripts("production-background.js");

@@ -1,13 +1,16 @@
-VIOLETTA 6.0.0 RC2 — TEST BUILD
+Violetta Apply Assistant 6.0.0 RC3
 
-1. Test the extension/ folder. Manifest version: 6.0.0 (RC2 in version_name).
-2. Dedicated HH questionnaire pages now get an inline ✦ Fill beside the native response button.
-3. Fill prepares answers but never clicks the employer submit button.
-4. Learning Center can train a real local logistic model only after enough real labels exist.
-5. career.habr.com is enabled as a beta second provider for vacancy reading/assistant surfaces; logged-in apply is not claimed production-validated.
-6. Export/backup before testing. Do not uninstall the existing extension first.
-7. Use the publisher for GitHub; do not copy FULL into the repository.
-8. Optional: publish with -SignTag if Git signing is configured.
+1. Сначала сохраните .vja из установленного расширения.
+2. Обновляйте ту же папку extension; не удаляйте карточку Chrome.
+3. Откройте chrome://extensions и нажмите Обновить на существующей карточке.
+4. Для новой установки загрузите распакованную папку extension.
+5. Откройте Центр управления. Первый запуск позволяет импортировать
+   private-data/PRIVATE_IMPORT.vja-profile.json после проверки фактов.
+6. Проверьте профиль, CV и Assist. Затем выполните один Analysis на HH.
+7. Для Авито откройте раздел /vakansii/: Analysis и Письмо работают в BETA; одно явное нажатие Письмо анализирует вакансию, открывает точный чат, вставляет и отправляет одно сообщение.
 
-The Windows backend is retained from 5.2.0 and is not rebuilt in this RC.
-Live HH account acceptance still requires your smoke test.
+FULL содержит личные данные. Не загружайте его в GitHub.
+Для репозитория предназначен GITHUB-UPDATE и проверяемый publisher.
+RC3 не является Final Production: живой HH smoke-test и авторизованная приёмка Avito ещё не выполнены.
+
+Инструкция: README.md и docs/USER_GUIDE.md.

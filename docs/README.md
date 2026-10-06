@@ -46,6 +46,7 @@ flowchart TB
 | Understand trust boundaries and modules | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) |
 | Install/update and operate the extension | [`USER_GUIDE.md`](USER_GUIDE.md) |
 | Understand features and limits | [`FEATURES.md`](FEATURES.md) |
+| Use Avito Vacancies BETA | [`../browser-extension/AVITO_VACANCIES_BETA.md`](../browser-extension/AVITO_VACANCIES_BETA.md) |
 | Review privacy and personal-data handling | [`PRIVACY_AND_DATA.md`](PRIVACY_AND_DATA.md) |
 | Create or restore a backup | [`BACKUP_AND_RESTORE.md`](BACKUP_AND_RESTORE.md) |
 | Inspect tests and exact RC3 results | [`TEST_REPORT_6.0.0.md`](TEST_REPORT_6.0.0.md) |
@@ -69,6 +70,7 @@ Do not collapse these statuses into a single “works” label. Unsupported prov
 - Быстро понять продукт: [`../README.md`](../README.md), раздел **Русский**.
 - Архитектура и границы системы: [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
 - Инструкция пользователя: [`USER_GUIDE.md`](USER_GUIDE.md).
+- Авито BETA: [`../browser-extension/AVITO_VACANCIES_BETA.md`](../browser-extension/AVITO_VACANCIES_BETA.md).
 - Приватность и личные данные: [`PRIVACY_AND_DATA.md`](PRIVACY_AND_DATA.md).
 - Backup / Restore: [`BACKUP_AND_RESTORE.md`](BACKUP_AND_RESTORE.md).
 - Точный отчёт тестов: [`TEST_REPORT_6.0.0.md`](TEST_REPORT_6.0.0.md).

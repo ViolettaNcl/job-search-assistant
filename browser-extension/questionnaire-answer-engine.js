@@ -6,7 +6,7 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(Q){
   'use strict';
   const clean=v=>Q?.clean?Q.clean(v):String(v||'').replace(/\s+/g,' ').trim();
-  function facts(profile={}){return (profile.facts||[]).filter(f=>f&&f.status==='CONFIRMED');}
+  function facts(profile={}){return (profile.facts||[]).filter(f=>f&&f.status==='CONFIRMED'&&!f.pendingReview);}
   function factText(f,lang='ru'){if(!f)return '';return clean((lang==='en'?f.textEn:f.textRu)||f.text||'');}
   function roleFacts(profile,role){return facts(profile).filter(f=>!role||!Array.isArray(f.roles)||!f.roles.length||f.roles.includes(role));}
   function byTopic(profile,topics,role='',allowGlobal=false){const ts=topics.map(x=>String(x).toLowerCase());const pool=allowGlobal?facts(profile):roleFacts(profile,role);return pool.filter(f=>{const hay=[f.kind,f.id,...(f.topics||[])].join(' ').toLowerCase();return ts.some(t=>hay.includes(t));});}
@@ -40,29 +40,26 @@
     if(/(?:сколько|how many).{0,35}(?:лет|years)|(?:лет|years).{0,25}(?:опыт|experience)|стаж|commercial experience|коммерческ.*опыт/i.test(q))return '';
     const ru=lang==='ru';
     if(category==='SALARY')return ru?'Готова обсудить уровень дохода в зависимости от задач, формата работы и общего объёма ответственности.':'I am open to discussing compensation based on the responsibilities, work format and overall scope of the role.';
-    if(category==='SCHEDULE'&&/ночн|night/i.test(question))return ru?'График 2/2, включая ночные смены, рассматриваю. Готова заранее согласовать точное время смен и требования по часовому поясу.':'I am open to a 2/2 schedule including night shifts and can confirm the exact shift times and timezone in advance.';
-    if(['START_DATE','AVAILABILITY','SCHEDULE','RELOCATION','REMOTE_WORK'].includes(category))return ru?'Готова обсудить этот вопрос и подобрать подходящий вариант с учётом задач и условий позиции.':'I am open to discussing this and finding a suitable arrangement based on the role and its requirements.';
+    if(['START_DATE','AVAILABILITY','SCHEDULE','RELOCATION','REMOTE_WORK'].includes(category))return '';
     if(['WHY_COMPANY','WHY_ROLE','MOTIVATION'].includes(category)){
       if(ru)return company?`Мне интересна эта позиция в ${company}: хочу работать с практическими задачами и развиваться в направлении, которое соответствует профилю вакансии.`:`Мне интересна ${title?`позиция «${title}»`:'эта позиция'}: хочу работать с практическими задачами и развиваться в этом направлении.`;
       return company?`I am interested in this position at ${company} because I want to work on practical tasks and grow in the direction described in the vacancy.`:`I am interested in ${title?`the ${title} role`:'this role'} because I want to work on practical tasks and continue developing in this area.`;
     }
-    if(category==='DOMAIN_EXPERIENCE')return ru?'Прямого опыта именно в Gambling / Betting пока не было. Есть опыт технической поддержки SaaS, работы с обращениями пользователей, диагностикой и интеграциями; быстро осваиваю новую предметную область.':'I do not yet have direct Gambling / Betting experience. I do have SaaS technical-support experience with user requests, troubleshooting and integrations, and I learn new domains quickly.';
-    if(category==='CHAT_SALES')return ru?'Есть опыт письменной работы с клиентами и поддержки в чатах. Основной опыт связан с консультациями и решением вопросов, а не с активными продажами; готова работать по скриптам и быстро изучить продукт.':'I have experience communicating with customers in writing and supporting them in chats. My main background is support rather than aggressive sales, and I am comfortable learning a product and working with scripts.';
-    if(category==='CHAT_VOLUME')return ru?'Работаю с потоком обращений и тикетов; точная нагрузка зависит от сложности запросов. Умею вести несколько диалогов параллельно, соблюдать приоритеты и ориентироваться на SLA и качество ответа.':'I work with a flow of tickets and customer requests; exact volume depends on request complexity. I can handle several conversations in parallel while following priorities, SLA and response quality.';
-    if(['EXPERIENCE','SUPPORT_EXPERIENCE','CUSTOMER_SERVICE','PROJECTS','TECH_STACK','PROGRAMMING_LANGUAGE','DATABASES','API','CRM','LINUX','WINDOWS','NETWORKING','AI','OTHER_TECHNICAL','ACHIEVEMENTS'].includes(category)){
-      return ru?'По этому вопросу могу подробнее рассказать о релевантном опыте и задачах на интервью. Быстро разбираюсь в новых инструментах и стараюсь доводить задачи до понятного результата.':'I can discuss the most relevant experience and tasks in more detail during an interview. I learn new tools quickly and focus on bringing tasks to a clear result.';
+    if(['CONFLICT_RESOLUTION','TROUBLESHOOTING'].includes(category)){
+      return ru ? 'Сначала уточню, что произошло и какой результат ожидается. Проверю доступные данные, предложу понятные шаги и сообщу о результате. Если решение потребует другой команды, передам ей контекст и сохраню обратную связь.' : 'I would first clarify what happened and the expected outcome, check the available information, explain the next steps and communicate the result. If another team is needed, I would pass on the context and maintain follow-up.';
     }
-    if(category==='EDUCATION')return ru?'Могу подробнее рассказать об образовании и профильной подготовке на интервью.':'I can provide more detail about my education and relevant training during an interview.';
-    if(category==='OTHER_LANGUAGE'||category==='ENGLISH_LEVEL')return ru?'Могу подробнее рассказать об уровне языка и о том, как использую его в работе, на интервью.':'I can provide more detail about my language level and how I use it in work during an interview.';
-    if(category==='LOCATION')return ru?'Готова уточнить актуальную локацию и формат работы при общении с работодателем.':'I can confirm my current location and preferred work format directly with the employer.';
-    if(['CONTACT','EMAIL','PHONE','TELEGRAM'].includes(category))return '';
-    if(category==='UNKNOWN')return ru?'Готова подробнее обсудить этот вопрос на интервью и уточнить детали в контексте задач вакансии.':'I am happy to discuss this in more detail during an interview and clarify it in the context of the role.';
+    // Unknown personal facts stay empty; an evasive answer is not a confirmed fact.
+    if(category==='UNKNOWN' && !/(?:сколько|когда|где|какой|какая|какие|работал|работали|работала|занимал|есть ли|имеете|сертифик|образован|должност|назовите|укажите|which|when|where|how many|have you|do you have|certif|date|number)/i.test(q))
+      return ru?'Готова подробнее обсудить этот вопрос на интервью и уточнить детали в контексте задач вакансии.':'I am happy to discuss this in more detail during an interview in the context of the role.';
     return '';
   }
   function decide({question='',field={},profile={},context={},memoryEntry=null}={}){
     const category=Q.classify(question,field),lang=Q.language(question),role=context.role||'',vacancy=context.vacancy||{},vacancyKey=context.vacancyKey||vacancy.vacancyId||vacancy.url||'',vacancySpecific=Q.isVacancySpecific(category);
     const meta={category,lang,vacancySpecific,semanticKey:Q.semanticKey(category,question,vacancyKey)};
-    if(memoryEntry?.userConfirmed&&clean(memoryEntry.answer)&&(!vacancySpecific||String(memoryEntry.vacancyKey||'')===String(vacancyKey))){return result('fill',category,'confirmed-question-memory',{...meta,value:clipAnswer(memoryEntry.answer,field.maxLength),source:'confirmed-question-memory',confidence:.99,evidenceIds:memoryEntry.evidenceIds||[]});}
+    if(['LEGAL','CONSENT','WORK_AUTHORIZATION'].includes(category))return result('review',category,'personal-decision',{...meta,confidence:0});
+    const memoryMatchesScope=!memoryEntry?.vacancyKey||String(memoryEntry.vacancyKey)===String(vacancyKey)||memoryEntry.reusable===true;
+    const memoryMatchesType=String(field.type||'').toLowerCase()!=='number'||/^-?\d+(?:[.,]\d+)?$/.test(clean(memoryEntry?.answer));
+    if(memoryEntry?.userConfirmed&&memoryMatchesScope&&memoryMatchesType&&clean(memoryEntry.answer)&&(!vacancySpecific||String(memoryEntry.vacancyKey||'')===String(vacancyKey)||memoryEntry.reusable===true)){return result('fill',category,'confirmed-question-memory',{...meta,value:clipAnswer(memoryEntry.answer,field.maxLength),source:'confirmed-question-memory',confidence:.99,evidenceIds:memoryEntry.evidenceIds||[]});}
     if(['checkbox','radio','radiogroup','combobox','multiselect','select'].includes(String(field.type||'').toLowerCase())&&!["EMAIL","PHONE","CONTACT","LOCATION"].includes(category))return result('review',category,'manual-choice',{...meta,confidence:0});
     if(category==='SALARY'){
       const value=salaryValue(profile,lang);
@@ -75,12 +72,18 @@
       const draft=humanFallback({category,question,field,profile,context,lang});
       return draft?result('fill',category,'human-fallback',{...meta,value:clipAnswer(draft,field.maxLength),source:'human-fallback',confidence:.3,requiresReview:true,evidenceIds:[]}):result('review',category,'personal-decision',{...meta,confidence:0});
     }
+    if(/(?:сколько|how many).{0,35}(?:лет|years)|стаж|commercial experience|коммерческ.*опыт/i.test(question))return result('review',category,'specific-fact-unconfirmed',{...meta,confidence:0});
+    if(category==='EXPERIENCE' && /(?:с |with |в |using )[A-ZА-Я][A-Za-zА-Яа-я#+.-]{2,}/.test(question) && !facts(profile).some(f=>String(question).split(/[^a-z0-9#+.-]+/i).filter(t=>t.length>2&&/[A-Z]/.test(t)).some(t=>new RegExp('(?:^|[^a-z])'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?:$|[^a-z])','i').test([f.text,...(f.topics||[])].join(' ')))))return result('review',category,'specific-fact-unconfirmed',{...meta,confidence:0});
     const c=profile.contacts||{};let value='',evidenceIds=[];
     if(category==='EMAIL')value=c.email||'';
     else if(category==='PHONE')value=c.phone||'';
     else if(category==='TELEGRAM')value=c.telegram||'';
     else if(category==='CONTACT')value=c.telegram||c.email||c.phone||'';
     else if(category==='LOCATION')value=profile.location||'';
+    else if(category==='GITHUB')value=profile.github||'';
+    else if(category==='TIMEZONE')value=profile.timezone||'';
+    else if(['RUSSIAN_LEVEL','GREEK_LEVEL','FRENCH_LEVEL'].includes(category)){const pattern={RUSSIAN_LEVEL:/russian|русск/i,GREEK_LEVEL:/greek|греческ/i,FRENCH_LEVEL:/french|француз/i}[category];const fs=facts(profile).filter(f=>f.kind==='language'&&pattern.test([f.text,f.textRu,f.textEn,...(f.topics||[])].join(' ')));value=uniqueTexts(fs,lang,2).join(' ');evidenceIds=fs.slice(0,2).map(f=>f.id);}
+    else if(['DOMAIN_EXPERIENCE','CHAT_SALES','CHAT_VOLUME','SLA','TICKET_SYSTEMS','FINTECH','ECOMMERCE'].includes(category)){const patterns={DOMAIN_EXPERIENCE:/gambling|betting|гембл|беттинг|казино/i,CHAT_SALES:/chat.sales|продаж.*чат|чат.*продаж/i,CHAT_VOLUME:/volume|throughput|нагрузк|объем|объём|количеств/i,SLA:/\bsla\b/i,TICKET_SYSTEMS:/ticket|тикет|zendesk|freshdesk|jira/i,FINTECH:/fintech|финтех/i,ECOMMERCE:/e.?commerce|электронн.*коммерц/i};const fs=facts(profile).filter(f=>patterns[category].test([f.text,f.textRu,f.textEn,...(f.topics||[])].join(' ')));value=uniqueTexts(fs,lang,2).join(' ');evidenceIds=fs.slice(0,2).map(f=>f.id);}
     else if(category==='COVER_LETTER')value=context.coverLetter||'';
     else if(category==='EDUCATION'){const fs=facts(profile).filter(f=>f.kind==='education');value=uniqueTexts(fs,lang,2).join(' ');evidenceIds=fs.slice(0,2).map(f=>f.id);}
     else if(category==='PROJECTS'){const fs=facts(profile).filter(f=>['project','project_detail'].includes(f.kind));const ps=projects(profile,lang,role);value=ps.length?(lang==='ru'?'Да. ':'Yes. ')+ps.join(' '):'';evidenceIds=fs.slice(0,4).map(f=>f.id);}

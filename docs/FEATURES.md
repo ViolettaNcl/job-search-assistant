@@ -10,9 +10,31 @@ This document lists user-visible capabilities together with their engineering bo
 - explainable Fit with reasons and risks;
 - Calls / No Calls / Unknown stored independently from Fit;
 - Save / Skip / queue decisions preserved by vacancy context;
-- duplicate/repost support using provider identity and canonical fingerprints.
+- duplicate/repost support using provider identity and canonical fingerprints;
+- Avito Vacancies BETA: persistent card/page controls, background full read, Fit/Calls, feminine vacancy-specific letter, confirmed contacts and explicit one-click native chat send.
 
 If full vacancy data cannot be read, the system should fail or fall back safely instead of inventing an analysis.
+
+
+## Avito Vacancies BETA
+
+```mermaid
+flowchart LR
+    S[Search cards / detail page] --> A[Analysis / Analyze page]
+    A --> B[Inactive background read]
+    B --> F[Fit + reasons/risks]
+    B --> C[Calls / No Calls / Unknown]
+    F --> L[Feminine vacancy-specific letter]
+    C --> L
+    L --> K[Confirmed Telegram + email]
+    K --> U{Explicit Letter click}
+    U --> W[Native Write]
+    W --> X[Exact chat verification]
+    X --> I[Fill composer]
+    I --> M[Send one message + verify]
+```
+
+Avito is intentionally isolated from the HH submit path. One explicit **Letter** click authorizes one vacancy-scoped message: the extension validates the matching chat, fills the composer, activates the live send control and verifies completion. It never enables page-wide background messaging. Provider state: **BETA / NOT LIVE VALIDATED**.
 
 ## Application preparation
 
@@ -87,6 +109,10 @@ RC3 does not claim a bundled production Gradient Boosting personal model or a pr
 ### Поиск и анализ
 
 Analysis/Batch работают с конкретной вакансией. Fit содержит объяснение и риски, а Calls / No Calls / Unknown хранится отдельно. Если полное описание получить не удалось, система не должна подменять его выдуманным анализом.
+
+### Авито BETA
+
+На карточках Авито доступны постоянно видимые Analysis, Письмо, Fit и Calls. Одно явное нажатие **Письмо** создаёт vacancy-specific текст в женском роде, добавляет подтверждённые Telegram/email, открывает точный штатный чат, заполняет composer и отправляет одно сообщение с bounded verification/retry.
 
 ### Отклик и анкеты
 

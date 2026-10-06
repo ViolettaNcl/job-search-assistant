@@ -87,3 +87,18 @@ jobs:
           name: site-apply-browser-results
           path: test-results/
           if-no-files-found: ignore
+
+  rc3-product-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test browser
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Control Center and questionnaire choices
+        run: python tests/browser_os_rc3.py

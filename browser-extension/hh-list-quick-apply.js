@@ -151,7 +151,7 @@
     return {kind:'unknown',card:current};
   }
   async function setLetter(field,letter){
-    if(typeof root.vjaSiteSetTextVerified==='function'){const ok=await root.vjaSiteSetTextVerified(field,letter);if(ok)return true;}
+    if(typeof root.vjaSiteSetTextVerified==='function'){const ok=await root.vjaSiteSetTextVerified(field,letter);if(ok){field.dispatchEvent(new Event('blur',{bubbles:true}));await wait(80);return true;}}
     field.focus();
     if(field instanceof HTMLTextAreaElement||field instanceof HTMLInputElement){
       const proto=field instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
@@ -159,16 +159,29 @@
     }else field.textContent=letter;
     try{field.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:letter}));}catch{field.dispatchEvent(new Event('input',{bubbles:true}));}
     field.dispatchEvent(new Event('change',{bubbles:true}));
+    field.dispatchEvent(new Event('blur',{bubbles:true}));
+    await wait(90);
     const current=String(field.isContentEditable?field.innerText:field.value||'').trim();
     return current===String(letter||'').trim();
   }
-  function sendButton(container){
-    const items=[...container.querySelectorAll('button,input[type="submit"],[role="button"]')].filter(visible).map(el=>({el,label:text(el),visible:true,disabled:Boolean(el.disabled)}));
-    return H.chooseSendCandidate(items).candidate?.el||null;
+  function actionScopes(container){
+    const scopes=[];let node=container;
+    for(let depth=0;node&&depth<6;depth++,node=node.parentElement){if(!scopes.includes(node))scopes.push(node);if(node.matches?.('[role="dialog"],dialog,[class*="overlay" i],[data-qa*="modal" i]'))break;}
+    return scopes;
   }
-  function initialSubmitButton(container){
-    const items=[...container.querySelectorAll('button,input[type="submit"],[role="button"]')].filter(visible).map(el=>({el,label:text(el),visible:true,disabled:Boolean(el.disabled)}));
-    return H.chooseInitialSubmitCandidate(items).candidate?.el||null;
+  function chooseAction(container,chooser){
+    for(const scope of actionScopes(container)){
+      const items=[...scope.querySelectorAll('button,input[type="submit"],[role="button"]')].filter(visible).map(el=>({el,label:text(el),visible:true,disabled:Boolean(el.disabled)||el.getAttribute?.('aria-disabled')==='true'}));
+      const candidate=chooser(items).candidate?.el;if(candidate)return candidate;
+    }
+    const global=[...document.querySelectorAll('button,input[type="submit"],[role="button"]')].filter(visible).map(el=>({el,label:text(el),visible:true,disabled:Boolean(el.disabled)||el.getAttribute?.('aria-disabled')==='true'}));
+    return chooser(global).candidate?.el||null;
+  }
+  function sendButton(container){return chooseAction(container,H.chooseSendCandidate);}
+  function initialSubmitButton(container){return chooseAction(container,H.chooseInitialSubmitCandidate);}
+  async function waitForActionButton(container,kind='send',timeout=5000){
+    const started=Date.now(),getter=kind==='initial'?initialSubmitButton:sendButton;
+    while(Date.now()-started<timeout){const button=getter(container);if(button)return button;await wait(100);}return null;
   }
   function closeButton(container){
     if(!container)return null;
@@ -190,6 +203,67 @@
     }
     return false;
   }
+  function currentLetterValue(field){return String(field?.isContentEditable?field.innerText:field?.value||'').trim();}
+  function coverLetterSubmitState(ui,vacancyId,appliedCard){
+    const refreshed=findLetterUi();
+    const activeUi=refreshed||ui||null;
+    const container=activeUi?.container||ui?.container||null;
+    const field=activeUi?.field||ui?.field||null;
+    const card=findCard(vacancyId,appliedCard)||appliedCard||null;
+    const containerOpen=Boolean(container&&container.isConnected&&visible(container));
+    const fieldOpen=Boolean(field&&field.isConnected&&visible(field));
+    const successPattern=/письм[оа].{0,36}(?:отправлен|добавлен|приложен)|сопроводительное.{0,36}(?:отправлен|добавлен|приложен)|cover\s+letter.{0,36}(?:sent|submitted|attached)/i;
+    // Never trust a page-wide success label: a search page can contain the same
+    // text for another vacancy. Confirmation must belong to the active modal or
+    // to the exact vacancy card after the modal has closed.
+    const modalSuccess=Boolean(containerOpen&&!fieldOpen&&successPattern.test(text(container)));
+    const cardSuccess=Boolean(!containerOpen&&!fieldOpen&&card&&successPattern.test(text(card)));
+    const originalContainer=ui?.container||container;
+    const containerClosed=Boolean(originalContainer&&(!originalContainer.isConnected||!visible(originalContainer))&&!refreshed);
+    const noUi=Boolean(!refreshed&&!containerOpen&&!fieldOpen);
+    const success=modalSuccess||cardSuccess;
+    return {confirmed:Boolean(success||containerClosed||noUi),success,modalSuccess,cardSuccess,containerClosed,containerOpen,fieldOpen,ui:activeUi,field,card};
+  }
+  async function waitForCoverLetterSubmitState(ui,vacancyId,appliedCard,timeout=2800){
+    const started=Date.now();let state=coverLetterSubmitState(ui,vacancyId,appliedCard);
+    while(Date.now()-started<timeout){
+      const viewed=employerAlreadyViewedUi(state.ui?.container||ui?.container||null);
+      if(viewed)return {...state,alreadyViewed:true};
+      state=coverLetterSubmitState(state.ui||ui,vacancyId,state.card||appliedCard);
+      if(state.confirmed)return state;
+      await wait(180);
+    }
+    return coverLetterSubmitState(state.ui||ui,vacancyId,state.card||appliedCard);
+  }
+  async function clickCoverLetterSendUntilClosed(ui,vacancy,appliedCard,letter,{maxAttempts=6}={}){
+    let currentUi=ui,lastReason='cover-letter-modal-still-open',attempts=0;
+    for(let attempt=1;attempt<=maxAttempts;attempt++){
+      attempts=attempt;
+      const before=coverLetterSubmitState(currentUi,vacancy.vacancyId,appliedCard);
+      currentUi=before.ui||currentUi;
+      if(before.confirmed)return {...before,attempts};
+      if(before.field&&visible(before.field)&&currentLetterValue(before.field)!==String(letter||'').trim()){
+        if(!await setLetter(before.field,letter))return {...before,confirmed:false,attempts,reason:'cover-letter-not-persisted-before-retry'};
+      }
+      const send=await waitForActionButton(currentUi?.container||ui.container,'send',attempt===1?5000:3500);
+      if(!send){
+        const settled=await waitForCoverLetterSubmitState(currentUi,vacancy.vacancyId,appliedCard,900);
+        currentUi=settled.ui||currentUi;
+        if(settled.confirmed||settled.alreadyViewed)return {...settled,attempts};
+        lastReason='cover-letter-send-not-found';
+        if(attempt<maxAttempts)await wait(350+attempt*180);
+        continue;
+      }
+      send.scrollIntoView?.({block:'center'});send.focus?.();send.click();
+      const settled=await waitForCoverLetterSubmitState(currentUi,vacancy.vacancyId,appliedCard,attempt===1?2800:3600);
+      currentUi=settled.ui||currentUi;
+      if(settled.confirmed||settled.alreadyViewed)return {...settled,attempts};
+      lastReason='cover-letter-modal-still-open';
+      if(attempt<maxAttempts)await wait(420+attempt*220);
+    }
+    const finalState=await waitForCoverLetterSubmitState(currentUi,vacancy.vacancyId,appliedCard,1800);
+    return {...finalState,attempts,reason:finalState.confirmed?'':lastReason};
+  }
   function toast(message,anchor,kind='neutral',ms=3800){try{return U?.toast?.(message,anchor,kind,ms);}catch{return null;}}
   async function preparedLetter(preparedPromise){
     const prepared=await preparedPromise;if(!prepared||prepared?.ok===false)throw new Error(prepared?.error||'Не удалось подготовить письмо.');
@@ -197,38 +271,45 @@
     return {prepared,letter};
   }
   async function completePrepared(prepared,{coverLetterSubmitted=true,employerAlreadyViewed=false}={}){if(prepared?.application?.id)await request('quick-list-complete',{id:prepared.application.id,appliedConfirmed:true,coverLetterSubmitted,employerAlreadyViewed}).catch(()=>{});}
-  async function submitInitialLetter(stage,vacancy,preparedPromise,anchor){
+  async function submitInitialLetter(stage,vacancy,preparedPromise,anchor,options={}){
     const {prepared,letter}=await preparedLetter(preparedPromise);
     if(!await setLetter(stage.ui.field,letter))throw new Error('Не удалось надёжно заполнить обязательное сопроводительное письмо.');
-    const submit=initialSubmitButton(stage.ui.container);if(!submit)throw new Error('Письмо заполнено, но кнопка «Откликнуться» в форме не определена однозначно.');
-    submit.scrollIntoView?.({block:'center'});submit.click();
-    const appliedCard=await waitForApplied(vacancy.vacancyId,stage.card,16000);
-    if(!appliedCard)throw new Error('Письмо заполнено и отклик отправлялся, но HH не подтвердил результат.');
+    await (root.vjaSubmissionGuard||{requirePermission:async()=>{throw new Error('Final submission requires review.');}}).requirePermission({id:prepared.application?.id,vacancyId:vacancy.vacancyId,userInitiated:options.userInitiatedSubmit===true,intent:'quick-list-apply-letter'});
+    let appliedCard=null,currentUi=stage.ui;
+    for(let attempt=1;attempt<=4&&!appliedCard;attempt++){
+      const activeUi=findLetterUi()||currentUi;currentUi=activeUi||currentUi;
+      if(currentUi?.field&&visible(currentUi.field)&&currentLetterValue(currentUi.field)!==letter){
+        if(!await setLetter(currentUi.field,letter))throw new Error('Не удалось восстановить текст письма перед повторной отправкой.');
+      }
+      const submit=await waitForActionButton(currentUi?.container||stage.ui.container,'initial',attempt===1?5000:3500);
+      if(!submit){if(attempt<4){await wait(450+attempt*180);continue;}throw new Error('Письмо заполнено, но активная кнопка отправки отклика не определена однозначно.');}
+      submit.scrollIntoView?.({block:'center'});submit.focus?.();submit.click();
+      appliedCard=await waitForApplied(vacancy.vacancyId,stage.card,attempt===1?5200:6200);
+      if(!appliedCard&&attempt<4)await wait(420+attempt*220);
+    }
+    if(!appliedCard)appliedCard=await waitForApplied(vacancy.vacancyId,stage.card,2600);
+    if(!appliedCard)throw new Error('Письмо заполнено, но HH не подтвердил отправку после повторных попыток.');
+    if(stage.ui.container?.isConnected&&visible(stage.ui.container)){const close=closeButton(stage.ui.container);if(close){close.click();await wait(120);}}
     await completePrepared(prepared);toast('✓ Отклик + сопроводительное письмо отправлены',anchor,'ok',4500);return appliedCard;
   }
-  async function appendLetterAfterApplied(appliedCard,vacancy,preparedPromise,anchor){
+  async function appendLetterAfterApplied(appliedCard,vacancy,preparedPromise,anchor,options={}){
     const {prepared,letter}=await preparedLetter(preparedPromise);
     const found=await waitForLetterAction(vacancy.vacancyId,appliedCard,12000);
     if(!found)throw new Error('Отклик отправлен, но HH не показал действие «Приложить письмо».');
     found.action.scrollIntoView?.({block:'center'});found.action.click();
     const ui=await waitForLetterUi(10000);if(!ui)throw new Error('Отклик отправлен, но редактор сопроводительного письма не найден.');
     if(!await setLetter(ui.field,letter))throw new Error('Не удалось надёжно вставить сопроводительное письмо.');
-    const send=sendButton(ui.container);if(!send)throw new Error('Письмо заполнено, но кнопка «Отправить» не определена однозначно.');
-    send.scrollIntoView?.({block:'center'});send.click();
-    let confirmed=false,alreadyViewed=false;
-    for(let i=0;i<50;i++){
-      await wait(160);
-      if(employerAlreadyViewedUi(ui.container)){alreadyViewed=await closeEmployerAlreadyViewed(ui.container,1800);if(alreadyViewed)break;}
-      const success=/письм[оа].{0,30}(?:отправлен|добавлен|приложен)|сопроводительное.{0,30}(?:отправлен|добавлен|приложен)/i.test(text(document.body));
-      const actionGone=!letterAction(findCard(vacancy.vacancyId,appliedCard));
-      if(!ui.field.isConnected||!visible(ui.field)||success||actionGone){confirmed=true;break;}
-    }
-    if(alreadyViewed){
+    await (root.vjaSubmissionGuard||{requirePermission:async()=>{throw new Error('Final submission requires review.');}}).requirePermission({id:prepared.application?.id,vacancyId:vacancy.vacancyId,userInitiated:options.userInitiatedSubmit===true,intent:'quick-list-apply-letter'});
+    const submission=await clickCoverLetterSendUntilClosed(ui,vacancy,appliedCard,letter,{maxAttempts:6});
+    if(submission.alreadyViewed){
+      await closeEmployerAlreadyViewed(submission.ui?.container||ui.container,1800);
       await completePrepared(prepared,{coverLetterSubmitted:false,employerAlreadyViewed:true});
       toast('↷ Отклик уже просмотрен работодателем — окно закрыто, идём дальше.',anchor,'neutral',4800);
       return {card:found.card,outcome:'already-viewed'};
     }
-    if(!confirmed)throw new Error('Письмо отправлялось, но HH не подтвердил результат. Проверьте окно письма вручную.');
+    if(!submission.confirmed)throw new Error(`Письмо не подтвердилось после ${submission.attempts||6} попыток отправки. Окно оставлено открытым для проверки.`);
+    const activeContainer=submission.ui?.container||ui.container;
+    if(activeContainer?.isConnected&&visible(activeContainer)){const close=closeButton(activeContainer);if(close){close.click();await wait(120);}}
     await completePrepared(prepared);toast('✓ Отклик + сопроводительное письмо отправлены',anchor,'ok',4500);return {card:found.card,outcome:'sent'};
   }
   async function run(nativeButton,initialCard,vacancy,preparePromise,options={}){
@@ -246,10 +327,10 @@
       let outcome='sent';
       if(stage.kind==='initial-letter'){
         note=toast('Заполняю обязательное сопроводительное письмо…',nativeButton||options.control);
-        await submitInitialLetter(stage,vacancy,preparedPromise,nativeButton||options.control);
+        await submitInitialLetter(stage,vacancy,preparedPromise,nativeButton||options.control,options);
       }else if(stage.kind==='applied'){
         note=toast('Отклик отправлен. Добавляю сопроводительное письмо…',nativeButton||options.control);
-        const appendResult=await appendLetterAfterApplied(stage.card,vacancy,preparedPromise,nativeButton||options.control);outcome=appendResult?.outcome||'sent';
+        const appendResult=await appendLetterAfterApplied(stage.card,vacancy,preparedPromise,nativeButton||options.control,options);outcome=appendResult?.outcome||'sent';
       }else{
         throw new Error('HH открыл другой сценарий отклика. Нужна проверка текущей формы.');
       }
@@ -268,13 +349,16 @@
     const vacancy=pinnedByCard.get(card)||extractVacancy(card),native=nativeApplyButton(card);if(!vacancy||!native){toast('Не удалось однозначно определить именно эту карточку вакансии.',control,'bad',5200);return;}
     selected={vacancy,card,at:Date.now()};pinnedByCard.set(card,vacancy);card.dataset.vjaVacancyId=vacancy.vacancyId;
     clearOtherCards(card);markCard(card,'working');
-    control.dataset.state='working';control.textContent='✦ Готовлю…';control.disabled=true;
+    control.dataset.state='working';control.textContent='✦ Анализирую…';control.disabled=true;
     let prepared;try{prepared=await request('quick-list-prepare',{vacancy});if(!prepared||prepared.ok===false)throw new Error(prepared?.error||'Не удалось подготовить отклик.');}
     catch(e){markCard(card,'error');control.dataset.state='error';control.textContent='! Повторить';control.disabled=false;toast(e?.message||'Не удалось подготовить отклик.',control,'bad',6200);return;}
     if(prepared.duplicate){markCard(card,'done');renderApplicationControl(control,{status:prepared.application?.status||'Applied',completed:true,coverLetterSubmitted:Boolean(prepared.application?.coverLetterMemory?.submittedAt)});toast('✓ Эта вакансия уже есть в памяти откликов.',control,'neutral',3600);return;}
+    // The dedicated button is an explicit user confirmation for this one vacancy.
+    // Do not stop on the list with a “letter saved” message: open the native HH flow,
+    // then authorize the actual final button only after the real form/modal is visible.
     const preparePromise=Promise.resolve(prepared);
     native.scrollIntoView?.({block:'center'});native.click();
-    await run(native,card,vacancy,preparePromise,{control});
+    await run(native,card,vacancy,preparePromise,{control,userInitiatedSubmit:true});
   }
   function analysisTitle(result){const source=result?.source==='hh-live-dom'?'Источник: полная страница вакансии, прочитанная в фоновой вкладке':result?.source==='hh-api'?'Источник: полное описание HH API':result?.source==='card-snippet'?'Источник: карточка вакансии (полную страницу прочитать не удалось)':'Источник: описание вакансии';return [result?.reason,result?.evidence&&`Фрагмент: ${result.evidence}`,source].filter(Boolean).join('\n');}
   function renderAnalysisControl(control,result){
@@ -356,7 +440,7 @@
     if(settingsCache.quickListCoverLetter===false)return;
     clearOtherCards(card);markCard(card,'working');
     const preparePromise=request('quick-list-prepare',{vacancy});
-    setTimeout(()=>void run(target,card,vacancy,preparePromise),0);
+    setTimeout(()=>void run(target,card,vacancy,preparePromise,{userInitiatedSubmit:true}),0);
   },true);
   const observer=new MutationObserver(()=>{clearTimeout(observer._t);observer._t=setTimeout(scanCards,90);});
   observer.observe(document.documentElement,{childList:true,subtree:true});

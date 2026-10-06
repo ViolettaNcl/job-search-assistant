@@ -31,13 +31,24 @@ jobs:
   package:
     runs-on: windows-latest
     timeout-minutes: 25
+    outputs:
+      has_backend: ${{ steps.source.outputs.has_backend }}
     steps:
       - uses: actions/checkout@v4
+      - name: Detect backend source
+        id: source
+        shell: pwsh
+        run: |
+          $available = Test-Path 'src/JobSearchAssistant/JobSearchAssistant.csproj'
+          "has_backend=$($available.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          if (-not $available) { 'Windows backend packaging: NOT RUN — C# source is absent.' >> $env:GITHUB_STEP_SUMMARY }
       - uses: actions/setup-dotnet@v4
+        if: steps.source.outputs.has_backend == 'true' 
         with:
           dotnet-version: '10.0.x'
 
       - name: Publish self-contained Windows backend
+        if: steps.source.outputs.has_backend == 'true'
         shell: pwsh
         run: |
           dotnet restore src/JobSearchAssistant/JobSearchAssistant.csproj -r win-x64
@@ -49,6 +60,7 @@ jobs:
             -o dist/Violetta-Apply-Assistant/backend
 
       - name: Assemble current extension and launcher
+        if: steps.source.outputs.has_backend == 'true'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist/Violetta-Apply-Assistant/extension | Out-Null
@@ -64,6 +76,7 @@ jobs:
           if (-not (Test-Path dist/Violetta-Apply-Assistant/extension/manifest.json)) { throw 'Extension manifest missing.' }
 
       - name: Verify package metadata
+        if: steps.source.outputs.has_backend == 'true'
         shell: pwsh
         run: |
           $manifest = Get-Content browser-extension/manifest.json -Raw | ConvertFrom-Json
@@ -73,6 +86,7 @@ jobs:
           Write-Host "Extension release: $($manifest.version); compatible backend source release: $backendVersion"
 
       - uses: actions/upload-artifact@v4
+        if: steps.source.outputs.has_backend == 'true'
         with:
           name: violetta-apply-assistant-windows
           path: dist/Violetta-Apply-Assistant/
@@ -81,6 +95,7 @@ jobs:
 
   verify-downloaded-package:
     needs: package
+    if: needs.package.outputs.has_backend == 'true'
     runs-on: windows-latest
     timeout-minutes: 15
     steps:

@@ -12,6 +12,7 @@
   function factText(f,lang='ru'){return str(lang==='ru'?(f.textRu||f.text):(f.textEn||f.text));}
   function revision(p={}){return hash(JSON.stringify({facts:p.facts,contacts:p.contacts,github:p.github,deletedFactIds:p.deletedFactIds}));}
   function migrate(old={},seed={},now=Date.now()){
+    if(seed.emptySeed && Object.keys(old).length){const profile=copy(old);return {profile,changed:false,warnings:profile.sourceWarnings||[]};}
     if(old.seedRevision===seed.revision)return {profile:copy(old),changed:false,warnings:old.sourceWarnings||[]};
     const fresh=(seed.facts||[]).map(normalizeFact),known=new Map(fresh.map(f=>[f.id,f]));
     const archived=[...(old.archivedFacts||[])],deleted=new Set(old.deletedFactIds||[]),warnings=[];
@@ -68,7 +69,7 @@
   }
   function structuredMemory(messages=[],previous={}){
     const safe=messages.map(m=>({id:str(m.id,300),speaker:['candidate','employer'].includes(m.speaker)?m.speaker:'unknown',text:str(m.text,7000),timestamp:str(m.timestamp,150)}));
-    const keep=safe.filter(m=>/\d|зарплат|salary|интервью|interview|обещ|дедлайн|deadline|график|schedule|SQL|API|\.NET|AppXite/i.test(m.text));
+    const keep=safe.filter(m=>/\d|зарплат|salary|интервью|interview|обещ|дедлайн|deadline|график|schedule|SQL|API|\.NET/i.test(m.text));
     const unique=new Map([...(previous.important||[]),...keep].map(m=>[[m.speaker,m.id||'',m.text].join('|'),m]));
     return {scope:'conversation-only',important:[...unique.values()].slice(-80),recent:safe.slice(-20),lastRecruiterMessage:[...safe].reverse().find(m=>m.speaker==='employer')||null,discussedTopics:[],updatedAt:Date.now(),truncated:safe.length>20};
   }

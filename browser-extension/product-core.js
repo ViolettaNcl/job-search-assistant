@@ -1,8 +1,9 @@
 /* Productization utilities. Pure functions: no network, storage or automatic submission. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.vjaProductCore=api;})(globalThis,function(){
   'use strict';
-  const SCHEMA=1, MAX_BYTES=32*1024*1024;
-  const permanent=/^(vjaCandidateTruthProfile$|vjaProfileBefore380$|vjaPersonalReplies$|vjaCopilotSettings$|vjaJobPreferencesV1$|vjaLearningEventsV1$|vjaLearningSettingsV1$|vjaFeatureFlagsV1$|vjaModelRegistryV1$|vjaQuestionnaire|vjaApplicationJob:|vjaVacancyIntel:|vjaVacancyDecision:|vjaCallAnalysis:|vjaVacancyCache:|vjaConversation:|vjaProductSettingsV1$|cvVault(?:En|Ru)$|applicationMemory$)/;
+  const SCHEMA=2, MAX_BYTES=32*1024*1024;
+  const transient=/^(?:vjaPending|vjaSiteApplyResult|vjaBrowserAutopilot(?:ActivePlan|TabId)|vjaCopilotFocus:|vjaAutopilotSession|vjaIndexRetryRequired)/;
+  const permanent={test:key=>/^(?:vja[A-Z]|cvVault(?:En|Ru)$|applicationMemory$)/.test(key)&&!transient.test(key)};
   const secret=/password|passwd|secret|token|authorization|cookie|api[_-]?key|encryptionkey/i;
   const forbidden=new Set(['__proto__','constructor','prototype']);
   const clone=x=>JSON.parse(JSON.stringify(x));
@@ -20,21 +21,22 @@
     if(obj(value)){const out={};for(const [k,v] of Object.entries(value))if(!secret.test(k)&&!forbidden.has(k))out[k]=scrub(v);return out;}
     return value;
   }
-  function snapshot(storage={}, {includeCV=true, now=Date.now()}={}){
+  function snapshot(storage={}, {includeCV=true, includeProfile=true, sync={}, now=Date.now()}={}){
     assertTree(storage);const local={},excluded=[];
     for(const [k,v] of Object.entries(storage)){
-      if(!permanent.test(k)||(!includeCV&&/^cvVault/.test(k))){excluded.push(k);continue;}
+      if(!permanent.test(k)||(!includeCV&&/^cvVault/.test(k))||(!includeProfile&&/^(vjaCandidateTruthProfile|vjaProfileBefore380|applicationMemory)$/.test(k))){excluded.push(k);continue;}
       local[k]=scrub(v);
     }
-    const out={format:'violetta-backup',schemaVersion:SCHEMA,createdAt:now,local,excludedKeys:excluded.length};
+    const out={format:'violetta-backup',schemaVersion:SCHEMA,createdAt:now,local,sync:scrub(sync),excludedKeys:excluded.length};
     if(new TextEncoder().encode(JSON.stringify(out)).length>MAX_BYTES)throw new Error('Резервная копия превышает 32 MiB. Экспортируйте CV отдельно.');
     return out;
   }
   function validateBackup(payload){
     assertTree(payload);
-    if(payload?.format!=='violetta-backup'||payload.schemaVersion!==SCHEMA||!obj(payload.local))throw new Error('Неизвестный формат или версия backup.');
+    if(payload?.format!=='violetta-backup'||![1,SCHEMA].includes(payload.schemaVersion)||!obj(payload.local))throw new Error('Неизвестный формат или версия backup.');
     if(new TextEncoder().encode(JSON.stringify(payload)).length>MAX_BYTES)throw new Error('Backup превышает 32 MiB.');
     for(const k of Object.keys(payload.local))if(!permanent.test(k))throw new Error('Неподдерживаемый ключ backup: '+k);
+    if(payload.sync!==undefined&&!obj(payload.sync))throw new Error('Invalid sync settings.');
     return payload;
   }
   function restorePlan(payload,current={}){
@@ -47,8 +49,13 @@
     if(patch.vjaModelRegistryV1){const r=patch.vjaModelRegistryV1;r.activeModel=null;r.activeModels={preference:null,engagement:null};r.models=(r.models||[]).map(x=>({...x,status:'candidate'}));}
     patch.vjaFeatureFlagsV1={...(current.vjaFeatureFlagsV1||{}),...(patch.vjaFeatureFlagsV1||{}),mlRanking:false};
     patch.vjaCopilotSettings={...(current.vjaCopilotSettings||{}),...(patch.vjaCopilotSettings||{}),aiConsent:false,discoveryEnabled:false};
-    patch.vjaProductSettingsV1={...(patch.vjaProductSettingsV1||{}),shadowModel:null};
-    return {patch,conflicts,added,keyCount:Object.keys(patch).length};
+    patch.vjaProductSettingsV1={...(current.vjaProductSettingsV1||{}),...(patch.vjaProductSettingsV1||{}),shadowModel:null};
+    patch.vjaAutomationPolicyV1={...(patch.vjaAutomationPolicyV1||{}),mode:'assist',paused:true,explicitOptIn:false};
+    const syncPatch=scrub(clone(payload.sync||{}));
+    // Restoring a backup never enables a remote backend destination implicitly.
+    if(syncPatch.apiBase&&!/^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\/?$/.test(syncPatch.apiBase))delete syncPatch.apiBase;
+    syncPatch.vjaHhBrowserSearch=false;
+    return {patch,syncPatch,conflicts,added,keyCount:Object.keys(patch).length};
   }
   function identity(x={}){return `${String(x.provider||'hh').toLowerCase()}:${x.vacancyId||x.eventId||''}`;}
   function datasetQuality(rows=[],label='labelUserApply'){
@@ -57,7 +64,7 @@
     const n=labels[0]+labels[1],issues=[];
     if(n<100)issues.push('Менее 100 размеченных вакансий');if(Math.min(labels[0],labels[1])<10)issues.push('Нужно не менее 10 примеров каждого класса');
     if(duplicates)issues.push('Повторяющиеся вакансии');if(invalid)issues.push('Неверные labels');if(n&&missing/n>.25)issues.push('Много строк без признаков');if(!times.length&&n)issues.push('Нет временных меток');
-    return {n,labels,unique:ids.size,duplicates,invalid,missing,issues,ready:!issues.length,minTime:times.length?Math.min(...times):null,maxTime:times.length?Math.max(...times):null};
+    return {trainingStatus:issues.length?'NOT READY':n<500?'EXPERIMENTAL':'READY',n,labels,unique:ids.size,duplicates,invalid,missing,issues,ready:!issues.length,minTime:times.length?Math.min(...times):null,maxTime:times.length?Math.max(...times):null};
   }
   function summarize(storage={}){
     const intel=[],jobs=[],events=Array.isArray(storage.vjaLearningEventsV1)?storage.vjaLearningEventsV1:[];

@@ -6,7 +6,7 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
   const categories=[
-    'SALARY','DOMAIN_EXPERIENCE','CHAT_SALES','CHAT_VOLUME','EXPERIENCE','PROJECTS','TECH_STACK','PROGRAMMING_LANGUAGE','ENGLISH_LEVEL','OTHER_LANGUAGE','EDUCATION','LOCATION','REMOTE_WORK','RELOCATION','SCHEDULE','AVAILABILITY','START_DATE','CONTACT','TELEGRAM','EMAIL','PHONE','COVER_LETTER','WHY_COMPANY','WHY_ROLE','MOTIVATION','ACHIEVEMENTS','SUPPORT_EXPERIENCE','CUSTOMER_SERVICE','DATABASES','API','CRM','LINUX','WINDOWS','NETWORKING','AI','OTHER_TECHNICAL','LEGAL','WORK_AUTHORIZATION','CONSENT','UNKNOWN'
+    'TIMEZONE','RUSSIAN_LEVEL','GREEK_LEVEL','FRENCH_LEVEL','SLA','TICKET_SYSTEMS','FINTECH','ECOMMERCE','CONFLICT_RESOLUTION','TROUBLESHOOTING','GITHUB','SALARY','DOMAIN_EXPERIENCE','CHAT_SALES','CHAT_VOLUME','EXPERIENCE','PROJECTS','TECH_STACK','PROGRAMMING_LANGUAGE','ENGLISH_LEVEL','OTHER_LANGUAGE','EDUCATION','LOCATION','REMOTE_WORK','RELOCATION','SCHEDULE','AVAILABILITY','START_DATE','CONTACT','TELEGRAM','EMAIL','PHONE','COVER_LETTER','WHY_COMPANY','WHY_ROLE','MOTIVATION','ACHIEVEMENTS','SUPPORT_EXPERIENCE','CUSTOMER_SERVICE','DATABASES','API','CRM','LINUX','WINDOWS','NETWORKING','AI','OTHER_TECHNICAL','LEGAL','WORK_AUTHORIZATION','CONSENT','UNKNOWN'
   ];
   function clean(value){return String(value||'').replace(/\s+/g,' ').trim();}
   function normalize(value){return clean(value).toLocaleLowerCase('ru-RU').replace(/ё/g,'е').replace(/[«»“”"'`]/g,'').replace(/[^a-zа-я0-9#+.\-/ ]+/gi,' ').replace(/\s+/g,' ').trim();}
@@ -14,6 +14,18 @@
   function classify(question,field={}){
     const s=normalize([question,field.label,field.name,field.placeholder].filter(Boolean).join(' '));
     const type=String(field.type||'').toLowerCase();
+    if(/паспорт|инн\b|снилс|судимост|passport|social security|criminal record|citizenship|дата рождения|date of birth/i.test(s))return 'LEGAL';
+    if(/часов.*пояс|timezone|time zone|utc|gmt/i.test(s)&&!/смен|schedule/i.test(s))return 'TIMEZONE';
+    if(/github|гитхаб/i.test(s))return 'GITHUB';
+    if(/греческ|greek/i.test(s))return 'GREEK_LEVEL';
+    if(/француз|french/i.test(s))return 'FRENCH_LEVEL';
+    if(/русск.*язык|уровень.*русск|russian/i.test(s))return 'RUSSIAN_LEVEL';
+    if(/\bsla\b|соглашен.*уровн.*сервис/i.test(s))return 'SLA';
+    if(/тикет.*систем|ticket.*system|zendesk|jira service|freshdesk/i.test(s))return 'TICKET_SYSTEMS';
+    if(/fintech|финтех/i.test(s))return 'FINTECH';
+    if(/e.?commerce|электронн.*коммерц/i.test(s))return 'ECOMMERCE';
+    if(/(?:как|how).*(?:конфликт|недовольн|сложн.*клиент|angry|difficult customer|conflict)/i.test(s))return 'CONFLICT_RESOLUTION';
+    if(/(?:как|how).*(?:диагност|устран.*ошиб|troubleshoot|debug)/i.test(s))return 'TROUBLESHOOTING';
     if(/зарплат|оклад|доход|вилк|salary|compensation|expected pay|rate\b|оплат/i.test(s))return 'SALARY';
     if(/gambling|betting|гембл|беттинг|букмек|казино|ставк.*спорт/i.test(s))return 'DOMAIN_EXPERIENCE';
     if(/(?:продаж|sales).{0,35}(?:чат|переписк)|(?:чат|переписк).{0,35}(?:продаж|sales)/i.test(s))return 'CHAT_SALES';
@@ -62,7 +74,9 @@
   function semanticKey(category,question,vacancyKey=''){
     const c=categories.includes(category)?category:'UNKNOWN';
     if(isVacancySpecific(c))return `${c}:${String(vacancyKey||'vacancy')}:${hash(normalize(question)).slice(0,12)}`;
-    return c;
+    // A shared category is not evidence that two factual questions ask the same thing.
+    const exact = new Set(['UNKNOWN','OTHER_LANGUAGE','TECH_STACK','PROGRAMMING_LANGUAGE','EXPERIENCE','SUPPORT_EXPERIENCE','CUSTOMER_SERVICE','PROJECTS','DOMAIN_EXPERIENCE','DATABASES','API','CRM','SLA','TICKET_SYSTEMS','FINTECH','ECOMMERCE','ACHIEVEMENTS','OTHER_TECHNICAL','AVAILABILITY','SCHEDULE','REMOTE_WORK']);
+    return exact.has(c) ? `${c}:${hash(normalize(question))}` : c;
   }
   function hash(value){let h=2166136261;for(const ch of String(value||'')){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return (h>>>0).toString(16).padStart(8,'0');}
   function questionText(el,adapter){

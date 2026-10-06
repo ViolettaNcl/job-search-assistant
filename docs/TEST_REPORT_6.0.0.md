@@ -1,32 +1,33 @@
 # Violetta Apply Assistant 6.0.0 RC3 — отчёт проверок
 
-**Дата:** 5 октября 2026. **База:** предоставленный архив 6.0.0 RC2.  
+**Дата:** 6 октября 2026. **База:** предоставленный архив 6.0.0 RC2.  
 **Статус:** Release Candidate — **NOT LIVE VALIDATED**, не Final Production.
 
 ## Среда и итог
 
-Linux; Node.js 22.16.0; Python 3.13.5; Chromium 144.0.7559.96; Python Playwright. Проверки выполнялись локально, без авторизации в HH/Habr и без отправки откликов. Windows PowerShell и .NET SDK в среде отсутствовали; C#-исходников в предоставленном архиве нет.
+Linux; Node.js 22.16.0; Python 3.13.5; Chromium 144.0.7559.96; Python Playwright. Проверки выполнялись локально, без авторизации в HH/Habr/Avito и без отправки откликов или сообщений. Windows PowerShell и .NET SDK в среде отсутствовали; C#-исходников в предоставленном архиве нет.
 
-Базовая версия: **325 Node-тестов, 325 успешных**. После изменений: **367 Node-тестов, 367 успешных, 0 проваленных, 0 пропущенных**. Python: **34 теста, 34 успешных, 0 пропущенных**. Промежуточные ошибки не были объявлены успешными: после исправлений выполнены повторные запуски.
+Базовая версия: **325 Node-тестов, 325 успешных**. Текущее дерево: **388 Node-тестов, 388 успешных, 0 проваленных, 0 пропущенных**. Python: **34 теста, 34 успешных, 0 пропущенных**. Промежуточные ошибки не были объявлены успешными: после исправлений выполнены повторные запуски.
 
 | Проверка | Результат | Реальная граница |
 | :--- | ---: | :--- |
-| `node --test extension/*.test.js` | 367 / 367 | Реальный JS; зависимости отдельных сценариев подменены |
+| `node --test browser-extension/*.test.js` | 388 / 388 | Реальный JS; зависимости отдельных сценариев подменены |
 | `python -m unittest discover -s tests -p 'test_*.py' -v` | 34 / 34 | ML/ranking/provenance, hygiene, manifest и локальный Git |
 | `node tests/product_worker_600.cjs` | 10 / 10 assertions | Реальный worker; Chrome/HTTP подменены |
-| `node tests/worker_authorization_rc3.cjs` | 15 / 15 assertions | Реальный worker: режим, opt-in, вкладка, origin, Fit и запреты |
+| `node tests/worker_authorization_rc3.cjs` | 19 / 19 assertions | Реальный worker: режим, opt-in, вкладка, origin, Fit и запреты |
 | `python tests/browser_e2e.py` | 102 / 102 assertions | Chromium DOM-фикстуры; Chrome/HTTP и финальное разрешение подменены |
 | `python tests/browser_os_rc3.py` | 21 / 21 assertions | Центр управления, импорт, выбор полей, mobile; Chrome/IDB/crypto подменены |
 | `python tests/browser_product_600.py` | 16 / 16 assertions | Chromium DOM; storage/crypto/Chrome подменены |
 | `python tests/browser_questionnaire_rc2.py` | 8 / 8 assertions | Redirected questionnaire DOM-фикстура |
 | `python tests/browser_questionnaire_3912.py` | 9 / 9 assertions | Dynamic questionnaire DOM-фикстура |
 | `python tests/browser_habr_rc2.py` | 5 / 5 assertions | Habr DOM-фикстура, не живая анкета |
+| `python tests/browser_avito_beta.py` | 19 / 19 assertions | Avito list/detail fixture, hover persistence, Fit/Calls, exact chat fill/send; не живой аккаунт |
 | `python tests/browser_memory_399.py` | 8 / 8 assertions | Память и переходы на DOM-фикстуре |
 | `python tests/browser_batch_400.py` | 6 / 6 assertions | Batch/Calls/queue на DOM-фикстуре |
 | `python tests/browser_learning_520.py` | 5 / 5 assertions | Learning Center DOM-фикстура |
 | `python tests/hh_read_fallback_3910.py` | 3 / 3 assertions | Reader и API fallback с подменёнными ответами |
-| `node --check` | 177 JS-файлов | Только синтаксис |
-| `py_compile` | 29 Python-файлов | Только компиляция |
+| `node --check` | 181 JS-файл | Только синтаксис |
+| `py_compile` | 32 Python-файла | Только компиляция |
 | Разбор workflow YAML | 5 файлов | Синтаксис и уникальность ключей; не remote CI run |
 | `python tools/check-repo-hygiene.py` | PASS | Проверены разрешённые цели source manifest |
 
@@ -50,6 +51,7 @@ ML-проверки используют тестовые данные. Пров
 | :--- | :--- |
 | Живой критический маршрут HH | **NOT LIVE VALIDATED** — нет авторизованной пользовательской приёмки |
 | Полный отклик и многошаговая анкета Habr | **NOT LIVE VALIDATED** — только DOM-фикстуры, провайдер BETA |
+| Авторизованный Avito vacancy/chat workflow | **NOT LIVE VALIDATED** — fixture отправляет сообщение только в synthetic chat; реальный аккаунт/работодатель не использовался |
 | Установленное расширение, permissions и service-worker lifecycle | **NOT VALIDATED** — DOM-исполнение не заменяет установку |
 | Native IndexedDB, тысячи реальных записей, quota, crash recovery | **NOT VALIDATED** — контролируемые mocks и проверки структуры |
 | .NET build/tests и запуск Windows runtime | **NOT RUN** — нет C#-исходников и .NET SDK |
@@ -67,3 +69,43 @@ SHA-256 — контроль целостности, не цифровая по�
 ## Приёмка
 
 [Живой чек-лист](LIVE_ACCEPTANCE_6.0.0.md) содержит непроверенные пункты без фиктивных PASS. Полная матрица всех 52 требований, включая частично выполненные пункты: [IMPLEMENTATION_STATUS](../IMPLEMENTATION_STATUS.md). Переход в Final Production требует успешной живой проверки критического маршрута HH, а не только автоматических тестов.
+
+## RC3 automatic cover-letter submit hotfix
+
+- Node unit/integration: **379 / 379 PASS**.
+- Python tests: **34 / 34 PASS**.
+- Real worker authorization (`worker_authorization_rc3.cjs`): **19 / 19 PASS**.
+- Focused Chromium one-click regression: **4 / 4 PASS**.
+- Long Chromium E2E: direct HH, HeadHunter.kg, native list-card, mandatory pre-submit letter and post-response attach-letter checks passed before the runner reached its execution limit. The long suite is therefore **not** reported as a complete-suite PASS.
+
+The focused regression verifies that the dedicated **«✦ Отклик + письмо»** control carries explicit user intent into final-action authorization, ignores unrelated required search filters, inserts the prepared vacancy-specific letter, clicks the native **«Отправить»** button, observes the modal closing, and does not emit the legacy manual-review denial.
+## RC3 Send-retry hotfix · 6 октября 2026
+
+Проверена отдельная ошибка, при которой HH оставлял форму сопроводительного письма открытой после первого нажатия **«Отправить»**. Новая логика повторно находит кнопку после reactive re-render, восстанавливает текст при сбросе поля и выполняет не более шести попыток. Успех фиксируется только после закрытия текущей формы или подтверждения внутри контекста текущей вакансии; аналогичная надпись у другой карточки игнорируется.
+
+| Проверка | Результат | Граница |
+| :--- | ---: | :--- |
+| `node --test browser-extension/*.test.js` | **380 / 380 PASS** | JS unit/integration и структурные regression contracts |
+| `python -m unittest discover -s tests -p 'test_*.py' -v` | **34 / 34 PASS** | Python ML/publication/hygiene tests |
+| `node tests/product_worker_600.cjs` | **10 / 10 PASS** | Реальный worker, mocked Chrome/HTTP |
+| `node tests/worker_authorization_rc3.cjs` | **19 / 19 PASS** | One-shot user intent и hard safety gates |
+| `python tests/browser_oneclick_user_intent_rc3.py` | **PASS** | Поиск HH: первые два Send no-op, третий закрывает форму; stale success другой карточки игнорируется |
+| `python tests/browser_cover_letter_retry_rc3.py` | **PASS** | Страница вакансии: два no-op клика, третий Send, сохранность письма, verified closure |
+| `python tools/check-repo-hygiene.py` | **PASS** | Публичный source plan без приватных/runtime-файлов |
+
+Эти сценарии используют Chromium DOM-фикстуры и не отправляют реальный отклик. Живая авторизованная проверка HH остаётся **NOT LIVE VALIDATED**.
+
+
+
+## Avito Vacancies BETA validation · 6 октября 2026
+
+Добавлен отдельный Avito-only content bundle без HH auto-submit scripts. Он распознаёт vacancy list/detail routes, использует provider-qualified item identity, читает полное объявление в неактивной вкладке, сохраняет независимые Fit и Calls, удерживает controls при hover UI и выполняет vacancy-scoped one-click message flow после явного нажатия **Письмо**.
+
+| Проверка | Результат | Граница |
+| :--- | ---: | :--- |
+| `node --test extension/*.test.js` | **390 / 390 PASS** | Включает 8 Avito provider/identity/writing/manifest contracts |
+| `python -m pytest -q` | **34 / 34 PASS** | Source publication, hygiene, ML/tooling after manifest refresh |
+| `python tests/browser_avito_beta.py` | **19 / 19 PASS** | Synthetic Chromium list/detail pages; hover persistence, exact chat, fill/send; no login or real employer |
+| `node --check extension/*.js` | **182 / 182 PASS** | Syntax only |
+
+Avito remains **BETA / NOT LIVE VALIDATED**. The fixture verifies persistent controls, exact native **Написать** activation, feminine vacancy-specific text with confirmed contacts, composer fill, one-message send and completion verification in a synthetic chat. It does not validate an authenticated account, anti-bot states or current production DOM variants.

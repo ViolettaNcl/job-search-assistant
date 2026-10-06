@@ -43,7 +43,7 @@ for(const [message,intent] of [['Мы рассмотрим ваше резюме
 test('default feedback quick reply contains preferred contacts and phone note',()=>{const item=Q.suggest('Спасибо, мы рассмотрим ваше резюме и дадим обратную связь.','ru',p.contacts)[0];assert.equal(item.id,'feedback_default');assert.equal(item.text,'Здравствуйте! Спасибо за ответ. Буду ждать обратной связи.\n\nЕсли будет возможность, пожалуйста, напишите мне здесь в чате, в Telegram @fixture или на почту candidate@example.test. По обычному телефонному звонку могу не успеть ответить.');});
 test('unknown template variables are not silently dropped',()=>assert.equal(Q.render('Hello {{recruiterName}}',{}),''));
 test('quick reply library is Russian-only and capped at five',()=>{const lib=Q.library('en',{email:'candidate@example.test',telegram:'@fixture'},[{id:'default-feedback-ru',label:'Мой ответ',language:'ru',text:'Привет'}]);assert.equal(lib.length,5);assert.equal(lib[0].label,'Мой ответ');assert.equal(lib.some(x=>x.label==='My reply'),false);});
-test('default Russian feedback reply is prefilled with Violetta contacts',()=>{assert.match(Q.defaultPersonalReply.text,/Здравствуйте! Спасибо за ответ/);assert.match(Q.defaultPersonalReply.text,/@Violet111/);assert.match(Q.defaultPersonalReply.text,/violettanicolaou@gmail\.com/);assert.match(Q.defaultPersonalReply.text,/телефонному звонку могу не успеть ответить/);});
+test('default Russian feedback reply contains no hardcoded private contacts',()=>{assert.match(Q.defaultPersonalReply.text,/Здравствуйте! Спасибо за ответ/);assert.doesNotMatch(Q.defaultPersonalReply.text,/@/);assert.match(Q.render(Q.templates[0].text,{email:'candidate@example.invalid',telegram:'@ExampleCandidate'})||'',/Спасибо/);});
 test('quick replies avoid recently inserted and sent repetition',()=>{assert.equal(Q.suggest('Мы рассмотрим резюме','ru',p.contacts,[{id:'feedback_default',at:Date.now()}]).some(x=>x.id==='feedback_default'),false);const exact=Q.library('ru',p.contacts)[0].text;assert.equal(Q.suggest('Мы рассмотрим резюме','ru',p.contacts,[],[],[{text:exact}]).some(x=>x.id==='feedback_default'),false);});
 test('contact reply uses one authoritative profile',()=>assert(Q.library('ru',p.contacts).find(t=>t.id==='contacts').text.includes('@fixture')));
 test('memory retains material promises and latest messages',()=>{const m=C.threadMemory([{id:'1',speaker:'employer',text:'Interview on 12/10 at 14:00'},{id:'2',speaker:'candidate',text:'I will confirm the time.'}]);assert.equal(m.important[0].id,'1');assert.equal(m.recent.at(-1).id,'2');});
@@ -52,14 +52,14 @@ test('complex test-assignment message is delegated to AI instead of canned repli
 
 
 test('developer cover letter is short, vacancy-specific and excludes unrelated hospitality history',()=>{
-  const profile=C.profile({fullName:'Violetta Nicolaou',contacts:{email:'violettanicolaou@gmail.com',telegram:'@Violet111'},facts:[
+  const profile=C.profile({fullName:'Demo Candidate',contacts:{email:'candidate@example.invalid',telegram:'@ExampleCandidate'},facts:[
     {id:'csharp',kind:'skill',text:'C#',status:'CONFIRMED',roles:['developer','qa']},
     {id:'dotnet',kind:'skill',text:'.NET',status:'CONFIRMED',roles:['developer','qa']},
     {id:'asp',kind:'skill',text:'ASP.NET Core',status:'CONFIRMED',roles:['developer']},
     {id:'sql',kind:'skill',text:'SQL Server',status:'CONFIRMED',roles:['developer','qa']},
     {id:'rest',kind:'skill',text:'REST API',status:'CONFIRMED',roles:['developer']},
     {id:'dental',kind:'project',text:'DentalClinic full-stack client project with ASP.NET Core, EF Core, SQL Server, REST API, JWT/RBAC, SignalR, Docker and automated tests.',status:'CONFIRMED',roles:['developer','qa','implementation']},
-    {id:'hotel',kind:'experience',text:'Front Desk Receptionist, Crowne Plaza Limassol',status:'CONFIRMED',roles:['technical_support','customer_support','operations']}
+    {id:'hotel',kind:'experience',text:'Front Desk Receptionist, Example Hotel Limassol',status:'CONFIRMED',roles:['technical_support','customer_support','operations']}
   ]});
   const vacancy=C.vacancy({url:'https://hh.ru/vacancy/55',title:'Junior .NET Backend Developer',company:'Example',description:'C# ASP.NET Core REST API SQL Server Docker backend'});
   const text=C.coverLetter(profile,vacancy,'en');
@@ -68,19 +68,19 @@ test('developer cover letter is short, vacancy-specific and excludes unrelated h
 });
 
 test('IT cover letters include the configured GitHub portfolio and remain vacancy-specific',()=>{
-  const profile=C.profile({fullName:'Violetta Nicolaou',github:'https://github.com/ViolettaNcl',facts:[
+  const profile=C.profile({fullName:'Demo Candidate',github:'https://github.com/DemoNcl',facts:[
     {id:'csharp2',kind:'skill',text:'C#',status:'CONFIRMED',roles:['developer','technical_support']},
     {id:'dotnet2',kind:'skill',text:'.NET',status:'CONFIRMED',roles:['developer','technical_support']},
     {id:'dental2',kind:'project',text:'DentalClinic full-stack client project with ASP.NET Core and SQL Server.',status:'CONFIRMED',roles:['developer','technical_support']}
   ]});
   const dev=C.coverLetter(profile,C.vacancy({url:'https://hh.ru/vacancy/99',title:'Junior C# .NET Developer',description:'C# .NET ASP.NET Core'}),'ru');
-  assert.match(dev,/github\.com\/ViolettaNcl/);assert.match(dev,/C#|\.NET/);assert.doesNotMatch(dev,/Crowne|Front Desk/i);
+  assert.match(dev,/github\.com\/DemoNcl/);assert.match(dev,/C#|\.NET/);assert.doesNotMatch(dev,/Crowne|Front Desk/i);
   const tech=C.coverLetter(profile,C.vacancy({url:'https://hh.ru/vacancy/100',title:'Technical Support Engineer',description:'API SQL troubleshooting SaaS'}),'en');
-  assert.match(tech,/github\.com\/ViolettaNcl/);assert.match(tech,/technical|GitHub/i);
+  assert.match(tech,/github\.com\/DemoNcl/);assert.match(tech,/technical|GitHub/i);
 });
 
 test('non-IT generic support letter does not force a GitHub link',()=>{
-  const profile=C.profile({fullName:'Violetta Nicolaou',github:'https://github.com/ViolettaNcl',facts:[]});
+  const profile=C.profile({fullName:'Demo Candidate',github:'https://github.com/DemoNcl',facts:[]});
   const text=C.coverLetter(profile,C.vacancy({url:'https://hh.ru/vacancy/101',title:'Customer Support Agent',description:'Answer customer questions in chat'}),'en');
-  assert.doesNotMatch(text,/github\.com\/ViolettaNcl/);
+  assert.doesNotMatch(text,/github\.com\/DemoNcl/);
 });

@@ -1,39 +1,11 @@
-# Violetta Apply Assistant — Chrome Extension 5.2.0
+# Расширение Violetta
 
-`extension/` is the packaged Chrome runtime in the FULL bundle. The same source is published to `browser-extension/` in Git.
+Загрузите эту папку через `chrome://extensions`. При обновлении используйте ту же папку и нажмите **Обновить / Reload** на существующей карточке, не создавая вторую установку. Новая публичная установка имеет пустой профиль.
 
-## Search
+Поддерживаемые поверхности RC3:
 
-- exact per-card `Analysis`;
-- `⚡ Analyze page` with bounded concurrency;
-- separate Fit and Calls indicators;
-- deterministic base Fit + bounded real-user preference signals;
-- optional explicitly-promoted preference-model contribution;
-- separate optional employer-engagement prediction;
-- filters and Ready Queue;
-- Save / Skip / Fit feedback learning signals.
+- HH / HeadHunter — основной workflow, Release Candidate;
+- Habr Career — BETA;
+- Avito Vacancies — BETA: постоянные Analysis/Письмо/Fit/Calls, женская форма письма с подтверждёнными контактами и one-click exact-chat fill/send после явного нажатия Письмо.
 
-## Apply / forms
-
-- exact vacancy-specific `✦ Отклик + письмо`;
-- persistent vacancy/application memory;
-- Smart Questionnaire Autofill;
-- confirmed-answer retrieval, including local semantic fallback;
-- trusted user-correction learning;
-- review-safe human drafts;
-- pre-submit change summary;
-- employer-already-viewed recovery.
-
-## Learning & Model Center
-
-The popup exposes local learning statistics, preference/engagement dataset export, backup/import/reset, model-candidate import, explicit promotion/disable and post-promotion monitoring/drift when real labels exist.
-
-Importing a model never activates it automatically. Test-only/synthetic models are rejected by the promotion gate.
-
-## Recruiter / interview
-
-Recruiter intent and Interview Prep use vacancy context and confirmed profile evidence. Mock-practice feedback evaluates answer structure/evidence grounding only.
-
-## Installation
-
-Chrome → `chrome://extensions` → Developer mode → Load unpacked → select this `extension` directory.
+Документация: `../docs/USER_GUIDE.md`. Avito: [`AVITO_VACANCIES_BETA.md`](AVITO_VACANCIES_BETA.md).

@@ -9,7 +9,7 @@
 
 [![Release](https://img.shields.io/badge/release-6.0.0_RC3-6d5dfc?style=for-the-badge)](docs/RELEASE_NOTES_6.0.0.md)
 [![Chrome](https://img.shields.io/badge/Chrome-Manifest_V3-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](ARCHITECTURE.md)
-[![Node tests](https://img.shields.io/badge/Node_tests-367%2F367-22c55e?style=for-the-badge)](docs/TEST_REPORT_6.0.0.md)
+[![Node tests](https://img.shields.io/badge/Node_tests-388%2F388-22c55e?style=for-the-badge)](docs/TEST_REPORT_6.0.0.md)
 [![Python tests](https://img.shields.io/badge/Python_tests-34%2F34-22c55e?style=for-the-badge&logo=python&logoColor=white)](docs/TEST_REPORT_6.0.0.md)
 [![Status](https://img.shields.io/badge/status-Release_Candidate-f59e0b?style=for-the-badge)](docs/LIVE_ACCEPTANCE_6.0.0.md)
 
@@ -18,7 +18,7 @@
 </div>
 
 > [!IMPORTANT]
-> **6.0.0 RC3 is a Release Candidate, not Final Production.** Automated suites pass, but the critical authenticated HH workflow has not yet been live-validated in the user's installed browser. Habr Career remains **BETA**. See [Live Acceptance](docs/LIVE_ACCEPTANCE_6.0.0.md).
+> **6.0.0 RC3 is a Release Candidate, not Final Production.** Automated suites pass, but the critical authenticated HH workflow has not yet been live-validated in the user's installed browser. Habr Career and Avito Vacancies remain **BETA**. See [Live Acceptance](docs/LIVE_ACCEPTANCE_6.0.0.md).
 
 ---
 
@@ -65,6 +65,7 @@ flowchart LR
 | Area | Current RC3 capability | Safety / boundary |
 |---|---|---|
 | **Vacancy intelligence** | Single + batch analysis, exact vacancy identity, full-reading fallback, Fit reasons/risks | Fit is not hiring probability |
+| **Avito Vacancies BETA** | Persistent card/page controls, background full read, Calls/Fit, feminine vacancy-specific letter, one-click native chat fill + send | One explicit **Letter** click authorizes one message; exact-chat and send verification; not live validated |
 | **Calls classification** | Calls / No Calls / Unknown, stored separately from Fit | Unknown is preserved instead of guessed |
 | **Application preparation** | Vacancy-bound context, CV selection, tailored cover letter, queue actions | Application stays bound to vacancy identity |
 | **Questionnaires** | Text, textarea, native selects/radios/checkboxes, selected ARIA controls, verified writes | Unsupported/ambiguous controls remain review-required |
@@ -82,6 +83,7 @@ flowchart TB
     subgraph Sites[Job sites]
       HH[HH / HeadHunter]
       HC[Habr Career BETA]
+      AV[Avito Vacancies BETA]
       ATS[External ATS / questionnaires]
     end
 
@@ -107,6 +109,7 @@ flowchart TB
 
     HH --> CS
     HC --> CS
+    AV --> CS
     ATS --> CS
     CS <--> SW
     SW <--> QE
@@ -181,13 +184,14 @@ The public GitHub package is designed to exclude private CV/profile/runtime data
 
 | Check | RC3 result | Meaning |
 |---|---:|---|
-| Node test suite | **367 / 367** | JS unit/integration coverage with controlled dependencies |
+| Node test suite | **388 / 388** | JS unit/integration coverage with controlled dependencies |
 | Python suite | **34 / 34** | ML/ranking/provenance, hygiene, manifests and tooling |
 | Browser DOM suite | **102 / 102 assertions** | Chromium fixtures; not authenticated HH production traffic |
 | Control Center suite | **21 / 21 assertions** | UI/import/field/mobile checks with mocked browser services |
-| Worker authorization | **15 / 15 assertions** | Mode, opt-in, origin, Fit and risk gating |
+| Worker authorization | **19 / 19 assertions** | Mode, opt-in, origin, one-shot intent, Fit and risk gating |
 | Live authenticated HH critical path | **NOT LIVE VALIDATED** | Required before Final Production |
 | Habr application flow | **BETA / NOT LIVE VALIDATED** | Fixtures only |
+| Avito vacancy workflow | **19 / 19 fixture assertions · BETA** | Persistent controls, Fit/Calls, exact native chat, fill/send verification; no authenticated account |
 | Windows/.NET rebuild | **NOT RUN** | C# sources were not present in the supplied baseline |
 
 See the exact matrix in [TEST_REPORT_6.0.0.md](docs/TEST_REPORT_6.0.0.md) and the 52-point implementation matrix in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
@@ -206,6 +210,12 @@ See the exact matrix in [TEST_REPORT_6.0.0.md](docs/TEST_REPORT_6.0.0.md) and th
 ### Updating an existing installation
 
 Back up first. Replace the extension source in the **same directory** used by Chrome, then click **Reload** on the existing extension card. Avoid deleting and reinstalling the extension unless you intentionally want a new extension storage scope.
+
+## Avito Vacancies BETA
+
+On Avito vacancy search pages the extension adds **Analysis**, **Letter**, Fit and Calls controls to detected cards. **Analyze page** processes visible cards with bounded concurrency. The full vacancy is read in an inactive background tab and the tab is closed after extraction.
+
+The injected controls remain visible when Avito shows its native hover actions. One explicit **Letter** click reads the exact vacancy, prepares a concise message from confirmed CV/profile facts, enforces feminine Russian candidate grammar, appends the confirmed Telegram/email contacts, activates Avito’s native **Write** control, verifies the matching chat, fills the composer and sends that one message. The action is bounded and vacancy-scoped. If the first automatic attempt cannot verify the exact chat/composer/send state, the saved-letter window exposes **Send to chat**: it retries the exact native chat, fills and sends the edited text, and closes only after confirmed send. Avito remains BETA and is not authenticated-live-validated. See [AVITO_VACANCIES_BETA.md](browser-extension/AVITO_VACANCIES_BETA.md).
 
 ## Repository layout
 
@@ -249,7 +259,7 @@ Repository packages must not include release ZIPs, private runtime data, secrets
 <summary><strong>Release boundary — what RC3 does not claim</strong></summary>
 
 - Authenticated HH end-to-end critical workflow is not yet live-validated.
-- Habr Career is BETA and not production-validated.
+- Habr Career and Avito Vacancies are BETA and not production-validated. Avito one-click sending is fixture-validated only and remains pending authenticated live acceptance.
 - Full runtime migration from browser storage into a filesystem vault is not complete.
 - Real embeddings are not implemented in the claimed production form.
 - Gradient Boosting is not bundled/promoted as a trained personal production model.
@@ -281,6 +291,7 @@ Violetta Apply Assistant — персональная система для по
 | Область | Что есть в RC3 | Граница |
 |---|---|---|
 | **Анализ вакансий** | Analysis, Batch, полное чтение, Fit, причины и риски | Fit не является вероятностью найма |
+| **Авито BETA** | Постоянные кнопки карточки, Fit/Calls, женская форма письма, Telegram/email, открытие точного чата, вставка и отправка | Одно явное нажатие **Письмо** разрешает одно сообщение; exact-chat/send verification; live-проверки нет |
 | **Звонки** | Calls / No Calls / Unknown отдельно от Fit | Unknown не подменяется догадкой |
 | **Отклик** | Контекст конкретной вакансии, выбор CV, персональное письмо, очередь | Контекст не должен смешиваться между вакансиями |
 | **Анкеты** | Текст, textarea, native select/radio/checkbox, часть ARIA-контролов, проверка сохранения значения | Неизвестный custom-контрол остаётся на ручной проверке |
@@ -337,9 +348,15 @@ Autopilot должен остановиться на неизвестных об
 
 ## Качество RC3
 
-Автоматические проверки проходят: **367/367 Node**, **34/34 Python**, **102/102 browser assertions**, **21/21 Control Center assertions**, **15/15 worker authorization assertions**. Это подтверждает покрытые сценарии в контролируемой среде, но **не заменяет живую авторизованную проверку HH**.
+Текущий автоматический прогон проходит: **390/390 Node**, **34/34 Python** и **19/19 Avito Chromium fixture assertions**. Ранее зафиксированные HH/Control Center/worker наборы остаются в точном отчёте тестов. Это подтверждает покрытые сценарии в контролируемой среде, но **не заменяет живую авторизованную проверку HH**.
 
-Пока критический HH workflow не пройден на установленном расширении, версия остаётся **Release Candidate**. Habr Career — **BETA / NOT LIVE VALIDATED**.
+Пока критический HH workflow не пройден на установленном расширении, версия остаётся **Release Candidate**. Habr Career и Avito Vacancies — **BETA / NOT LIVE VALIDATED**.
+
+## Работа с вакансиями Авито (BETA)
+
+На странице поиска вакансий Авито расширение добавляет к карточкам **Analysis**, **Письмо**, Fit и статус звонков. Кнопка **Анализ страницы** последовательно читает видимые вакансии, открывая каждую только в неактивной фоновой вкладке и закрывая её после чтения.
+
+Добавленные кнопки остаются видимыми и при наведении, когда Авито показывает собственную кнопку **Написать**. Одно явное нажатие **Письмо** читает точную вакансию, создаёт короткое профессиональное письмо по подтверждённым данным профиля/CV, приводит русские формы кандидата к женскому роду, добавляет подтверждённые Telegram и email, нажимает штатную кнопку **Написать**, проверяет, что открыт чат именно этой вакансии, вставляет текст и отправляет одно сообщение. Если первая автоматическая попытка не смогла подтвердить exact chat/composer/send, текст сохраняется, а окно показывает явную кнопку **«Отправить в чат»**: она повторяет открытие точного чата, вставку и отправку и закрывает окно только после подтверждения. Авито остаётся **BETA / NOT LIVE VALIDATED**. Подробности: [AVITO_VACANCIES_BETA.md](browser-extension/AVITO_VACANCIES_BETA.md).
 
 ## Быстрый запуск
 
@@ -370,7 +387,7 @@ Autopilot должен остановиться на неизвестных об
 <summary><strong>Что RC3 пока не заявляет</strong></summary>
 
 - Критический workflow HH ещё не прошёл живую авторизованную приёмку.
-- Habr Career остаётся BETA.
+- Habr Career и Avito Vacancies остаются BETA; Avito one-click message flow проверен только на контролируемой DOM-фикстуре, а не в живом авторизованном аккаунте.
 - Полный filesystem vault для всей runtime-памяти не завершён.
 - Production embeddings в заявленном полном виде не реализованы.
 - Gradient Boosting не выдаётся за обученную персональную production-модель.
@@ -383,7 +400,7 @@ Autopilot должен остановиться на неизвестных об
 <div align="center">
 
 **Violetta Apply Assistant 6.0.0 RC3**  
-Engineering status: **automated suites passing · live HH acceptance pending**
+Engineering status: **automated suites passing · live HH / Avito acceptance pending**
 
 [Back to top](#violetta-apply-assistant)
 

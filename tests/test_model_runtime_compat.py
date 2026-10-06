@@ -2,6 +2,7 @@ import json, math, subprocess, unittest
 from pathlib import Path
 import sys
 ROOT=Path(__file__).resolve().parents[1]
+EXTENSION_ROOT = ROOT/'extension' if (ROOT/'extension').exists() else ROOT/'browser-extension'
 sys.path.insert(0,str(ROOT/'tools'/'ml'))
 from common import features, sigmoid
 
@@ -10,7 +11,7 @@ class RuntimeCompatibility(unittest.TestCase):
         row={'title':'Junior C# Developer','company':'Example Tech','role':'developer','remote':True,'calls':'no-calls','sales':False,'senior':False,'junior':True,'requiredYears':2,'technologies':['c#','sql','docker']}
         py=features(row)
         script=f"""
-const R=require({json.dumps(str(ROOT/'extension'/'model-runtime.js'))});
+const R=require({json.dumps(str(EXTENSION_ROOT/'model-runtime.js'))});
 (async()=>{{const x=await R.vector({json.dumps(row,ensure_ascii=False)},256);process.stdout.write(JSON.stringify(x));}})().catch(e=>{{console.error(e);process.exit(1)}});
 """
         out=subprocess.check_output(['node','-e',script],text=True)
@@ -24,7 +25,7 @@ const R=require({json.dumps(str(ROOT/'extension'/'model-runtime.js'))});
         py=sigmoid(sum(a*b for a,b in zip(w,features(row))))
         model={'schemaVersion':1,'modelType':'personal-vacancy-logreg','modelVersion':'compat','dimension':256,'weights':w,'threshold':.5,'trainedOnRealLabels':False}
         script=f"""
-const R=require({json.dumps(str(ROOT/'extension'/'model-runtime.js'))});
+const R=require({json.dumps(str(EXTENSION_ROOT/'model-runtime.js'))});
 (async()=>{{const r=await R.predict({json.dumps(model)},{json.dumps(row)});process.stdout.write(String(r.rawProbability));}})().catch(e=>{{console.error(e);process.exit(1)}});
 """
         js=float(subprocess.check_output(['node','-e',script],text=True))

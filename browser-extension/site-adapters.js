@@ -14,6 +14,13 @@
     ashby:{title:['[class*="jobPostingHeader"] h1','h1'],description:['[class*="jobDescription"]','[data-testid="job-description"]']},
     workable:{title:['[data-ui="job-title"]'],description:['[data-ui="job-description"]']},
     habr:{title:['.vacancy-title__text','h1'],company:['.company_name','[class*=company] a'],description:['.vacancy-description','[class*=vacancy-description]','main'],jobLink:'a[href*="/vacancies/"]'},
+    avito:{
+      title:['[data-marker="item-view/title-info"] h1','[data-marker="item-view/title-info"]','[data-marker="item-title"]','h1'],
+      company:['[data-marker="seller-info/name"]','[data-marker*="seller-info"] [itemprop="name"]','[data-marker*="seller"] h2','[data-marker*="seller"] h3'],
+      description:['[data-marker="item-view/item-description"]','[data-marker="item-description/text"]','[data-marker*="item-description"]','[itemprop="description"]'],
+      messages:['[data-marker*="message"]','[data-testid*="message"]','[class*="message-bubble"]','[class*="messenger-message"]'],
+      jobLink:'a[href*="/vakansii/"]'
+    },
     superjob:{title:['h1'],description:['[itemprop="description"]']},
     geekjob:{title:['h1'],description:['.job-description']},
     bamboohr:{title:['[class*="JobOpening"] h1','h1'],description:['[class*="jobDescription"]']},
@@ -34,7 +41,8 @@
   function text(el,max=24000){return C.clip(el?.innerText||el?.textContent||el?.getAttribute?.('alt')||'',max);}
   function first(selectors,scope=document){for(const s of selectors){const e=all(s,scope).find(visible);if(e)return text(e,60000)||e.getAttribute('alt')||'';}return '';}
   function attr(scope,names){if(!scope)return '';for(const key of names){let el=scope instanceof Element&&scope.hasAttribute(key)?scope:all(`[${key}]`,scope).find(visible);const value=el?.getAttribute(key);if(value)return C.clip(value,300);}return '';}
-  function formFields(scope=document){return all('input,textarea,select,[contenteditable="true"][role="textbox"],[role="combobox"],[role="radiogroup"]',scope).filter(el=>!el.disabled&&!el.readOnly&&el.getAttribute('aria-disabled')!=='true'&&(!['hidden','password','submit','button','reset','image'].includes(el.type))&&(visible(el)||el.type==='file'&&visible(el.parentElement)));}
+  function formFields(scope=document){const fields=all('input,textarea,select,[contenteditable="true"][role="textbox"],[role="combobox"],[role="radiogroup"],[role="checkbox"]',scope).filter(el=>!el.disabled&&!el.readOnly&&el.getAttribute('aria-disabled')!=='true'&&(!['hidden','password','submit','button','reset','image'].includes(el.type))&&(visible(el)||el.type==='file'&&visible(el.parentElement)));return root.vjaChoiceControls?.groupFields(fields)||fields;}
+
   function label(el){
     const parts=[el.getAttribute('aria-label'),el.getAttribute('placeholder'),el.getAttribute('name'),el.id];
     const scope=el.getRootNode();
@@ -45,7 +53,7 @@
     if(group)parts.unshift(first(['legend','label','[class*="label"]'],group));
     return [...new Set(parts.filter(Boolean))].join(' ').slice(0,1000);
   }
-  function descriptor(el,i=0){return {token:typeof ensureToken==='function'?ensureToken(el,i):'field-'+i,label:label(el),type:el.getAttribute('role')==='combobox'?'combobox':el.tagName==='SELECT'?(el.multiple?'multiselect':'select'):el.tagName==='TEXTAREA'||el.isContentEditable?'textarea':el.type||el.getAttribute('role')||'text',currentValue:el.type==='file'?(el.files?.length?'attached':''):['radio','checkbox'].includes(el.type)?(el.checked?'checked':''):el.value||'',required:el.required||el.getAttribute('aria-required')==='true',maxLength:el.maxLength||0,options:el.options?[...el.options].map(o=>({value:o.value,text:text(o)})):[]};}
+  function descriptor(el,i=0){const d={token:typeof ensureToken==='function'?ensureToken(el,i):'field-'+i,label:label(el),type:el.getAttribute('role')==='combobox'?'combobox':el.tagName==='SELECT'?(el.multiple?'multiselect':'select'):el.tagName==='TEXTAREA'||el.isContentEditable?'textarea':el.type||el.getAttribute('role')||'text',currentValue:el.type==='file'?(el.files?.length?'attached':''):['radio','checkbox'].includes(el.type)?(el.checked?'checked':''):el.value||'',required:el.required||el.getAttribute('aria-required')==='true',maxLength:el.maxLength||0,options:el.options?[...el.options].map(o=>({value:o.value,text:text(o)})):[]};return root.vjaChoiceControls?.describe(el,d)||d;}
   function structured(doc=document){
     const items=[];
     for(const s of all('script[type="application/ld+json"]',doc))try{root.vjaAtsStructured?.collectJobPostings(JSON.parse(s.textContent),items);}catch{}
@@ -71,7 +79,27 @@
           }
         }else title='';
       }
-      const v={provider,url,title,company:(typeof j?.hiringOrganization==='string'?j.hiringOrganization:j?.hiringOrganization?.name)||first([...(cfg.company||[]),...generic.company],scope),description:j?.description?root.vjaAtsStructured.htmlToText(j.description):first([...(cfg.description||[]),...generic.description],scope),vacancyId:String(j?.identifier?.value||attr(scope,['data-vacancy-id','data-job-id','data-requisition-id'])||C.idFromUrl(url)),location:j?.jobLocation?.address?.addressLocality||first(['[data-qa="vacancy-view-location"]','[class="location"]'],scope),experience:j?.experienceRequirements||'',employmentType:j?.employmentType||'',salary:j?.baseSalary||null,remote:/TELECOMMUTE/i.test(j?.jobLocationType||''),requirements:j?.qualifications||j?.skills||'',descriptionCoverage:scope===doc?(j?'full-structured':'full-dom'):'partial'};
+      let company=(typeof j?.hiringOrganization==='string'?j.hiringOrganization:j?.hiringOrganization?.name)||first([...(cfg.company||[]),...generic.company],scope);
+      let description=j?.description?root.vjaAtsStructured.htmlToText(j.description):first([...(cfg.description||[]),...generic.description],scope);
+      let locationText=j?.jobLocation?.address?.addressLocality||first(['[data-qa="vacancy-view-location"]','[data-marker="item-view/location"]','[data-marker="item-address"]','[class*="location"]'],scope);
+      let requirements=j?.qualifications||j?.skills||'';
+      let experience=j?.experienceRequirements||'';
+      let employmentType=j?.employmentType||'';
+      if(provider==='avito'){
+        const sections=[
+          first(['[data-marker="item-view/item-description"]','[data-marker="item-description/text"]','[data-marker*="item-description"]','[itemprop="description"]'],scope),
+          first(['[data-marker="item-view/item-params"]','[data-marker*="item-params"]','[data-marker*="params"]'],scope),
+          first(['[data-marker="item-view/seo-description"]'],scope)
+        ].filter(Boolean);
+        description=C.clip([...new Set(sections)].join('\n'),60000)||description;
+        const body=C.clip([title,description,first(['main'],scope)].filter(Boolean).join('\n'),60000);
+        requirements=C.clip([requirements,body.match(/(?:Требования|Что нужно|Мы ожидаем|Подойд[её]т, если)[:\s][\s\S]{0,3500}/i)?.[0]||''].filter(Boolean).join('\n'),5000);
+        experience=experience||body.match(/(?:Опыт работы|Опыт)[:\s]{0,5}([^\n]{1,120})/i)?.[1]||'';
+        employmentType=employmentType||body.match(/(?:График|Занятость|Формат работы)[:\s]{0,5}([^\n]{1,180})/i)?.[1]||'';
+        if(!company)company=first(['[data-marker*="seller"] [data-marker*="name"]','[data-marker*="company"]'],scope);
+      }
+      const combinedText=[title,description,requirements,employmentType].filter(Boolean).join('\n');
+      const v={provider,url,title,company,description,vacancyId:String(j?.identifier?.value||attr(scope,['data-vacancy-id','data-job-id','data-requisition-id','data-item-id'])||C.idFromUrl(url)),location:locationText,experience,employmentType,salary:j?.baseSalary||null,remote:/TELECOMMUTE/i.test(j?.jobLocationType||'')||/удал[её]н|дистанцион|remote|из дома/i.test(combinedText),requirements,descriptionCoverage:scope===doc?(j?'full-structured':'full-dom'):'partial'};
       return C.vacancy(v);
     }
     function getReplyInput(){
@@ -220,8 +248,10 @@
       // A direct HH vacancy URL is authoritative enough to keep the launcher visible
       // even while description blocks are still loading.
       if(provider==='hh'&&/\/vacancy\/\d+/i.test(path))return 'JOB_DESCRIPTION';
+      if(provider==='avito'&&/\/vakansii\//i.test(path)&&Boolean(C.idFromUrl(url)))return 'JOB_DESCRIPTION';
       if(v.title&&(structured(doc)||v.description&&(/vacancy|job|career|position|requisition/i.test(url)||cfg.description?.length)))return 'JOB_DESCRIPTION';
       if(v.title&&/vacancy|job|career|position|requisition/i.test(url))return 'JOB_DESCRIPTION';
+      if(provider==='avito'&&/\/vakansii(?:\/|$)/i.test(path)&&all('a[href*="/vakansii/"]',doc).length>1)return 'JOB_LIST';
       if(/(?:jobs|vacancies|search)/i.test(path)&&all('a[href*="/vacancy/"],a[href*="/jobs/"]',doc).length>2)return 'JOB_LIST';
       if(/interview|собеседование/i.test(path))return 'INTERVIEW_PAGE';
       if(/compan(?:y|ies)|about/i.test(path))return 'COMPANY_PAGE';

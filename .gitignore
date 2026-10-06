@@ -1,98 +1,34 @@
-# Release packages
+# Runtime, private data and packaged releases
 *.zip
-*.zip.sha256
-*.sha256
-
-# Generated test output
-/test-results/
-/playwright-report/
-/coverage/
-Violetta_*_TEST_REPORT.md
-TEST_REPORT.md
-
-# Logs / diagnostics
-*.log
-backend-diagnostic.txt
-
-# Local databases
-*.db
-*.db-shm
-*.db-wal
-
-# .NET generated output
-**/bin/
-**/obj/
 *.dll
 *.exe
 *.pdb
-
-# Node / tooling
-node_modules/
-.npm/
-.cache/
-
-# Temporary extraction folders
-violetta-*-github-upload/
-violetta-*-clean-source/
-
-# IDE / OS
-.vs/
-.vscode/
-.idea/
-Thumbs.db
-.DS_Store
-
-# Generated release files
-/backend/
-/extension/
-/test-results/
-FILE_HASHES.sha256
-*.zip
-*.zip.sha256
-/artifacts/
-/dist/
-**/.env
-**/.env.*
-!**/.env.example
-**/candidate.private.json
-**/appsettings.local.json
-**/user-settings.cmd
+*.db
+*.db-wal
+*.db-shm
+*.log
 *.vja
 *.jsonl
 *.pyc
 __pycache__/
-/Violetta-Apply-Assistant-*/
-/backups/
-/private-data/
-/github-source/
-
-# Local/private Violetta data
-private/
-profile/
-cv/
-memory/
-applications/
-questionnaires/
-learning/
-datasets/
-models/
-backups/
-logs/
-
-# Build/release/private output
-*.zip
-*.exe
-*.dll
-*.pdb
-*.db
-*.sqlite
-*.sqlite3
-*.log
-.env
-.env.*
 node_modules/
 bin/
 obj/
 test-results/
 artifacts/
-coverage/
+dist/
+private-data/
+backend/
+extension/
+Violetta-Apply-Assistant-*/
+.env
+.env.*
+!.env.example
+user-settings.cmd
+candidate.private.json
+appsettings.local.json
+browser-extension/assets/cv/
+
+# Private FULL-only candidate bootstrap
+browser-extension/private-bootstrap.local.js
+private-bootstrap.local.js

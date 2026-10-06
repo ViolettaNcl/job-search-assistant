@@ -25,23 +25,37 @@ const cpFeatureFlagsKey='vjaFeatureFlagsV1';
 async function cpInitialize(){
   if(cpInit)return cpInit;
   cpInit=(async()=>{
-    const stored=await chrome.storage.local.get([cpKey,'applicationMemory','vjaCopilotSettings','vjaPersonalReplies']);
+    const stored=await chrome.storage.local.get([cpKey,'applicationMemory','vjaCopilotSettings','vjaPersonalReplies','cvVaultRu','cvVaultEn','vjaAutomationPolicyV1']);
     await globalThis.vjaBundledCv?.ensure?.().catch(()=>null);
+    const bootstrap=globalThis.vjaPrivateBootstrap;
+    const hasConfirmedFacts=Array.isArray(stored[cpKey]?.facts)&&stored[cpKey].facts.some(f=>f?.status==='CONFIRMED'&&!f?.pendingReview);
+    if(bootstrap&&!hasConfirmedFacts){
+      globalThis.vjaPrivateProfile.validate(bootstrap);
+      const now=Date.now(),profile=JSON.parse(JSON.stringify(bootstrap.profile));
+      profile.emptySeed=false;profile.importedAt=now;profile.privateBootstrapAppliedAt=now;
+      profile.facts=(profile.facts||[]).map(f=>({...f,status:'CONFIRMED',origin:'user-confirmed',priority:Math.max(100,Number(f.priority)||0),pendingReview:false,confirmedAt:f.confirmedAt||now}));
+      const patch={[cpKey]:profile};
+      for(const key of ['cvVaultRu','cvVaultEn'])if(!stored[key]?.base64&&bootstrap.cv?.[key]?.base64)patch[key]={...bootstrap.cv[key],source:'private-full-bootstrap'};
+      if(!stored.vjaAutomationPolicyV1)patch.vjaAutomationPolicyV1={mode:'assist',paused:false,explicitOptIn:false,approvedCategories:[],dailyLimit:20};
+      await chrome.storage.local.set(patch);Object.assign(stored,patch);
+    }
     const base=stored[cpKey]||{};
     const migrated=globalThis.vjaCandidateTruth.migrate(base,globalThis.vjaCandidateSeed);
     if(migrated.changed){
       const p=cpCore.profile(migrated.profile);p.contacts.phone=stored.applicationMemory?.phone||p.contacts.phone;
       await chrome.storage.local.set({[cpKey]:p,...(stored[cpKey]?{'vjaProfileBefore380':stored[cpKey]}:{})});
     }
+    const replyProfile=migrated.profile||base;const replyContacts=[replyProfile.contacts?.telegram?'в Telegram '+replyProfile.contacts.telegram:'',replyProfile.contacts?.email?'на почту '+replyProfile.contacts.email:''].filter(Boolean).join(' или ');
     const defaultReply={
+      systemGenerated:true,
       id:'default-feedback-ru',
       label:'Спасибо, буду ждать',
       language:'ru',
-      text:'Здравствуйте! Спасибо за ответ. Буду ждать обратной связи.\n\nЕсли будет возможность, пожалуйста, напишите мне здесь в чате, в Telegram @Violet111 или на почту violettanicolaou@gmail.com. По обычному телефонному звонку могу не успеть ответить.'
+      text:'Здравствуйте! Спасибо за ответ. Буду ждать обратной связи.\n\nЕсли будет возможность, пожалуйста, напишите мне здесь в чате'+(replyContacts?', '+replyContacts:'')+'. По обычному телефонному звонку могу не успеть ответить.'
     };
     const existing=Array.isArray(stored.vjaPersonalReplies)?stored.vjaPersonalReplies:[];
     const withoutSystemDefault=existing.filter(r=>r?.id!==defaultReply.id);
-    if(!existing.some(r=>r?.id===defaultReply.id&&r?.text)){
+    if(!existing.some(r=>r?.id===defaultReply.id&&r?.text)||existing.some(r=>r?.id===defaultReply.id&&r.systemGenerated&&r.text!==defaultReply.text)){
       await chrome.storage.local.set({vjaPersonalReplies:[defaultReply,...withoutSystemDefault].slice(0,30)});
     }
     if(!stored.vjaCopilotSettings)await chrome.storage.local.set({vjaCopilotSettings:{aiConsent:false,debug:false,historyLimit:24,discoveryEnabled:false,floatingApplyMode:'auto',alwaysCoverLetter:true,compactApplyStatus:true,quickListCoverLetter:true}});
@@ -52,7 +66,7 @@ async function cpInitialize(){
     if(!foundation[cpModelRegistryKey])initPatch[cpModelRegistryKey]={schemaVersion:2,activeModel:null,activeModels:{preference:null,engagement:null},models:[],updatedAt:Date.now()};
     if(!foundation[cpFeatureFlagsKey])initPatch[cpFeatureFlagsKey]={batchAnalysis:true,personalRanking:true,learningEngine:true,outcomeLearning:true,recruiterCopilot:true,multiSite:true,mlRanking:false,modelMonitoring:true,preSubmitDiff:true,semanticQuestionMemory:true};
     if(Object.keys(initPatch).length)await chrome.storage.local.set(initPatch);
-    if(stored.vjaCopilotSettings) {const next={...stored.vjaCopilotSettings,historyLimit:Number(stored.vjaCopilotSettings.historyLimit)===8?24:(stored.vjaCopilotSettings.historyLimit||24),floatingApplyMode:'auto',alwaysCoverLetter:true,compactApplyStatus:true,quickListCoverLetter:stored.vjaCopilotSettings.quickListCoverLetter!==false};if(JSON.stringify(next)!==JSON.stringify(stored.vjaCopilotSettings))await chrome.storage.local.set({vjaCopilotSettings:next});}
+    if(stored.vjaCopilotSettings) {const next={...stored.vjaCopilotSettings,historyLimit:Number(stored.vjaCopilotSettings.historyLimit)===8?24:(stored.vjaCopilotSettings.historyLimit||24),floatingApplyMode:stored.vjaCopilotSettings.floatingApplyMode||'auto',alwaysCoverLetter:true,compactApplyStatus:true,quickListCoverLetter:stored.vjaCopilotSettings.quickListCoverLetter!==false};if(JSON.stringify(next)!==JSON.stringify(stored.vjaCopilotSettings))await chrome.storage.local.set({vjaCopilotSettings:next});}
   })().catch(e=>{cpInit=null;throw e;});return cpInit;
 }
 async function cpData(){
@@ -88,6 +102,12 @@ function cpAssertEmbeddedVacancy(sender,vInput={}){
     const hhHost=h=>/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(h);
     if(!hhHost(page.hostname)||!hhHost(target.hostname)||!v.vacancyId)throw new Error('Не удалось подтвердить HeadHunter-вакансию из списка.');
     if(cpCore.suspiciousVacancyTitle?.(v.title))throw new Error('Выбранная карточка не содержит название конкретной вакансии.');
+    return;
+  }
+  if(pageProvider==='avito'){
+    const avitoHost=h=>/(^|\.)avito\.ru$/i.test(h);
+    if(!avitoHost(page.hostname)||!avitoHost(target.hostname)||!v.vacancyId||!/\/vakansii\//i.test(target.pathname))throw new Error('Не удалось подтвердить Avito-вакансию из списка.');
+    if(cpCore.suspiciousVacancyTitle?.(v.title))throw new Error('Выбранная карточка Avito не содержит название конкретной вакансии.');
     return;
   }
   if(page.origin!==target.origin)throw new Error('Вакансия относится к другой странице.');
@@ -181,7 +201,7 @@ async function cpLearningImport(payload){
 }
 async function cpLearningReset(){await chrome.storage.local.set({[cpLearningEventsKey]:[],[cpModelRegistryKey]:{schemaVersion:2,activeModel:null,activeModels:{preference:null,engagement:null},models:[],updatedAt:Date.now()}});return cpLearningSummary();}
 async function cpFindDuplicate(vacancy){
-  if(!cpDuplicate?.bestMatch)return null;const keys=await chrome.storage.local.get(null),records=[];for(const [k,v] of Object.entries(keys))if(k.startsWith('vjaVacancyIntel:')&&v?.vacancy&&String(v.vacancy.vacancyId)!==String(vacancy.vacancyId))records.push(v);const best=cpDuplicate.bestMatch(vacancy,records);return best?.similarity?.repost?{vacancyId:best.vacancy.vacancyId,title:best.vacancy.title,company:best.vacancy.company,similarity:best.similarity}:null;
+  if(!cpDuplicate?.bestMatch)return null;const keys=await chrome.storage.local.get(null),records=[];for(const [k,v] of Object.entries(keys))if(k.startsWith('vjaVacancyIntel:')&&v?.vacancy&&!cpCore.sameVacancy(v.vacancy,vacancy))records.push(v);const best=cpDuplicate.bestMatch(vacancy,records);return best?.similarity?.repost?{vacancyId:best.vacancy.vacancyId,title:best.vacancy.title,company:best.vacancy.company,similarity:best.similarity}:null;
 }
 async function cpJobPreferences(){
   const stored=(await chrome.storage.local.get(cpPreferencesKey))[cpPreferencesKey]||{};
@@ -193,8 +213,14 @@ async function cpSaveJobPreferences(value,sender){
   cpAssertHhListSender(sender);const normalized=cpFit?.normalizePreferences?.(value||{})||value||{};
   await chrome.storage.local.set({[cpPreferencesKey]:normalized});return normalized;
 }
-function cpVacancyIntelKey(id){return 'vjaVacancyIntel:'+String(id||'');}
-function cpVacancyDecisionKey(id){return 'vjaVacancyDecision:'+String(id||'');}
+function cpVacancyStoragePart(input,provider=''){
+  const value=input&&typeof input==='object'?cpCore.vacancy(input):{vacancyId:String(input||''),provider:String(provider||'')};
+  const id=String(value.vacancyId||'');const p=String(value.provider||provider||'');
+  return p&&p!=='hh'?`${p}:${id}`:id;
+}
+function cpVacancyIntelKey(input,provider=''){return 'vjaVacancyIntel:'+cpVacancyStoragePart(input,provider);}
+function cpVacancyDecisionKey(input,provider=''){return 'vjaVacancyDecision:'+cpVacancyStoragePart(input,provider);}
+function cpCallAnalysisKey(input,provider=''){return 'vjaCallAnalysis:'+cpVacancyStoragePart(input,provider);}
 async function cpQuickListApplicationState(v){
   const jobs=await applicationJobs();const job=jobs.filter(j=>cpCore.sameVacancy(cpCore.application(j).vacancy,v)).sort((a,b)=>Number(b.context?.updatedAt||b.plan?.createdAt||0)-Number(a.context?.updatedAt||a.plan?.createdAt||0))[0]||null;
   if(!job)return null;const app=cpCore.application(job),site=job.result?.result||{},memory=job.context?.coverLetterMemory||{},formMemory=job.context?.formMemory||null;
@@ -202,11 +228,12 @@ async function cpQuickListApplicationState(v){
 }
 async function cpQuickListFullAnalysis(vInput,sender,{force=false}={}){
   cpAssertEmbeddedVacancy(sender,vInput);const selected=cpCore.vacancy(vInput),id=String(selected.vacancyId||'');if(!id)throw new Error('Не удалось определить vacancy ID.');
-  const preferences=await cpJobPreferences(),intelKey=cpVacancyIntelKey(id),decisionKey=cpVacancyDecisionKey(id),stored=await chrome.storage.local.get([intelKey,decisionKey]);
+  const preferences=await cpJobPreferences(),intelKey=cpVacancyIntelKey(selected),decisionKey=cpVacancyDecisionKey(selected),stored=await chrome.storage.local.get([intelKey,decisionKey]);
   const cached=stored[intelKey],decision=stored[decisionKey]?.decision||'',preferenceKey=cpCore.hash(JSON.stringify(preferences));
   const fresh=cached?.vacancy?.vacancyId===id&&cached?.preferenceKey===preferenceKey&&Date.now()-Number(cached.at||0)<30*24*60*60*1000;
   if(fresh&&!force)return {...cached,application:await cpQuickListApplicationState(selected),decision,preferences,cached:true};
-  if(cpVacancyIntelInFlight.has(id)&&!force)return cpVacancyIntelInFlight.get(id);
+  const flightKey=cpVacancyStoragePart(selected);
+  if(cpVacancyIntelInFlight.has(flightKey)&&!force)return cpVacancyIntelInFlight.get(flightKey);
   const task=(async()=>{
     const acquired=await cpAcquireHhVacancy(selected,sender,{fast:true}),full=acquired.vacancy,source=acquired.source;
     if(!cpCore.sameVacancy(selected,full))throw new Error('Получено описание другой вакансии.');
@@ -221,23 +248,23 @@ async function cpQuickListFullAnalysis(vInput,sender,{force=false}={}){
     const vacancy={provider:full.provider,url:full.url,vacancyId:full.vacancyId,title:full.title,company:full.company||'',location:full.location||'',remote:Boolean(full.remote)};
     const duplicate=await cpFindDuplicate({...vacancy,description:full.description,requirements:full.requirements});
     const record={schemaVersion:2,vacancy,analysis:{...analysis,source,coverage:full.descriptionCoverage||(source==='hh-api'?'full-fetch':'full-dom')},fit,features:{...(fit.features||{}),descriptionHash:relevance.descriptionHash||'',descriptionCoverage:relevance.descriptionCoverage||full.descriptionCoverage||''},duplicate,preferenceKey,source,at:Date.now()};
-    await chrome.storage.local.set({[intelKey]:record,[`vjaCallAnalysis:${id}`]:{vacancyId:id,url:selected.url,at:record.at,result:{vacancyId:id,title:full.title,status:analysis.status,hasCalls:analysis.hasCalls,canApply:analysis.canApply,confidence:analysis.confidence,reason:analysis.reason,evidence:analysis.evidence||'',source,coverage:record.analysis.coverage}}});
+    await chrome.storage.local.set({[intelKey]:record,[cpCallAnalysisKey(selected)]:{vacancyId:id,provider:selected.provider,url:selected.url,at:record.at,result:{vacancyId:id,provider:selected.provider,title:full.title,status:analysis.status,hasCalls:analysis.hasCalls,canApply:analysis.canApply,confidence:analysis.confidence,reason:analysis.reason,evidence:analysis.evidence||'',source,coverage:record.analysis.coverage}}});
     return {...record,application:await cpQuickListApplicationState(selected),decision,preferences,cached:false};
   })();
-  cpVacancyIntelInFlight.set(id,task);try{return await task;}finally{if(cpVacancyIntelInFlight.get(id)===task)cpVacancyIntelInFlight.delete(id);}
+  cpVacancyIntelInFlight.set(flightKey,task);try{return await task;}finally{if(cpVacancyIntelInFlight.get(flightKey)===task)cpVacancyIntelInFlight.delete(flightKey);}
 }
 async function cpQuickListDecision(vInput,sender,decision){
   cpAssertEmbeddedVacancy(sender,vInput);const v=cpCore.vacancy(vInput),id=String(v.vacancyId||'');const allowed=new Set(['SAVED','SKIPPED','REVIEWED','']);
   decision=String(decision||'').toUpperCase();if(decision==='CLEAR')decision='';if(!allowed.has(decision))throw new Error('Неизвестное решение по вакансии.');
-  const key=cpVacancyDecisionKey(id);if(!decision)await chrome.storage.local.remove(key);else await chrome.storage.local.set({[key]:{vacancyId:id,url:v.url,title:v.title,decision,at:Date.now()}});
-  if(decision){const intel=(await chrome.storage.local.get(cpVacancyIntelKey(id)))[cpVacancyIntelKey(id)];const type=decision==='SAVED'?'VACANCY_SAVED':decision==='SKIPPED'?'VACANCY_SKIPPED':'VACANCY_REVIEWED';await cpRecordLearningEvent({type,vacancy:v,userAction:decision,source:'quick-list',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{},ml:intel?.fit?.ml||null},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score,ml:intel?.fit?.ml||null}});}
+  const key=cpVacancyDecisionKey(v);if(!decision)await chrome.storage.local.remove(key);else await chrome.storage.local.set({[key]:{vacancyId:id,provider:v.provider,url:v.url,title:v.title,decision,at:Date.now()}});
+  if(decision){const intelKey=cpVacancyIntelKey(v),intel=(await chrome.storage.local.get(intelKey))[intelKey];const type=decision==='SAVED'?'VACANCY_SAVED':decision==='SKIPPED'?'VACANCY_SKIPPED':'VACANCY_REVIEWED';await cpRecordLearningEvent({type,vacancy:v,userAction:decision,source:'quick-list',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{},ml:intel?.fit?.ml||null},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score,ml:intel?.fit?.ml||null}});}
   return {vacancyId:id,decision};
 }
 async function cpQuickListCallAnalysis(vInput,sender){
   try{const intel=await cpQuickListFullAnalysis(vInput,sender);return {...intel.analysis,fit:intel.fit,features:intel.features,cached:Boolean(intel.cached)};}
   catch(error){
     cpAssertEmbeddedVacancy(sender,vInput);const selected=cpCore.vacancy(vInput),analysis=cpHhList?.analyzeCallRequirement?.(`${selected.title||''}\n${selected.description||''}\n${selected.requirements||''}`,'snippet')||{status:'unknown',hasCalls:null,canApply:false,confidence:0,evidence:''};
-    return {vacancyId:selected.vacancyId,title:selected.title,status:'unknown',hasCalls:null,canApply:false,confidence:analysis.confidence||0,reason:'Не удалось прочитать полную страницу выбранной вакансии ни в фоне, ни через HH API. Повторите Analysis.',evidence:analysis.evidence||'',source:'card-snippet',coverage:'snippet',liveError:error?.message||String(error)};
+    return {vacancyId:selected.vacancyId,title:selected.title,status:'unknown',hasCalls:null,canApply:false,confidence:analysis.confidence||0,reason:'Не удалось прочитать полную страницу выбранной вакансии в фоновой вкладке. Повторите Analysis.',evidence:analysis.evidence||'',source:'card-snippet',coverage:'snippet',liveError:error?.message||String(error)};
   }
 }
 const cpQuickListAnalysisTtl=30*24*60*60*1000;
@@ -271,7 +298,7 @@ async function cpPendingPayload(job,extra={}){
   return {application:cpCore.application(job),context:job.context,profile:job.context?.profileSnapshot,coverLetter:job.context?.coverLetter,role:job.context?.role,cvFile:cvVersion===job.context?.cvVersion&&cpCore.cvValid(file)?file:null,...extra};
 }
 async function cpQuickListState(vInput,sender){
-  cpAssertEmbeddedVacancy(sender,vInput);const v=cpCore.vacancy(vInput),id=String(v.vacancyId||''),cacheKey='vjaCallAnalysis:'+id,intelKey=cpVacancyIntelKey(id),decisionKey=cpVacancyDecisionKey(id);
+  cpAssertEmbeddedVacancy(sender,vInput);const v=cpCore.vacancy(vInput),id=String(v.vacancyId||''),cacheKey=cpCallAnalysisKey(v),intelKey=cpVacancyIntelKey(v),decisionKey=cpVacancyDecisionKey(v);
   const stored=await chrome.storage.local.get([cacheKey,intelKey,decisionKey]),call=stored[cacheKey],intel=stored[intelKey],decision=stored[decisionKey]?.decision||'';
   const analysis=call?.result&&Date.now()-Number(call.at||0)<cpQuickListAnalysisTtl&&String(call.result.vacancyId||id)===id?{...call.result,cached:true,at:Number(call.at||0)}:(intel?.analysis&&Date.now()-Number(intel.at||0)<cpQuickListAnalysisTtl?{...intel.analysis,cached:true,at:Number(intel.at||0)}:null);
   const application=await cpQuickListApplicationState(v),preferences=await cpJobPreferences();
@@ -368,9 +395,10 @@ async function cpPrepare(vInput,sender,legacyPlan=null,options={}){
     await chrome.storage.local.set({[applicationJobKey(id)]:next});
     record={application:cpCore.application(next),context,profile:p,coverLetter,cvFile:file&&cvVersion===context.cvVersion&&cpCore.cvValid(file)?file:null,cvChanged:Boolean(file&&cvVersion!==context.cvVersion),role,language:lang,duplicate:false};
   });
+  record.automation=typeof vjaPolicy==='function'?await vjaPolicy():{mode:'assist'};
   return record;
 }
-async function cpAutoApply(vInput,sender){
+async function cpAutoApply(vInput,sender,options={}){
   const prepared=await cpPrepare(vInput,sender);
   if(prepared?.duplicate)return {duplicate:true,application:prepared.application,result:null,message:'На эту вакансию уже сохранён отклик.'};
   if(!prepared?.application?.id)throw new Error('Не удалось создать контекст отклика.');
@@ -383,7 +411,7 @@ async function cpAutoApply(vInput,sender){
   if(oldResult?.reason==='user-submit-required'&&!job.dispatched){
     job=await updateApplicationJob(id,{review:false,result:null,reason:null});
   }
-  const plan={...job.plan,coverLetter:prepared.coverLetter,cvKey:job.context?.cvKey||job.plan?.cvKey||'',fileData:prepared.cvFile||null,resumeHint:job.plan?.resumeHint||job.context?.vacancy?.title||vInput?.title||'',roleVariant:job.context?.role||job.plan?.roleVariant||'other',popup:true,direct:true,automatic:false};
+  const plan={...job.plan,coverLetter:prepared.coverLetter,cvKey:job.context?.cvKey||job.plan?.cvKey||'',fileData:prepared.cvFile||null,resumeHint:job.plan?.resumeHint||job.context?.vacancy?.title||vInput?.title||'',roleVariant:job.context?.role||job.plan?.roleVariant||'other',popup:true,direct:true,automatic:false,userInitiated:options.userInitiated===true,intent:String(options.intent||'vacancy-page-apply-letter')};
   const submittingState=cpState?.transition?.(job.context?.applicationState||'LETTER_READY','SUBMITTING',{cvName:job.context?.cvName||'',coverLetterHash:cpCore.hash(prepared.coverLetter)})||{state:'SUBMITTING',updatedAt:Date.now()};
   await updateApplicationJob(id,{plan,pending:plan,review:false,reason:null,context:{...job.context,applicationState:submittingState}});
   const execution=await executeApplication(await browserAutopilotApiBase(),plan);
@@ -414,7 +442,7 @@ async function cpQuickListComplete(message,sender){
   const reason=employerAlreadyViewed||letterSent?null:'Сопроводительное письмо не подтверждено сайтом.';
   const next=await updateApplicationJob(message.id,{context,completed:true,review:false,reason,pending:null,result:{id:message.id,trackedId:job.plan?.trackedId||job.plan?.vacancyId||'',sourceUrl:job.plan?.sourceUrl||'',coverLetter:job.context?.coverLetter||'',createdAt:now,result}});
   await chrome.storage.session.remove(cpQuickListActiveKey(sender)).catch(()=>{});
-  const intel=(await chrome.storage.local.get(cpVacancyIntelKey(job.plan?.vacancyId||'')))[cpVacancyIntelKey(job.plan?.vacancyId||'')];await cpRecordLearningEvent({type:'VACANCY_APPLIED',vacancy:job.context?.vacancy||{},userAction:'APPLY',accepted:true,source:'quick-list',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{},ml:intel?.fit?.ml||null},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score,ml:intel?.fit?.ml||null}});
+  const appliedVacancy=job.context?.vacancy||{vacancyId:job.plan?.vacancyId||'',provider:job.plan?.provider||''},intelKey=cpVacancyIntelKey(appliedVacancy),intel=(await chrome.storage.local.get(intelKey))[intelKey];await cpRecordLearningEvent({type:'VACANCY_APPLIED',vacancy:appliedVacancy,userAction:'APPLY',accepted:true,source:'quick-list',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{},ml:intel?.fit?.ml||null},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score,ml:intel?.fit?.ml||null}});
   return {ok:true,application:cpPublicApplication(cpCore.application(next||job)),result};
 }
 async function cpVacancyStatus(vInput,sender){
@@ -467,7 +495,7 @@ async function cpWaitForVacancyReadable(tabId,expectedProvider,expectedId,timeou
     }catch{/* Tab may be replacing its document during HH navigation. */}
     await browserAutopilotWait(250);
   }
-  throw new Error('HH vacancy page did not become readable in the background tab.');
+  throw new Error('Страница вакансии не стала доступна для чтения в фоновой вкладке.');
 }
 async function cpReadVacancy(url,sender,options={}){
   const canonical=cpCore.canonicalUrl(url);if(!canonical)throw new Error('Некорректная ссылка на вакансию.');
@@ -490,7 +518,7 @@ async function cpReadVacancy(url,sender,options={}){
       const loadedId=cpCore.idFromUrl(loadedUrl),loadedProvider=cpCore.provider(loadedUrl);
       if(loadedProvider===expectedProvider&&(!expectedId||loadedId===expectedId))break;
       if(attempt===0){await chrome.tabs.update(tab.id,{url:canonical});await browserAutopilotWait(500);continue;}
-      throw lastLoadError||new Error('HeadHunter открыл не выбранную вакансию. Письмо не создано.');
+      throw lastLoadError||new Error('Сайт открыл не выбранную вакансию. Письмо не создано.');
     }
     let result=null,lastReadError=null;
     for(let attempt=0;attempt<readAttempts;attempt++){
@@ -505,7 +533,7 @@ async function cpReadVacancy(url,sender,options={}){
       }catch(error){lastReadError=error;}
       await browserAutopilotWait(retryDelayMs);
     }
-    if(cpCore.suspiciousVacancyTitle?.(result?.vacancy?.title))throw new Error('Вместо выбранной вакансии HeadHunter вернул заголовок страницы поиска. Письмо не отправлено.');
+    if(cpCore.suspiciousVacancyTitle?.(result?.vacancy?.title))throw new Error('Вместо выбранной вакансии сайт вернул заголовок страницы поиска. Письмо не подготовлено.');
     throw lastReadError||new Error('Не удалось подтвердить полное описание именно выбранной вакансии.');
   }finally{if(tab?.id)await chrome.tabs.remove(tab.id).catch(()=>{});}
 }
@@ -573,8 +601,14 @@ async function cpRememberAiDraft(snapshot,style,sender){
   return {ok:true};
 }
 async function cpInject(tabId){
-  const [script]=chrome.runtime.getManifest().content_scripts.filter(s=>s.js.includes('copilot-core.js'));
   try{const r=await chrome.tabs.sendMessage(tabId,{type:'vjaCopilotPage',action:'ping'},{frameId:0});if(r?.ok)return;}catch{}
+  let tabUrl='';try{tabUrl=(await chrome.tabs.get(tabId))?.url||'';}catch{}
+  let host='';try{host=new URL(tabUrl).hostname.toLowerCase();}catch{}
+  const scripts=chrome.runtime.getManifest().content_scripts.filter(s=>Array.isArray(s.js)&&s.js.includes('copilot-core.js'));
+  const script=/(^|\.)avito\.ru$/i.test(host)
+    ? scripts.find(s=>(s.matches||[]).some(x=>/avito\.ru/i.test(x)))
+    : scripts.find(s=>!(s.matches||[]).some(x=>/avito\.ru/i.test(x)));
+  if(!script)throw new Error('Content script bundle for this site is not configured.');
   // Existing and future permitted frames are covered by manifest/dynamic scripts.
   // First activation injects the top frame only: never retry a partly executed
   // allFrames batch and redeclare legacy globals in an already loaded frame.
@@ -583,7 +617,7 @@ async function cpInject(tabId){
 async function cpRepairSupportedTabs(){
   if(!chrome.tabs?.query||!chrome.scripting?.executeScript)return;
   let tabs=[];
-  try{tabs=await chrome.tabs.query({url:['https://hh.ru/*','https://*.hh.ru/*','https://headhunter.kg/*','https://*.headhunter.kg/*']});}catch{return;}
+  try{tabs=await chrome.tabs.query({url:['https://hh.ru/*','https://*.hh.ru/*','https://headhunter.kg/*','https://*.headhunter.kg/*','https://avito.ru/*','https://*.avito.ru/*']});}catch{return;}
   for(const tab of tabs){
     if(!tab?.id)continue;
     try{await cpInject(tab.id);}catch{/* Chrome site access may still be set to On click. */}
@@ -593,8 +627,12 @@ async function cpRepairHhTab(tabId,url,delays=[80,500,1400]){
   try{const u=new URL(url||'');if(!/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(u.hostname))return;}catch{return;}
   for(const delay of delays)setTimeout(()=>void cpInject(tabId).catch(()=>{}),delay);
 }
+async function cpRepairAvitoTab(tabId,url,delays=[80,500,1400]){
+  try{const u=new URL(url||'');if(!/(^|\.)avito\.ru$/i.test(u.hostname))return;}catch{return;}
+  for(const delay of delays)setTimeout(()=>void cpInject(tabId).catch(()=>{}),delay);
+}
 async function cpRepairPermittedApplicationTab(tabId,url,delays=[120,650]){
-  let u;try{u=new URL(url||'');if(!/^https?:$/.test(u.protocol)||/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(u.hostname)||!cpApplicationRoute(u.href))return;}catch{return;}
+  let u;try{u=new URL(url||'');if(!/^https?:$/.test(u.protocol)||/(^|\.)(?:hh\.ru|headhunter\.kg|avito\.ru)$/i.test(u.hostname)||!cpApplicationRoute(u.href))return;}catch{return;}
   const pattern=u.origin+'/*';try{if(!await chrome.permissions.contains({origins:[pattern]}))return;}catch{return;}
   for(const delay of delays)setTimeout(()=>void cpInject(tabId).catch(()=>{}),delay);
 }
@@ -602,7 +640,7 @@ async function cpRegisterOrigin(origin){
   const pattern=new URL(origin).origin+'/*';
   if(!await chrome.permissions.contains({origins:[pattern]}))throw new Error('Разрешение на сайт не выдано.');
   const scripts=chrome.runtime.getManifest().content_scripts.find(s=>s.js.includes('copilot-core.js')).js;
-  if(/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(new URL(origin).hostname))return {ok:true};
+  if(/(^|\.)(?:hh\.ru|headhunter\.kg|avito\.ru)$/i.test(new URL(origin).hostname))return {ok:true};
   const id='vja-site-'+cpCore.hash(pattern);
   const existing=await chrome.scripting.getRegisteredContentScripts({ids:[id]});
   if(!existing.length)await chrome.scripting.registerContentScripts([{id,matches:[pattern],js:scripts,allFrames:true,runAt:'document_idle',persistAcrossSessions:true}]);
@@ -612,10 +650,10 @@ chrome.runtime.onInstalled.addListener(()=>setTimeout(()=>void cpRepairSupported
 chrome.runtime.onStartup.addListener(()=>setTimeout(()=>void cpRepairSupportedTabs(),250));
 chrome.tabs?.onUpdated?.addListener((tabId,change,tab)=>{
   if(!change.url&&change.status!=='loading'&&change.status!=='complete')return;
-  const url=change.url||tab?.url||'';void cpRepairHhTab(tabId,url);void cpRepairPermittedApplicationTab(tabId,url);
+  const url=change.url||tab?.url||'';void cpRepairHhTab(tabId,url);void cpRepairAvitoTab(tabId,url);void cpRepairPermittedApplicationTab(tabId,url);
 });
 chrome.tabs?.onActivated?.addListener(async info=>{
-  try{const tab=await chrome.tabs.get(info.tabId);const url=tab?.url||'';void cpRepairHhTab(info.tabId,url,[20,350]);void cpRepairPermittedApplicationTab(info.tabId,url,[60,500]);}catch{}
+  try{const tab=await chrome.tabs.get(info.tabId);const url=tab?.url||'';void cpRepairHhTab(info.tabId,url,[20,350]);void cpRepairAvitoTab(info.tabId,url,[20,350]);void cpRepairPermittedApplicationTab(info.tabId,url,[60,500]);}catch{}
 });
 // HH is a SPA: vacancy transitions can use history.pushState without a traditional
 // page load. Repair the top-frame surfaces on those navigation events as well.
@@ -623,6 +661,10 @@ const cpHhNavigationFilter={url:[{schemes:['https'],hostSuffix:'hh.ru'},{schemes
 chrome.webNavigation?.onHistoryStateUpdated?.addListener(details=>{
   if(details.frameId===0)void cpRepairHhTab(details.tabId,details.url,[0,120,500]);
 },cpHhNavigationFilter);
+const cpAvitoNavigationFilter={url:[{schemes:['https'],hostSuffix:'avito.ru'}]};
+chrome.webNavigation?.onHistoryStateUpdated?.addListener(details=>{
+  if(details.frameId===0)void cpRepairAvitoTab(details.tabId,details.url,[0,120,500]);
+},cpAvitoNavigationFilter);
 chrome.webNavigation?.onCommitted?.addListener(details=>{
   if(details.frameId===0)void cpRepairHhTab(details.tabId,details.url,[40,450,1200]);
 },cpHhNavigationFilter);
@@ -642,11 +684,18 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   (async()=>{
     const op=message.op;
     if(op==='questionnaire-memory'){
-      if(!cpExtensionSender(sender)&&(!sender.tab?.id||!/^https:\/\/(?:[a-z0-9-]+\.)*(?:hh\.ru|headhunter\.kg)\//i.test(sender.url||'')))throw new Error('Questionnaire memory: unsupported sender.');
+      if(!cpExtensionSender(sender)&&(!sender.tab?.id||!/^https:\/\/(?:[a-z0-9-]+\.)*(?:hh\.ru|headhunter\.kg|career\.habr\.com)\//i.test(sender.url||''))){
+        cpAssertPage(sender,sender.url);
+        const origin=new URL(sender.url).origin,scope=String(message.options?.vacancyKey||message.entry?.vacancyKey||'');
+        const approved=await chrome.permissions.contains({origins:[origin+'/*']});
+        const jobs=await applicationJobs();
+        const bound=jobs.find(j=>j.tabId===sender.tab.id&&Number(j.frameId||0)===Number(sender.frameId||0)&&cpCore.canonicalUrl(j.context?.vacancy?.url||j.plan?.sourceUrl)===cpCore.canonicalUrl(sender.url)&&cpCore.vacancyKey(j.context?.vacancy||cpCore.application(j).vacancy)===scope);
+        if(!approved||!bound||!scope)throw new Error('Questionnaire memory: unsupported sender.');
+      }
       const memory=globalThis.vjaQuestionnaireMemory;
       if(message.action==='get')return {ok:true,value:await memory.get(String(message.key||'').slice(0,500),message.options||{})};
       if(message.action==='remember'){const entry=message.entry||{};globalThis.vjaProductCore.assertTree(entry);return {ok:true,value:await memory.remember(entry)};}
-      if(message.action==='confirm')return {ok:true,value:await memory.confirm(String(message.key||'').slice(0,500),String(message.answer||'').slice(0,8000))};
+      if(message.action==='confirm')return {ok:true,value:await memory.confirm(String(message.key||'').slice(0,500),String(message.answer||'').slice(0,8000),message.options||{})};
       throw new Error('Unknown questionnaire memory operation.');
     }
 
@@ -672,7 +721,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
         const j=await applicationJob(message.id);if(!j)throw new Error('Отклик не найден.');
         let nextAction=j.context?.nextAction;if(['Offer','Rejected','Closed'].includes(message.status)&&nextAction&&!nextAction.doneAt)nextAction={...nextAction,doneAt:Date.now()};
         const context=cpWithTimeline({...j.context,status:message.status,statusSource:'user-confirmed',nextAction},'status',`Статус: ${message.status}`,{status:message.status});
-        await updateApplicationJob(message.id,{context,completed:message.status==='Applied'||j.completed});const outcomeVacancy=j.context?.vacancy||cpCore.application(j).vacancy||{};const outcomeIntel=(await chrome.storage.local.get(cpVacancyIntelKey(outcomeVacancy.vacancyId||'')))[cpVacancyIntelKey(outcomeVacancy.vacancyId||'')];await cpRecordLearningEvent({type:'OUTCOME_CHANGED',vacancy:outcomeVacancy,userAction:message.status,source:'user-status',modelDecision:{score:outcomeIntel?.fit?.score,decision:outcomeIntel?.fit?.decision,features:outcomeIntel?.features||outcomeIntel?.fit?.features||{},ml:outcomeIntel?.fit?.ml||null,engagement:outcomeIntel?.fit?.engagement||null},meta:{status:message.status,features:outcomeIntel?.features||outcomeIntel?.fit?.features||{},ml:outcomeIntel?.fit?.ml||null,engagement:outcomeIntel?.fit?.engagement||null}});await cpUpdateReminderBadge().catch(()=>{});return {ok:true};
+        await updateApplicationJob(message.id,{context,completed:message.status==='Applied'||j.completed});const outcomeVacancy=j.context?.vacancy||cpCore.application(j).vacancy||{},outcomeKey=cpVacancyIntelKey(outcomeVacancy),outcomeIntel=(await chrome.storage.local.get(outcomeKey))[outcomeKey];await cpRecordLearningEvent({type:'OUTCOME_CHANGED',vacancy:outcomeVacancy,userAction:message.status,source:'user-status',modelDecision:{score:outcomeIntel?.fit?.score,decision:outcomeIntel?.fit?.decision,features:outcomeIntel?.features||outcomeIntel?.fit?.features||{},ml:outcomeIntel?.fit?.ml||null,engagement:outcomeIntel?.fit?.engagement||null},meta:{status:message.status,features:outcomeIntel?.features||outcomeIntel?.fit?.features||{},ml:outcomeIntel?.fit?.ml||null,engagement:outcomeIntel?.fit?.engagement||null}});await cpUpdateReminderBadge().catch(()=>{});return {ok:true};
       }
       if(op==='next-action')return {ok:true,application:await cpChangeNextAction(message.id,message.mode,Number(message.days)||1)};
       if(op==='set-followup')return {ok:true,application:await cpChangeNextAction(message.id,'manual',Number(message.days)||3)};
@@ -710,14 +759,14 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(op==='focus'){await chrome.storage.session.set({[`vjaCopilotFocus:${sender.tab.id}`]:{frameId:sender.frameId||0,at:Date.now()}});return {ok:true};}
     if(op==='invalidate'){cpAiRequests.delete(`${sender.tab.id}:${sender.frameId||0}`);return {ok:true};}
     if(op==='prepare')return {ok:true,...await cpPrepare(message.vacancy,sender,message.legacyPlan,{safePreparation:true})};
-    if(op==='auto-apply')return {ok:true,...await cpAutoApply(message.vacancy,sender)};
+    if(op==='auto-apply')return {ok:true,...await cpAutoApply(message.vacancy,sender,{userInitiated:message.userInitiated===true,intent:String(message.intent||'vacancy-page-apply-letter')})};
     if(op==='quick-list-prepare')return {ok:true,...await cpQuickListPrepare(message.vacancy,sender)};
     if(op==='quick-list-call-analysis')return {ok:true,...await cpQuickListCallAnalysis(message.vacancy,sender)};
     if(op==='quick-list-state')return {ok:true,...await cpQuickListState(message.vacancy,sender)};
     if(op==='quick-list-full-analysis')return {ok:true,...await cpQuickListFullAnalysis(message.vacancy,sender,{force:message.force===true})};
     if(op==='quick-list-decision')return {ok:true,...await cpQuickListDecision(message.vacancy,sender,message.decision)};
-    if(op==='learning-feedback'){const v=cpCore.vacancy(message.vacancy||{}),accepted=String(message.sentiment||'').toLowerCase()==='accepted',rejected=String(message.sentiment||'').toLowerCase()==='rejected';if(!accepted&&!rejected)throw new Error('Неизвестная обратная связь.');const intel=(await chrome.storage.local.get(cpVacancyIntelKey(v.vacancyId)))[cpVacancyIntelKey(v.vacancyId)];const e=await cpRecordLearningEvent({type:accepted?'FIT_ACCEPTED':'FIT_REJECTED',vacancy:v,accepted,rejected,userAction:accepted?'ACCEPT':'REJECT',source:'fit-feedback',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{},ml:intel?.fit?.ml||null},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score,ml:intel?.fit?.ml||null}});return {ok:true,event:e,summary:await cpLearningSummary()};}
-    if(op==='questionnaire-correction'){const vacancyId=String(message.vacancyId||cpFormVacancyId(sender.url)||'');const jobs=(await applicationJobs()).filter(j=>String(j.plan?.vacancyId||j.context?.vacancy?.vacancyId||'')===vacancyId);const job=jobs.sort((a,b)=>Number(b.context?.updatedAt||0)-Number(a.context?.updatedAt||0))[0]||null;const vacancy=job?.context?.vacancy||{vacancyId,url:sender.url,title:'',company:'',provider:cpCore.provider(sender.url)};const e=await cpRecordLearningEvent({type:'QUESTIONNAIRE_EDITED',vacancy,originalValue:message.originalValue,correctedValue:message.correctedValue,edited:true,userAction:'EDIT',source:'questionnaire-user-correction',meta:{category:String(message.category||'UNKNOWN'),semanticKey:String(message.semanticKey||''),question:cpCore.clip(message.question||'',1000),pageUrl:cpCore.canonicalUrl(sender.url)}});return {ok:true,event:e};}
+    if(op==='learning-feedback'){const v=cpCore.vacancy(message.vacancy||{}),accepted=String(message.sentiment||'').toLowerCase()==='accepted',rejected=String(message.sentiment||'').toLowerCase()==='rejected';if(!accepted&&!rejected)throw new Error('Неизвестная обратная связь.');const intelKey=cpVacancyIntelKey(v),intel=(await chrome.storage.local.get(intelKey))[intelKey];const e=await cpRecordLearningEvent({type:accepted?'FIT_ACCEPTED':'FIT_REJECTED',vacancy:v,accepted,rejected,userAction:accepted?'ACCEPT':'REJECT',source:'fit-feedback',modelDecision:{score:intel?.fit?.score,decision:intel?.fit?.decision,features:intel?.features||intel?.fit?.features||{},ml:intel?.fit?.ml||null},confidence:intel?.analysis?.confidence,meta:{features:intel?.features||intel?.fit?.features||{},fitScore:intel?.fit?.score,ml:intel?.fit?.ml||null}});return {ok:true,event:e,summary:await cpLearningSummary()};}
+    if(op==='questionnaire-correction'){const vacancyId=String(message.vacancyId||cpFormVacancyId(sender.url)||'');const jobs=(await applicationJobs()).filter(j=>String(j.plan?.vacancyId||j.context?.vacancy?.vacancyId||'')===vacancyId);const job=jobs.sort((a,b)=>Number(b.context?.updatedAt||0)-Number(a.context?.updatedAt||0))[0]||null;const vacancy=job?.context?.vacancy||{vacancyId,url:sender.url,title:'',company:'',provider:cpCore.provider(sender.url)};const e=await cpRecordLearningEvent({type:'QUESTIONNAIRE_EDITED',vacancy,originalValue:message.originalValue,correctedValue:message.correctedValue,edited:true,userAction:'EDIT',source:'questionnaire-user-correction',meta:{category:String(message.category||'UNKNOWN'),semanticKey:String(message.semanticKey||''),question:cpCore.clip(message.question||'',1000),pageUrl:cpCore.canonicalUrl(sender.url)}});if(message.semanticKey&&String(message.correctedValue||'').trim())await globalThis.vjaQuestionnaireMemory.remember({semanticKey:String(message.semanticKey),originalWording:message.question||'',question:message.question||'',category:message.category||'UNKNOWN',answer:String(message.correctedValue),vacancyKey:cpCore.vacancyKey(vacancy),normalizedQuestion:globalThis.vjaQuestionnaireCore.normalize(message.question||''),company:vacancy.company||'',source:'user-correction',userConfirmed:true,confidence:1,reusable:false});return {ok:true,event:e};}
     if(op==='job-preferences-get')return {ok:true,preferences:await cpJobPreferences()};
     if(op==='job-preferences-save')return {ok:true,preferences:await cpSaveJobPreferences(message.preferences,sender)};
     if(op==='quick-list-complete')return cpQuickListComplete(message,sender);

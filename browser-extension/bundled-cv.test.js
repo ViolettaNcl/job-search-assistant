@@ -1,21 +1,5 @@
 'use strict';
-const assert=require('assert');
-const api=require('./bundled-cv.js');
-assert.equal(api.specs.en.key,'cvVaultEn');
-assert.equal(api.specs.ru.key,'cvVaultRu');
-assert.ok(api.specs.en.path.endsWith('.pdf'));
-assert.ok(api.specs.ru.path.endsWith('.pdf'));
-const bytes=Uint8Array.from([0x25,0x50,0x44,0x46,0x2d,0x31]);
-const fakeChrome={runtime:{getURL:p=>'chrome-extension://test/'+p},storage:{local:{get:async()=>({}),set:async patch=>{fakeChrome.patch=patch;}}}};
-const fakeFetch=async url=>({ok:true,arrayBuffer:async()=>bytes.buffer,url});
-(async()=>{
- const r=await api.ensure({chromeApi:fakeChrome,fetchFn:fakeFetch});
- assert.equal(r.ok,true);assert.deepEqual(r.loaded.sort(),['en','ru']);
- assert.ok(fakeChrome.patch.cvVaultEn.base64);assert.equal(fakeChrome.patch.cvVaultEn.source,'bundled');
- assert.ok(fakeChrome.patch.cvVaultRu.base64);assert.equal(fakeChrome.patch.vjaBundledCvVersion,api.VERSION);
- const migrating={runtime:{getURL:p=>'chrome-extension://test/'+p},storage:{local:{get:async()=>({cvVaultEn:{name:'old.pdf',base64:'OLD',source:'bundled'},cvVaultRu:{name:'old-ru.pdf',base64:'OLD',source:'bundled'}}),set:async patch=>{migrating.patch=patch;}}}};
- const m=await api.ensure({chromeApi:migrating,fetchFn:fakeFetch});assert.deepEqual(m.loaded.sort(),['en','ru']);assert.notEqual(migrating.patch.cvVaultEn.base64,'OLD');
- const stable={runtime:{getURL:p=>'chrome-extension://test/'+p},storage:{local:{get:async()=>({cvVaultEn:{name:'manual.pdf',base64:'KEEP',source:'manual'},cvVaultRu:{name:'manual-ru.pdf',base64:'KEEP',source:'manual'},vjaBundledCvVersion:api.VERSION}),set:async patch=>{stable.patch=patch;}}}};
- const st=await api.ensure({chromeApi:stable,fetchFn:fakeFetch});assert.deepEqual(st.loaded,[]);assert.equal(stable.patch,undefined);
- console.log('bundled-cv.test.js: ok');
-})().catch(e=>{console.error(e);process.exit(1);});
+const test=require('node:test'),assert=require('node:assert/strict'),api=require('./bundled-cv.js');
+test('fresh public install requests private CV import without fetching or writing',async()=>{let fetched=0,written=0;const r=await api.ensure({chromeApi:{storage:{local:{get:async()=>({}),set:async()=>written++}}},fetchFn:async()=>fetched++});assert.deepEqual(r.missing,['en','ru']);assert.equal(r.needsImport,true);assert.equal(fetched,0);assert.equal(written,0);});
+test('existing manual and old-bundled CV slots are retained byte for byte',async()=>{for(const source of ['manual','bundled']){const stored={cvVaultEn:{base64:'KEEP',source},cvVaultRu:{base64:'KEEP-RU',source}};const before=JSON.stringify(stored);const r=await api.ensure({chromeApi:{storage:{local:{get:async()=>stored,set:async()=>assert.fail('must not overwrite')}}}});assert.deepEqual(r.loaded,[]);assert.equal(r.needsImport,false);assert.equal(JSON.stringify(stored),before);}});
+test('explicit loader rejects a corrupt PDF and validates a supported payload',async()=>{const chromeApi={runtime:{getURL:x=>x}};await assert.rejects(api.load(api.specs.en,chromeApi,async()=>({ok:true,arrayBuffer:async()=>new Uint8Array([1,2,3]).buffer})),/not a valid PDF/);const file=await api.load(api.specs.en,chromeApi,async()=>({ok:true,arrayBuffer:async()=>new TextEncoder().encode('%PDF-1.4 fixture').buffer}));assert.equal(file.type,'application/pdf');});

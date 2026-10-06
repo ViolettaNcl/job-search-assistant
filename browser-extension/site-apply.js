@@ -159,7 +159,7 @@
   function chooseHhCoverLetterAction(candidates = []) {
     const matches = candidates
       .map((item, index) => ({ ...item, index, label: clean(item?.label) }))
-      .filter(item => /^(?:(?:приложить|добавить) сопроводительное письмо|add (?:a )?cover letter)(?:\s|$)/i.test(item.label));
+      .filter(item => /^(?:(?:приложить|добавить)(?:\s+сопроводительное)?\s+письмо|add (?:a )?cover letter)(?:\s|$)/i.test(item.label));
     if (!matches.length) return { found: false, ambiguous: false, count: 0 };
     if (matches.length > 1) {
       const normalized = matches.map(item => clean(item.label).toLowerCase());

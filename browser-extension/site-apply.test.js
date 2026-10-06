@@ -49,6 +49,7 @@ let letterAction = apply.chooseHhCoverLetterAction([
 ]);
 assert.equal(letterAction.found, true);
 assert.match(letterAction.candidate.label, /^Приложить сопроводительное письмо/);
+assert.equal(apply.chooseHhCoverLetterAction([{ label: 'Приложить письмо' }]).found, true, 'current compact HH wording is supported');
 const letterSubmit = apply.chooseHhCoverLetterSubmit([{ label: 'Закрыть' }, { label: 'Отправить' }]);
 assert.equal(letterSubmit.found, true);
 assert.equal(letterSubmit.candidate.label, 'Отправить');

@@ -71,9 +71,11 @@ async function applicationTabStorage(message, sender) {
     let originAllowed=false;
     try {
       const page=new URL(sender.url),source=new URL(job.plan.sourceUrl);
-      originAllowed=page.origin===source.origin || (/^(.*\.)?hh\.ru$/.test(page.hostname)&&/^(.*\.)?hh\.ru$/.test(source.hostname));
+      const hhFamily=host=>/(^|\.)(?:hh\.ru|headhunter\.kg)$/i.test(host||'');
+      originAllowed=page.origin===source.origin || (hhFamily(page.hostname)&&hhFamily(source.hostname));
       const vacancyId=page.pathname.match(/^\/vacancy\/(\d+)/)?.[1] || page.searchParams.get('vacancyId');
-      if (/(^|\.)hh\.ru$/.test(page.hostname) && vacancyId && vacancyId !== source.pathname.match(/^\/vacancy\/(\d+)/)?.[1]) originAllowed=false;
+      const sourceVacancyId=source.pathname.match(/^\/vacancy\/(\d+)/)?.[1]||job.plan.vacancyId||job.plan.trackedId||'';
+      if (hhFamily(page.hostname) && vacancyId && String(vacancyId)!==String(sourceVacancyId)) originAllowed=false;
     }catch{}
     if(!originAllowed)return {ok:false,error:'application-origin-mismatch'};
     const field = message.key === 'vjaPendingSiteApply' ? 'pending' : 'result';

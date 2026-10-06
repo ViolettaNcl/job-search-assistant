@@ -1,8 +1,8 @@
 const assert = require("node:assert/strict");
 const verification = require("./field-verification.js");
 
-assert.equal(verification.matchesExpected("text", ["Violetta Nicolaou"], "Violetta Nicolaou"), true);
-assert.equal(verification.matchesExpected("text", ["Violetta"], "Violetta Nicolaou"), false);
+assert.equal(verification.matchesExpected("text", ["Demo Candidate"], "Demo Candidate"), true);
+assert.equal(verification.matchesExpected("text", ["Demo"], "Demo Candidate"), false);
 assert.equal(verification.matchesExpected("textarea", ["Hello\nworld"], "Hello world"), true);
 assert.equal(verification.matchesExpected("select", ["true", "Yes"], "Yes"), true);
 assert.equal(verification.matchesExpected("select", ["false", "No"], "No"), true);

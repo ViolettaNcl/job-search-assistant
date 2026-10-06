@@ -12,7 +12,7 @@
   const hash = value => { let h = 2166136261; for (const c of String(value)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0).toString(16); };
   const domains = [
     ['hh', ['hh.ru','headhunter.kg']], ['linkedin', ['linkedin.com']], ['indeed', ['indeed.com','indeed.co.uk']],
-    ['glassdoor', ['glassdoor.com','glassdoor.co.uk']], ['habr', ['career.habr.com']], ['superjob', ['superjob.ru']],
+    ['glassdoor', ['glassdoor.com','glassdoor.co.uk']], ['habr', ['career.habr.com']], ['avito', ['avito.ru']], ['superjob', ['superjob.ru']],
     ['geekjob', ['geekjob.ru']], ['greenhouse', ['greenhouse.io','greenhouse.com']], ['lever', ['lever.co']],
     ['workday', ['myworkdayjobs.com','myworkdaysite.com']], ['smartrecruiters', ['smartrecruiters.com']],
     ['teamtailor', ['teamtailor.com']], ['ashby', ['ashbyhq.com']], ['workable', ['workable.com']],
@@ -27,7 +27,7 @@
       const u = new URL(raw);
       if (!/^https?:$/.test(u.protocol)) return '';
       u.username = ''; u.password = '';
-      for (const k of [...u.searchParams.keys()]) if (/^(utm_.+|hhtmFrom.*|from|source|ref|referrer|trackingId|trk|gh_src|fbclid|gclid)$/i.test(k)) u.searchParams.delete(k);
+      for (const k of [...u.searchParams.keys()]) if (/^(utm_.+|hhtmFrom.*|from|source|ref|referrer|trackingId|trk|gh_src|fbclid|gclid|context|localPriority|cd|geoCoords)$/i.test(k)) u.searchParams.delete(k);
       u.searchParams.sort();
       // Keep meaningful SPA fragments (a thread/job id can live there).
       if (!/(job|vacancy|thread|chat|message|conversation|application|requisition)/i.test(u.hash)) u.hash = '';
@@ -40,6 +40,12 @@
     try {
       const u = new URL(raw);
       for (const k of ['vacancyId','jobId','job_id','gh_jid','requisitionId','requisition','currentJobId','jk']) if (u.searchParams.get(k)) return clip(u.searchParams.get(k), 200);
+      if(provider(raw)==='avito'){
+        const last=decodeURIComponent(u.pathname.split('/').filter(Boolean).at(-1)||'');
+        const m=last.match(/_(\d{6,})(?:$|[/?#])/);
+        if(m)return m[1];
+        for(const k of ['itemId','item_id','adId','ad_id'])if(u.searchParams.get(k))return clip(u.searchParams.get(k),200);
+      }
       if(provider(raw)==='workday'){const segments=u.pathname.split('/').filter(Boolean);const at=segments.indexOf('job');if(at>=0){const last=segments.at(-1)||'';return last.match(/_(R[-_a-z0-9]+)$/i)?.[1]||last;}}
       if(['lever','ashby'].includes(provider(raw))){const last=u.pathname.split('/').filter(Boolean).at(-1)||'';if(/^[a-f0-9]{8}-[a-f0-9-]{27,}$/i.test(last))return last;}
       return u.pathname.match(/\/(?:vacancy|vacancies|jobs\/view|job|jobs|positions|posting)\/([^/?#]+)/i)?.[1] || '';
@@ -50,7 +56,7 @@
       const u = new URL(raw);
       if(p==='workday'&&u.hostname.endsWith('myworkdaysite.com')){const parts=u.pathname.split('/').filter(Boolean);const at=parts.indexOf('recruiting');return `${p}:${u.hostname}:${at>=0?parts.slice(at+1,at+3).join('/'):'unknown'}`;}
       if (['lever','ashby','greenhouse'].includes(p)) return `${p}:${u.hostname}:${u.pathname.split('/').filter(Boolean)[0] || ''}`;
-      return p === 'hh' ? 'hh' : `${p}:${u.hostname}`;
+      return p === 'hh' ? 'hh' : p === 'avito' ? 'avito:avito.ru' : `${p}:${u.hostname}`;
     } catch { return p; }
   }
   function suspiciousVacancyTitle(value = '') {

@@ -2,7 +2,7 @@
 
 ## До Production
 
-Живая критическая цепочка HH; native extension-origin IndexedDB и restore; Windows verifier/publisher; аудит взаимодействия новой глобальной политики со старым backend. Проверки выполняются на одной выбранной пользователем вакансии до массовых действий.
+Живая критическая цепочка HH; отдельная Avito BETA-приёмка list/detail, hover persistence, exact-chat one-message send без дублей; native extension-origin IndexedDB и restore; Windows verifier/publisher; аудит взаимодействия новой глобальной политики со старым backend. Проверки выполняются на одной выбранной пользователем вакансии до массовых действий.
 
 ## После данных реального использования
 

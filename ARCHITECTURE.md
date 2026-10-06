@@ -164,6 +164,7 @@ See [ML_ARCHITECTURE.md](docs/ML_ARCHITECTURE.md), [MODEL_EVALUATION.md](docs/MO
 |---|---|---|
 | HH / HeadHunter | Primary | Automated fixtures; critical authenticated flow pending |
 | Habr Career | BETA | Adapter/DOM fixtures; not live validated |
+| Avito Vacancies | BETA | Persistent search/detail controls, background full read, Fit/Calls, feminine letter with confirmed contacts, exact-chat one-message send; not live validated |
 | External ATS | Experimental | Generic form support only; origin and field confidence matter |
 
 Provider adapters should expose a consistent contract: page detection, vacancy identity, full vacancy extraction, application controls, questionnaire detection and status/chat surfaces where supported.
@@ -205,4 +206,4 @@ Chrome storage остаётся совместимым источником runt
 
 Анкетный движок пытается использовать только подтверждённую/scoped память, безопасные review-drafts и проверяемое заполнение DOM. Неизвестные обязательные факты, юридические поля и неуверенные controls должны останавливаться на ручной проверке.
 
-HH остаётся основным провайдером, но критический авторизованный workflow ещё должен пройти live acceptance. Habr Career — BETA.
+HH остаётся основным провайдером, но критический авторизованный workflow ещё должен пройти live acceptance. Habr Career и Avito Vacancies — BETA. Avito использует отдельный bundle и отдельную one-shot policy: одно явное нажатие **Письмо** разрешает одно сообщение после exact-vacancy/chat проверки, заполнения composer и verified send; фоновой массовой рассылки нет.

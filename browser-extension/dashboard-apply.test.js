@@ -26,6 +26,7 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
     if(url.endsWith('/browser-applied')||url.endsWith('/browser-auto-applied')){if(failRecord)ok=false;else queue=queue.filter(j=>!url.includes(j.vacancyId));}
     return {ok,text:async()=>JSON.stringify(value)};
   };
+  data.vjaCandidateTruthProfile=JSON.parse(fs.readFileSync(require('node:path').join(__dirname,'../tests/fixtures/candidate-seed.fixture.json'),'utf8'));
   vm.createContext(context);context.importScripts=(...paths)=>paths.forEach(p=>vm.runInContext(fs.readFileSync(__dirname+'/'+p,'utf8'),context));
   vm.runInContext(fs.readFileSync(__dirname+'/background.js','utf8'),context);
   await tick();context.browserAutopilotWait=async()=>{};trace.length=0;
@@ -33,7 +34,7 @@ async function fixture({data={},tabs=new Map(),pending=false,letter=true,createF
   return {context,data,trace,messages,sender,tabs,send:(n=1)=>context.runDashboardApply(apiBase,id(n),sender,'request-'+n),
     jobs:()=>Object.entries(data).filter(([k])=>k.startsWith('vjaApplicationJob:')).map(([,v])=>v),
     setPending:v=>pending=v,setGate:v=>gate=v,setRecordFailure:v=>failRecord=v,
-    enable:items=>{enabled=true;queue=items;},
+    enable:items=>{enabled=true;data.vjaAutomationPolicyV1={mode:'autopilot',explicitOptIn:true,paused:false,approvedCategories:['developer'],dailyLimit:20};queue=items;},
     request:async(message,s=sender)=>new Promise(resolve=>{for(const f of listeners)if(f(message,s,resolve))return;resolve(undefined);})};
 }
 (async()=>{

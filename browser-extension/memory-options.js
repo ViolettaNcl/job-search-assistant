@@ -7,7 +7,7 @@
  const el=(tag,text)=>{const x=document.createElement(tag);if(text)x.textContent=text;return x;};
  const button=(text,fn)=>{const b=el('button',text);b.type='button';b.onclick=fn;return b;};
  const details=el('details');details.className='group';details.id='truthMemory380';details.append(el('summary','Память CV и HH · источники и проверка'));
- details.append(el('p',`${profile.facts.length} фактов · версия источников ${profile.seedRevision}. AppXite и фриланс добавлены из вашего сообщения HH. Переписка не становится фактом профиля автоматически.`));
+ details.append(el('p',`${profile.facts.length} фактов · версия источников ${profile.seedRevision||'не указана'}. Используются только подтверждённые сведения. Переписка не становится фактом профиля автоматически.`));
  for(const source of profile.sources||[])details.append(el('p',`${source.name} · ${source.receivedAt||''} · ${source.verification||source.type}`));
  if(profile.archivedFacts?.length)details.append(el('p',`${profile.archivedFacts.length} старых импортированных фактов сохранены в архиве и не используются до повторного подтверждения.`));
  details.append(el('p','Новое подтверждение: вставьте JSON-массив фактов {id, kind, text, textEn, roles, topics}. Используйте существующий id для исправления факта. Изменения сначала показываются для проверки.'));
