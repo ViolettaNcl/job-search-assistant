@@ -66,6 +66,7 @@
         "field-verification.js",
         "chat-reader.js",
         "questionnaire-controls.js",
+        "hh-list-surfaces.js",
         "site-adapters.js",
         "copilot-ui.js",
         "content.js",
@@ -152,6 +153,6 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "version_name": "6.0.0 RC3 Avito One-Click Message BETA",
+  "version_name": "6.0.0 RC3 HH Feeds | Avito One-Click Message BETA",
   "web_accessible_resources": []
 }

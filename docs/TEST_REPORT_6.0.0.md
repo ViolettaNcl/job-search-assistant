@@ -1,3 +1,5 @@
+> Latest incremental build: [HH Feeds test report](HH_FEEDS_TEST_REPORT.md). The entries below are historical release evidence, not a substitute for the current matrix.
+
 # Violetta Apply Assistant 6.0.0 RC3 — отчёт проверок
 
 **Дата:** 6 октября 2026. **База:** предоставленный архив 6.0.0 RC2.  

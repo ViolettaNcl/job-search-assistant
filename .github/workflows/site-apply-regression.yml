@@ -7,6 +7,7 @@ on:
       - 'browser-extension/**'
       - 'tests/browser_e2e.py'
       - 'tests/browser_batch_400.py'
+      - 'tests/browser_hh_feeds.py'
       - 'tests/fixtures/**'
       - '.github/workflows/site-apply-regression.yml'
   pull_request:
@@ -14,6 +15,7 @@ on:
       - 'browser-extension/**'
       - 'tests/browser_e2e.py'
       - 'tests/browser_batch_400.py'
+      - 'tests/browser_hh_feeds.py'
       - 'tests/fixtures/**'
       - '.github/workflows/site-apply-regression.yml'
 
@@ -60,6 +62,8 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Verify Batch Analysis, Fit Score, queue and persistent vacancy score
         run: python tests/browser_batch_400.py
+      - name: Verify HH homepage collections and one-click apply
+        run: python tests/browser_hh_feeds.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

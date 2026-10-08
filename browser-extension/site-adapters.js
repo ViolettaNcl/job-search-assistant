@@ -244,6 +244,7 @@
       // and a reply composer is present.
       if(provider==='hh'&&/(?:\/applicant\/negotiations|\/negotiations|\/chat|\/messages)/i.test(path)&&getReplyInput())return 'RECRUITER_CHAT';
       if(detectApplicationForm())return 'APPLICATION_FORM';
+      if(provider==='hh'&&root.vjaHhListSurfaces?.isListPage(doc,url))return 'JOB_LIST';
       const v=extractVacancy();
       // A direct HH vacancy URL is authoritative enough to keep the launcher visible
       // even while description blocks are still loading.

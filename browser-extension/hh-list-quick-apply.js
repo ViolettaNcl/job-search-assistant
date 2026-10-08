@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   let __vjaHost='';try{__vjaHost=new URL(location.href).hostname}catch{}
-  const H=root.vjaHhListQuickApply,U=root.vjaCopilotUI,A=root.vjaSiteAdapters;
+  const H=root.vjaHhListQuickApply,U=root.vjaCopilotUI,A=root.vjaSiteAdapters,S=root.vjaHhListSurfaces;
   if(root.vjaHhListQuickApplyRuntime||window.top!==window||!H?.isSupportedHost?.(location.href))return;
   if(!H)return;
   const request=(op,args={})=>chrome.runtime.sendMessage({type:'vjaCopilot',op,...args});
@@ -19,7 +19,7 @@
   let settingsPromise=request('bootstrap').then(x=>{settingsCache=x?.settings||{};return settingsCache;}).catch(()=>settingsCache);
   const visible=el=>{if(!el||!el.isConnected||el.disabled||el.getAttribute?.('aria-disabled')==='true')return false;const s=getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&el.getClientRects().length>0;};
   const text=el=>String(el?.innerText||el?.textContent||el?.value||el?.getAttribute?.('aria-label')||'').replace(/\s+/g,' ').trim();
-  function isListPage(){try{return A?.make(document,location.href).detectPageType()==='JOB_LIST'||/(?:search\/vacancy|vacancies|jobs|vacancy\/search)/i.test(location.pathname+location.search);}catch{return /vacanc/i.test(location.pathname);}}
+  function isListPage(){if(S)return S.isListPage(document,location.href);try{return A?.make(document,location.href).detectPageType()==='JOB_LIST'||/(?:search\/vacancy|vacancies|jobs|vacancy\/search)/i.test(location.pathname+location.search);}catch{return /vacanc/i.test(location.pathname);}}
   async function enabled(){const settings=await settingsPromise;return settings.quickListCoverLetter!==false;}
   function installStyle(){
     if(document.getElementById('vja-card-fast-style'))return;
@@ -43,11 +43,12 @@
   }
   function vacancyLinks(card){
     if(!card)return [];
-    const links=[...card.querySelectorAll('a[href*="/vacancy/"]')].map(a=>({a,id:H.vacancyIdFromUrl(a.href),meta:String(a.getAttribute('data-qa')||'')+' '+String(a.className||''),label:text(a)})).filter(x=>x.id);
+    const links=[...card.querySelectorAll('a[href*="/vacancy/"]')].map(a=>({a,id:H.vacancyIdFromUrl(a.href),meta:String(a.getAttribute('data-qa')||'')+' '+String(a.className||''),label:text(a)})).filter(x=>x.id&&H.isSupportedHost(x.a.href));
     const seen=new Set();return links.filter(x=>{const key=x.id+'|'+x.a.href;if(seen.has(key))return false;seen.add(key);return true;});
   }
   function nativeApplyIn(node){return [...node.querySelectorAll?.('button,a,[role="button"]')||[]].filter(visible).some(x=>!x.classList.contains(BUTTON_CLASS)&&H.isApplyLabel(text(x)));}
   function cardFor(el){
+    if(S)return S.cardFor(el);
     const exact=el?.closest?.('[data-qa="vacancy-serp__vacancy"],[data-vacancy-id],[class*="vacancy-card"],[class*="serp-item"]');
     if(exact){const ids=new Set(vacancyLinks(exact).map(x=>x.id));if(ids.size===1)return exact;}
     let node=el;
@@ -71,16 +72,16 @@
     const url=new URL(link.href,location.href).href,vacancyId=H.vacancyIdFromUrl(url);if(!vacancyId)return null;
     const titleCandidates=[
       text(card.querySelector('[data-qa="serp-item__title"]')),
-      text(card.querySelector('[data-qa*="vacancy-title"]')),
+      text(card.querySelector('[data-qa*="vacancy-title"],[data-qa="vacancy-card__title"],[data-qa="recommended-vacancy__title"]')),
       text(card.querySelector('h2 a[href*="/vacancy/"],h3 a[href*="/vacancy/"]')),
       text(link)
     ].filter(Boolean);
     const title=titleCandidates.find(x=>!H.isSuspiciousVacancyTitle(x))||'';
     if(!title)return null;
     const ids=[...new Set(vacancyLinks(card).map(x=>x.id))];if(ids.length!==1||ids[0]!==vacancyId)return null;
-    const company=text(card.querySelector('[data-qa="vacancy-serp__vacancy-employer"],[data-qa*="vacancy-employer"],[class*="company"]'));
-    const locationText=text(card.querySelector('[data-qa="vacancy-serp__vacancy-address"],[data-qa*="vacancy-address"],[class*="location"]'));
-    const clone=card.cloneNode(true);clone.querySelectorAll?.('.'+BUTTON_CLASS+',.'+ANALYSIS_CLASS+',script,style').forEach?.(x=>x.remove());
+    const company=text(card.querySelector('[data-qa="vacancy-serp__vacancy-employer"],[data-qa*="vacancy-employer"],[data-qa="vacancy-card__company"],[data-qa="vacancy-card__employer"],[class*="company"],[class*="employer"]'));
+    const locationText=text(card.querySelector('[data-qa="vacancy-serp__vacancy-address"],[data-qa*="vacancy-address"],[data-qa="vacancy-card__location"],[class*="location"]'));
+    const clone=card.cloneNode(true);clone.querySelectorAll?.('.'+BUTTON_CLASS+',.'+ANALYSIS_CLASS+',.vja-card-fit-badge,.vja-card-calls-chip,.vja-intel-feedback-wrap,script,style').forEach?.(x=>x.remove());
     const cardText=text(clone).slice(0,7000);
     return {provider:'hh',url,vacancyId,title,company,location:locationText,description:cardText,descriptionCoverage:'snippet',requirements:'',remote:/удал[её]н|remote/i.test(cardText),selectedFromList:true};
   }
@@ -357,6 +358,10 @@
     // Do not stop on the list with a “letter saved” message: open the native HH flow,
     // then authorize the actual final button only after the real form/modal is visible.
     const preparePromise=Promise.resolve(prepared);
+    if(!card.isConnected||extractVacancy(card)?.vacancyId!==vacancy.vacancyId||(S&&!S.onActiveSurface(card))||!native.isConnected||!card.contains(native)){
+      if(control.isConnected){control.disabled=false;control.dataset.state='review';control.textContent='↻ Повторить отклик';}
+      toast('Подборка изменилась во время подготовки. Выберите нужную вакансию заново; отклик не отправлен.',control,'neutral',5000);return;
+    }
     native.scrollIntoView?.({block:'center'});native.click();
     await run(native,card,vacancy,preparePromise,{control,userInitiatedSubmit:true});
   }
@@ -377,13 +382,13 @@
     if(status==='Preparing'){control.dataset.state='review';control.textContent='↷ Продолжить отклик';control.disabled=false;control.title='Подготовленный отклик сохранён в памяти этой вакансии.';}
   }
   function vacancyCards(vacancyId){return [...document.querySelectorAll(`[data-vja-vacancy-id="${CSS.escape(String(vacancyId))}"]`)];}
-  function broadcastAnalysis(vacancyId,result){for(const c of vacancyCards(vacancyId)){const control=c.querySelector('.'+ANALYSIS_CLASS);if(control)renderAnalysisControl(control,result);c.dataset.vjaCallStatus=result?.status||'unknown';c.dataset.vjaMemoryRestored='1';}statePromises.delete(String(vacancyId));}
+  function broadcastAnalysis(vacancyId,result){for(const c of vacancyCards(vacancyId)){const control=c.querySelector('.'+ANALYSIS_CLASS);if(control)renderAnalysisControl(control,result);c.dataset.vjaCallStatus=result?.status||'unknown';c.dataset.vjaMemoryRestored='1';}statePromises.delete(String(vacancyId));dispatchEvent(new CustomEvent('vja-hh-analysis-updated',{detail:{vacancyId:String(vacancyId),analysis:result,fit:result?.fit||null,features:result?.features||null}}));}
   function broadcastApplication(vacancyId,state){for(const c of vacancyCards(vacancyId)){const control=c.querySelector('.'+BUTTON_CLASS);if(control)renderApplicationControl(control,state);c.dataset.vjaMemoryRestored='1';}statePromises.delete(String(vacancyId));}
   async function restoreCardState(card,vacancy,apply,analysis){
     if(!card?.isConnected||!vacancy?.vacancyId||card.dataset.vjaMemoryRestored==='pending'||card.dataset.vjaMemoryRestored==='1')return;
     card.dataset.vjaMemoryRestored='pending';const id=String(vacancy.vacancyId);let promise=statePromises.get(id);
     if(!promise){promise=request('quick-list-state',{vacancy}).catch(()=>null);statePromises.set(id,promise);}
-    const state=await promise;if(!card.isConnected)return;
+    const state=await promise;if(!card.isConnected||extractVacancy(card)?.vacancyId!==id)return;
     if(!state||state.ok===false){delete card.dataset.vjaMemoryRestored;return;}
     if(state.analysis&&analysis)renderAnalysisControl(analysis,state.analysis);
     if(state.application&&apply)renderApplicationControl(apply,state.application);
@@ -398,7 +403,7 @@
     control.disabled=true;control.dataset.state='working';control.textContent='… Analysis';control.title='Проверяю полное описание вакансии на входящие/исходящие звонки.';
     try{
       const result=await request('quick-list-call-analysis',{vacancy});if(!result||result.ok===false)throw new Error(result?.error||'Не удалось проанализировать вакансию.');
-      card.dataset.vjaCallStatus=result.status||'unknown';renderAnalysisControl(control,result);broadcastAnalysis(vacancy.vacancyId,result);
+      if(extractVacancy(card)?.vacancyId===vacancy.vacancyId){card.dataset.vjaCallStatus=result.status||'unknown';renderAnalysisControl(control,result);}broadcastAnalysis(vacancy.vacancyId,result);
       if(result.status==='calls')toast('✕ В вакансии найдены звонки — пропускаем.',control,'bad',3600);
       else if(result.status==='no-calls')toast('✓ Звонки не требуются или не указаны в полном описании.',control,'ok',3000);
       else toast(result.reason||'Не удалось прочитать полную вакансию. Повторите Analysis.',control,'neutral',5200);
@@ -407,6 +412,11 @@
   }
   function ensureCardButton(card){
     if(!card)return;const vacancy=extractVacancy(card);if(!vacancy)return;const native=nativeApplyButton(card);
+    if(card.dataset.vjaVacancyId&&card.dataset.vjaVacancyId!==vacancy.vacancyId){
+      card.querySelectorAll('.'+BUTTON_CLASS+',.'+ANALYSIS_CLASS+',.vja-card-fit-badge,.vja-card-calls-chip,.vja-intel-feedback-wrap').forEach(el=>el.remove());
+      for(const key of ['vjaMemoryRestored','vjaIntelSeen','vjaCallStatus','vjaState'])delete card.dataset[key];
+      card.classList.remove(CARD_CLASS,'vja-intel-hidden');
+    }
     pinnedByCard.set(card,vacancy);card.dataset.vjaVacancyId=vacancy.vacancyId;
     let apply=card.querySelector('.'+BUTTON_CLASS);
     if(!apply){
@@ -424,12 +434,13 @@
     if(card.dataset.vjaMemoryRestored!=='1')void restoreCardState(card,vacancy,apply,analysis);
   }
   function scanCards(){
-    if(!isListPage())return;
+    if(!isListPage()){dispatchEvent(new CustomEvent('vja-hh-cards-scanned'));return;}
     installStyle();
     const candidates=new Set();
     for(const link of document.querySelectorAll('a[href*="/vacancy/"]')){const card=cardFor(link);if(card)candidates.add(card);}
     for(const native of document.querySelectorAll('button,a,[role="button"]'))if(visible(native)&&H.isApplyLabel(text(native))){const card=cardFor(native);if(card)candidates.add(card);}
-    for(const card of candidates)ensureCardButton(card);
+    for(const card of candidates)if(!S||S.onActiveSurface(card))ensureCardButton(card);
+    dispatchEvent(new CustomEvent('vja-hh-cards-scanned'));
   }
   document.addEventListener('click',event=>{
     if(!event.isTrusted||!isListPage())return;
@@ -442,10 +453,15 @@
     const preparePromise=request('quick-list-prepare',{vacancy});
     setTimeout(()=>void run(target,card,vacancy,preparePromise,{userInitiatedSubmit:true}),0);
   },true);
-  const observer=new MutationObserver(()=>{clearTimeout(observer._t);observer._t=setTimeout(scanCards,90);});
-  observer.observe(document.documentElement,{childList:true,subtree:true});
+  let scanTimer=null;
+  const scheduleScan=()=>{if(scanTimer!==null)return;scanTimer=setTimeout(()=>{scanTimer=null;scanCards();},90);};
+  const observer=new MutationObserver(changes=>{if(!S||S.meaningfulMutations(changes))scheduleScan();});
+  observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeOldValue:true,attributeFilter:['href','data-vacancy-id','data-qa','hidden','aria-hidden','aria-selected','aria-pressed','class']});
+  // History.pushState runs in HH's isolated page world; poll only the URL, not the DOM.
+  let lastUrl=location.href;
+  setInterval(()=>{if(location.href!==lastUrl){lastUrl=location.href;scheduleScan();}},600);
   addEventListener('popstate',()=>setTimeout(scanCards,80));
   addEventListener('pageshow',()=>setTimeout(scanCards,80));
   scanCards();setTimeout(scanCards,600);setTimeout(scanCards,1800);
-  root.vjaHhListQuickApplyRuntime={extractVacancy,run,findCard,scanCards,quickApplyCard,analyzeCardCalls,selectedVacancy:()=>selected?.vacancy||null,selectedCard:()=>selected?.card?.isConnected?selected.card:null};
+  root.vjaHhListQuickApplyRuntime={isListPage,extractVacancy,run,findCard,scanCards,quickApplyCard,analyzeCardCalls,selectedVacancy:()=>selected?.vacancy||null,selectedCard:()=>selected?.card?.isConnected?selected.card:null};
 })(globalThis);

@@ -69,3 +69,9 @@ Avito не использует HH auto-submit scripts и не получает 
 ## Avito chat-send fallback hotfix · 7 октября 2026
 
 Добавлена явная кнопка **«Отправить в чат»** в fallback-окне подготовленного Avito-письма. Это закрывает сценарий, когда письмо уже создано, но текущий DOM Avito не позволил первой автоматической попытке найти или открыть native **«Написать»**. Кнопка сохраняет отредактированный текст, повторно связывается с точной вакансией, открывает matching chat, заполняет composer, нажимает native send и закрывает окно после подтверждения. Если exact chat уже открыт, используется он. Ошибка не скрывается: окно остаётся доступным для повторной попытки или копирования.
+
+## RC3 HH Feeds · homepage recommendations
+
+Base: AVITO-CHAT-SEND-HOTFIX. Added card-driven list detection for the HH homepage and its recommendation collections, including headhunter.kg. The existing batch, Fit/Calls, single-card analysis and user-initiated apply-with-letter paths are reused. Native hidden panels are excluded; late cards, DOM recycling and route changes are handled without broadening submit permissions. Avito, letter generation and private profile/CV files are unchanged.
+
+[Behavior](HH_FEEDS.md) · [Current-build verification](HH_FEEDS_TEST_REPORT.md). This remains RC3 / not live-validated.

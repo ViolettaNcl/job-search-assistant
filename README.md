@@ -9,11 +9,11 @@
 
 [![Release](https://img.shields.io/badge/release-6.0.0_RC3-6d5dfc?style=for-the-badge)](docs/RELEASE_NOTES_6.0.0.md)
 [![Chrome](https://img.shields.io/badge/Chrome-Manifest_V3-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](ARCHITECTURE.md)
-[![Node tests](https://img.shields.io/badge/Node_tests-388%2F388-22c55e?style=for-the-badge)](docs/TEST_REPORT_6.0.0.md)
-[![Python tests](https://img.shields.io/badge/Python_tests-34%2F34-22c55e?style=for-the-badge&logo=python&logoColor=white)](docs/TEST_REPORT_6.0.0.md)
+[![Node tests](https://img.shields.io/badge/Node_tests-400%2F400-22c55e?style=for-the-badge)](docs/HH_FEEDS_TEST_REPORT.md)
+[![Python tests](https://img.shields.io/badge/Python_tests-34_tests-22c55e?style=for-the-badge&logo=python&logoColor=white)](docs/HH_FEEDS_TEST_REPORT.md)
 [![Status](https://img.shields.io/badge/status-Release_Candidate-f59e0b?style=for-the-badge)](docs/LIVE_ACCEPTANCE_6.0.0.md)
 
-**[English](#english)** · **[Русский](#русский)** · [Architecture](ARCHITECTURE.md) · [Docs](docs/README.md) · [Testing](docs/TEST_REPORT_6.0.0.md) · [Privacy](docs/PRIVACY_AND_DATA.md)
+**[English](#english)** · **[Русский](#русский)** · [Architecture](ARCHITECTURE.md) · [Docs](docs/README.md) · [Testing](docs/HH_FEEDS_TEST_REPORT.md) · [Privacy](docs/PRIVACY_AND_DATA.md)
 
 </div>
 
@@ -23,6 +23,10 @@
 ---
 
 # English
+
+## HH homepage collections
+
+The **For you / Near home / Part-time / Shift work / Remote work** feeds now use the same card Analysis, Match, Calls and **Apply + letter** flow as search. **Analyze page** processes loaded cards in the active collection; it does not send applications or automatically traverse every page. See [feed behavior and boundaries](docs/HH_FEEDS.md).
 
 ## What this project is
 
@@ -184,17 +188,17 @@ The public GitHub package is designed to exclude private CV/profile/runtime data
 
 | Check | RC3 result | Meaning |
 |---|---:|---|
-| Node test suite | **388 / 388** | JS unit/integration coverage with controlled dependencies |
-| Python suite | **34 / 34** | ML/ranking/provenance, hygiene, manifests and tooling |
+| Node test suite | **400 / 400** | JS unit/integration coverage with controlled dependencies |
+| Python suite | **34 tests** | FULL: 34 passed; source-only: 27 passed, 7 release-plan tests skipped |
 | Browser DOM suite | **102 / 102 assertions** | Chromium fixtures; not authenticated HH production traffic |
-| Control Center suite | **21 / 21 assertions** | UI/import/field/mobile checks with mocked browser services |
+| HH homepage/feeds suite | **30 / 30 assertions** | Dynamic collections, card identity, full analysis and one-click fixture submission |
 | Worker authorization | **19 / 19 assertions** | Mode, opt-in, origin, one-shot intent, Fit and risk gating |
 | Live authenticated HH critical path | **NOT LIVE VALIDATED** | Required before Final Production |
 | Habr application flow | **BETA / NOT LIVE VALIDATED** | Fixtures only |
 | Avito vacancy workflow | **19 / 19 fixture assertions · BETA** | Persistent controls, Fit/Calls, exact native chat, fill/send verification; no authenticated account |
 | Windows/.NET rebuild | **NOT RUN** | C# sources were not present in the supplied baseline |
 
-See the exact matrix in [TEST_REPORT_6.0.0.md](docs/TEST_REPORT_6.0.0.md) and the 52-point implementation matrix in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
+See the current matrix in [HH_FEEDS_TEST_REPORT.md](docs/HH_FEEDS_TEST_REPORT.md) and the 52-point implementation matrix in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
 ## Quick start
 
@@ -209,7 +213,7 @@ See the exact matrix in [TEST_REPORT_6.0.0.md](docs/TEST_REPORT_6.0.0.md) and th
 
 ### Updating an existing installation
 
-Back up first. Replace the extension source in the **same directory** used by Chrome, then click **Reload** on the existing extension card. Avoid deleting and reinstalling the extension unless you intentionally want a new extension storage scope.
+Back up first. Replace the extension source in the **same directory** used by Chrome, then click **Reload** on the existing extension card. Then reload already-open HH tabs so they receive the new content scripts. Avoid deleting and reinstalling the extension unless you intentionally want a new extension storage scope.
 
 ## Avito Vacancies BETA
 
@@ -251,7 +255,7 @@ Repository packages must not include release ZIPs, private runtime data, secrets
 | Diagnostics | [DIAGNOSTICS.md](docs/DIAGNOSTICS.md) |
 | Supported providers | [SUPPORTED_SITES.md](SUPPORTED_SITES.md) |
 | Testing | [TESTING_GUIDE.md](TESTING_GUIDE.md) |
-| Exact RC3 test report | [TEST_REPORT_6.0.0.md](docs/TEST_REPORT_6.0.0.md) |
+| Exact RC3 test report | [TEST_REPORT_6.0.0.md](docs/HH_FEEDS_TEST_REPORT.md) |
 | Live acceptance | [LIVE_ACCEPTANCE_6.0.0.md](docs/LIVE_ACCEPTANCE_6.0.0.md) |
 | Release notes | [RELEASE_NOTES_6.0.0.md](docs/RELEASE_NOTES_6.0.0.md) |
 
@@ -270,6 +274,10 @@ Repository packages must not include release ZIPs, private runtime data, secrets
 ---
 
 # Русский
+
+## Подборки на главной HH
+
+**«Для вас», «У дома», «Подработка», «Вахта», «Удалённая работа»** получают те же Analysis, Match, статус звонков и **«Отклик + письмо»**, что и поиск. **Analyze page** анализирует загруженные карточки активной подборки, не отправляя отклики и не обходя все страницы автоматически. [Поведение и ограничения](docs/HH_FEEDS.md).
 
 ## Что это за проект
 
@@ -380,7 +388,7 @@ Autopilot должен остановиться на неизвестных об
 - **[docs/ML_ARCHITECTURE.md](docs/ML_ARCHITECTURE.md)** — модельный слой и границы ML.
 - **[docs/MODEL_EVALUATION.md](docs/MODEL_EVALUATION.md)** — метрики и promotion criteria.
 - **[SUPPORTED_SITES.md](SUPPORTED_SITES.md)** — статус провайдеров.
-- **[docs/TEST_REPORT_6.0.0.md](docs/TEST_REPORT_6.0.0.md)** — точные результаты тестов.
+- **[docs/TEST_REPORT_6.0.0.md](docs/HH_FEEDS_TEST_REPORT.md)** — точные результаты тестов.
 - **[IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)** — статус всех 52 требований.
 
 <details>

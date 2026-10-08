@@ -46,6 +46,7 @@ flowchart TB
 | Understand trust boundaries and modules | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) |
 | Install/update and operate the extension | [`USER_GUIDE.md`](USER_GUIDE.md) |
 | Understand features and limits | [`FEATURES.md`](FEATURES.md) |
+| Use HH homepage recommendations | [`HH_FEEDS.md`](HH_FEEDS.md) |
 | Use Avito Vacancies BETA | [`../browser-extension/AVITO_VACANCIES_BETA.md`](../browser-extension/AVITO_VACANCIES_BETA.md) |
 | Review privacy and personal-data handling | [`PRIVACY_AND_DATA.md`](PRIVACY_AND_DATA.md) |
 | Create or restore a backup | [`BACKUP_AND_RESTORE.md`](BACKUP_AND_RESTORE.md) |
@@ -76,3 +77,5 @@ Do not collapse these statuses into a single “works” label. Unsupported prov
 - Точный отчёт тестов: [`TEST_REPORT_6.0.0.md`](TEST_REPORT_6.0.0.md).
 - Живая приёмка HH: [`LIVE_ACCEPTANCE_6.0.0.md`](LIVE_ACCEPTANCE_6.0.0.md).
 - ML / Learning: [`ML_ARCHITECTURE.md`](ML_ARCHITECTURE.md), [`LEARNING_SYSTEM.md`](LEARNING_SYSTEM.md), [`MODEL_EVALUATION.md`](MODEL_EVALUATION.md).
+
+Текущая доработка главной HH: [HH_FEEDS.md](HH_FEEDS.md). Проверки этой сборки: [HH_FEEDS_TEST_REPORT.md](HH_FEEDS_TEST_REPORT.md).

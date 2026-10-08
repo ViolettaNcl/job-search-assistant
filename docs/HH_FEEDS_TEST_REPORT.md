@@ -1,0 +1,57 @@
+# HH Feeds · Verification report / Отчёт о проверках
+
+**Build:** `6.0.0 RC3 HH Feeds | Avito One-Click Message BETA`  
+**Baseline:** supplied `6.0.0-RC3-AVITO-CHAT-SEND-HOTFIX` archives.  
+**Scope:** HH homepage recommendation cards and lifecycle; no Avito/letter-generator/worker-policy changes.
+
+## Automated execution
+
+| Command | Result | Boundary |
+|---|---:|---|
+| `node --test browser-extension/*.test.js` | 400 passed; 0 failed; 0 skipped | 390 existing + 10 new list-surface tests |
+| `python -m unittest discover -s tests -p 'test_*.py' -v` (source package) | 27 passed, 7 skipped, 0 failed | Release-plan tests require FULL source-sync-manifest |
+| Same Python command from FULL | 34 passed; 0 failed; 0 skipped | Includes all seven release-plan tests |
+| `node tests/worker_authorization_rc3.cjs` | 19 assertions passed | Real JS worker; mocked Chrome/HTTP |
+| `node tests/product_worker_600.cjs` | 10 assertions passed | Real product worker; mocked Chrome/HTTP |
+| `python tests/browser_hh_feeds.py` | 30 assertions passed | New homepage/feed lifecycle suite |
+| `python tests/browser_batch_400.py` | 6 assertions passed | Existing HH batch analysis |
+| `python tests/browser_oneclick_user_intent_rc3.py` | 5 assertions passed | Existing explicit one-click flow |
+| `python tests/browser_cover_letter_retry_rc3.py` | 4 assertions passed | Existing bounded letter-send retries |
+| `python tests/browser_e2e.py` | 102 assertions passed | Complete existing browser integration suite |
+| `python tests/browser_avito_beta.py` | 19 assertions passed | Existing Avito/chat workflow |
+
+Browser assertions total **166**, across six completed scripts. Assertions are not independent real-world applications. The complete existing `browser_e2e.py` process finished successfully; its result was not inferred from partial logs. No authenticated external applications/messages were sent.
+
+## New feed coverage
+
+Late-rendered recommendations; exact per-card identity; individual full-description Analysis updating both Fit and Calls; page analysis without any native Apply clicks; controls on hover; explicit one-click native Apply → tailored letter → native Send; modal closure; worker authorization for the selected ID; switching each collection without reload; memory reuse for repeated jobs; lazy-added cards; native hidden-panel exclusion; reversible Fit filters; attribute-only tab changes; recycled DOM nodes and stale asynchronous results; removed-control recovery; direct-vacancy adapter preserved; route-only changes and Back; `hh.ru` and `headhunter.kg`; no uncaught JavaScript errors.
+
+## Environment and evidence limits
+
+Tests execute the manifest content-script bundle and actual worker JavaScript in Chromium with a controlled HTML fixture. The supplied screenshot informed the layout, not exact production selectors. The browser environment blocks navigation to HH; an initial navigation attempt failed before assertions. The completed regression uses a synthetic document and script-local URL injection, as in the existing batch suite. It is **not** an installed Manifest V3 extension test and **not** authenticated/live HH acceptance.
+
+The PowerShell publisher uses 5.1-compatible syntax and explicit exit-code checks; the script itself was **not executed in Windows PowerShell**. Downloading a portable test PowerShell runtime was unavailable because the container could not resolve the download host. Source-plan and Git semantics are covered by the FULL Python tests. Do not treat those as native PowerShell execution. No GitHub push was performed from this environment.
+
+No .NET rebuild or Windows-backend test was performed. That runtime is retained unchanged. Control Center-only and Habr-specific suites were not separately rerun for this change; no new results are asserted for them.
+
+## Release contract
+
+The existing automation limits, rules, profile/CV handling, contacts, grammatical gender, employment wording and Avito-specific modules are preserved. The shared site adapter gained only a HH-specific list check. Only the five HH runtime/manifest files listed in the final artifact audit are changed/added. No additional host permissions are requested. Hash lists provide integrity checks, not a digital signature.
+
+**Release status: RC3. Live validation pending.** Check the homepage in the user's installed extension before calling it live-validated.
+
+## Кратко по-русски
+
+На тестовых страницах проверены все шесть подборок, анализ полной вакансии, проценты/звонки, сохранение ID при перерисовке и полный путь «Отклик + письмо». Отдельно повторно прошли старый поиск HH, повторная отправка письма и Avito. Это проверка кода на контролируемом DOM, а не проверка в вашем авторизованном аккаунте. Публикация в GitHub не выполнялась; Windows PowerShell не запускался.
+
+## Artifact and source audit
+
+- JavaScript syntax: **186 files**, including `.js`, `.cjs`, `.mjs`; all parsed successfully.
+- Python compilation: **33 files**, all compiled; generated bytecode is excluded from the package.
+- Workflow YAML: **5 files**, parsed successfully.
+- Source-only files: **312**; path allowlist and SHA-256 metadata verified. Metadata excludes its own hash; the ZIP digest covers the complete archive.
+- FULL private-data and Windows backend: **378 original files** preserved byte-for-byte.
+- Public/GitHub and Standalone packages contain no CV documents, private bootstrap/profile folders, backend binaries, databases or the user's known Telegram/email values. This is a package audit, not a scan/removal of old Git history.
+- Avito script list/permissions are unchanged. All scripts in that list are byte-identical except shared `site-adapters.js`, whose only change is guarded by `provider === 'hh'`. The 19-assertion Avito suite passed after that addition.
+- Runtime changes: `hh-list-surfaces.js` (new), `hh-list-quick-apply.js`, `hh-list-intelligence.js`, `site-adapters.js`, `manifest.json`. Other runtime files match the supplied baseline.
+- FULL/Standalone runtime files match the public source. Source plan and internal/external SHA-256 lists are regenerated during packaging; ZIP CRC checks are required before delivery.
